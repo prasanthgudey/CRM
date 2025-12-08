@@ -1,6 +1,9 @@
-﻿namespace CRM.Server.Services.Interfaces
+﻿using CRM.Server.Models;
+
+namespace CRM.Server.Services.Interfaces
 {
-    public class JwtTokenService
+    public interface IJwtTokenService
     {
+        string GenerateToken(ApplicationUser user, IList<string> roles);
     }
 }

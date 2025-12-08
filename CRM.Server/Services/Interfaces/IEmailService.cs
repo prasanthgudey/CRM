@@ -1,6 +1,7 @@
 ﻿namespace CRM.Server.Services.Interfaces
 {
-    public class AuthService
+    public interface IEmailService
     {
+        Task SendAsync(string toEmail, string subject, string body);
     }
 }
