@@ -1,9 +1,8 @@
-﻿namespace CRM.Server.Models
+﻿namespace CRM.Server.DTOs
 {
-    public class Customer
+    public class CustomerResponseDto
     {
-        public Guid CustomerId {  get; set; }
-
+        public Guid CustomerId { get; set; }
         public string FullName { get; set; }
         public string Email { get; set; }
         public string Phone { get; set; }
