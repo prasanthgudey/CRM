@@ -1,0 +1,71 @@
+﻿@page "/admin/roles"
+@layout MainLayout
+
+@using CRM.Client.DTOs.Roles
+@using CRM.Client.Layout
+@using CRM.Client.Services.Roles
+@using Microsoft.AspNetCore.Components.Forms
+@inject RoleService RoleService
+
+<h3>Roles Management</h3>
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="alert alert-info mb-3">
+        @Message
+    </div>
+}
+
+<EditForm Model="RoleModel" OnValidSubmit="CreateRole">
+    <DataAnnotationsValidator />
+
+    <div class="row">
+        <div class="col-md-6">
+
+            <div class="form-group mb-3">
+                <label>Role Name</label>
+                <InputText class="form-control"
+                           @bind-Value="RoleModel.RoleName"
+                           placeholder="Enter role name" />
+            </div>
+
+            <button class="btn btn-success"
+                    disabled="@IsLoading">
+                @(IsLoading ? "Creating..." : "Create Role")
+            </button>
+
+        </div>
+    </div>
+</EditForm>
+
+@code {
+
+    private CreateRoleDto RoleModel { get; set; } = new CreateRoleDto();
+
+    private bool IsLoading { get; set; }
+
+    private string? Message { get; set; }
+
+    private async Task CreateRole()
+    {
+        IsLoading = true;
+        Message = null;
+
+        try
+        {
+            await RoleService.CreateRoleAsync(RoleModel);
+
+            Message = "Role created successfully.";
+
+            RoleModel = new CreateRoleDto();
+        }
+        catch
+        {
+            Message = "Failed to create role.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

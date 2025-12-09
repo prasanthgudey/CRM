@@ -1,0 +1,112 @@
+﻿@using CRM.Client.Config
+@using CRM.Client.Services.Auth
+@using CRM.Client.State
+@inject AppState AppState
+@inject FeatureFlags Features
+@inject NavigationManager Navigation
+
+<div class="sidebar-menu-wrapper">
+
+    <!-- ✅ COMMON DASHBOARD -->
+    <a href="" class="sidebar-link" @onclick="NavigateToDashboard" @onclick:preventDefault="true">
+        Dashboard
+    </a>
+
+    <!-- ✅ ADMIN SECTION -->
+    @if (IsAdmin())
+    {
+        <div class="sidebar-section-title">Administration</div>
+
+        @if (Features.EnableUserManagement)
+        {
+            <a href="" class="sidebar-link" @onclick="NavigateToUsers" @onclick:preventDefault="true">
+                Users
+            </a>
+        }
+
+        @if (Features.EnableRoleManagement)
+        {
+            <a href="" class="sidebar-link" @onclick="NavigateToRoles" @onclick:preventDefault="true">
+                Roles
+            </a>
+        }
+
+        @if (Features.EnableAuditLogs)
+        {
+            <a href="" class="sidebar-link" @onclick="NavigateToAuditLogs" @onclick:preventDefault="true">
+                Audit Logs
+            </a>
+        }
+    }
+
+    <!-- ✅ MANAGER SECTION -->
+    @if (IsManager())
+    {
+        <div class="sidebar-section-title">Manager</div>
+
+        <a href="" class="sidebar-link" @onclick="NavigateToManagerDashboard" @onclick:preventDefault="true">
+            Manager Dashboard
+        </a>
+    }
+
+    <!-- ✅ USER SECTION -->
+    @if (IsUser())
+    {
+        <div class="sidebar-section-title">User</div>
+
+        <a href="" class="sidebar-link" @onclick="NavigateToUserDashboard" @onclick:preventDefault="true">
+            My Dashboard
+        </a>
+    }
+
+</div>
+
+@code {
+
+    // ✅ ROLE CHECKS (NO INLINE LOGIC OUTSIDE)
+    private bool IsAdmin()
+    {
+        return AppState.Auth.Role == "Admin";
+    }
+
+    private bool IsManager()
+    {
+        return AppState.Auth.Role == "Manager";
+    }
+
+    private bool IsUser()
+    {
+        return AppState.Auth.Role == "User";
+    }
+
+    // ✅ NAVIGATION METHODS (NO INLINE LAMBDAS)
+    private void NavigateToDashboard()
+    {
+        Navigation.NavigateTo("/dashboard");
+    }
+
+    private void NavigateToUsers()
+    {
+        Navigation.NavigateTo("/admin/users");
+    }
+
+    private void NavigateToRoles()
+    {
+        Navigation.NavigateTo("/admin/roles");
+    }
+
+    private void NavigateToAuditLogs()
+    {
+        Navigation.NavigateTo("/admin/audit-logs");
+    }
+
+    private void NavigateToManagerDashboard()
+    {
+        Navigation.NavigateTo("/manager");
+    }
+
+    private void NavigateToUserDashboard()
+    {
+        Navigation.NavigateTo("/user");
+    }
+}

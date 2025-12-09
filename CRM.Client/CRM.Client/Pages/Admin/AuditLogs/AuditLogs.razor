@@ -1,0 +1,65 @@
+﻿@page "/admin/audit-logs"
+@layout MainLayout
+
+@using CRM.Client.DTOs.Audit
+@using CRM.Client.Layout
+@using CRM.Client.Services.Audit
+@inject AuditService AuditService
+
+<h3>Audit Logs</h3>
+
+@if (Logs == null)
+{
+    <p>Loading audit logs...</p>
+}
+else if (!Logs.Any())
+{
+    <p>No audit logs found.</p>
+}
+else
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th style="width:60px">#</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+                <th>User</th>
+                <th>IP</th>
+                <th style="width:160px">Timestamp</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var log in Logs)
+            {
+                <tr>
+                    <td>@log.Id</td>
+                    <td>@log.Action</td>
+                    <td>@(string.IsNullOrWhiteSpace(log.EntityName) ? "-" : log.EntityName)</td>
+                    <td class="text-muted">
+                        @(string.IsNullOrWhiteSpace(log.OldValue) ? "-" : log.OldValue)
+                    </td>
+                    <td class="fw-bold">
+                        @(string.IsNullOrWhiteSpace(log.NewValue) ? "-" : log.NewValue)
+                    </td>
+                    <td>@(string.IsNullOrWhiteSpace(log.UserId) ? "-" : log.UserId)</td>
+                    <td>@(string.IsNullOrWhiteSpace(log.IpAddress) ? "-" : log.IpAddress)</td>
+                    <td>@log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    private List<AuditLogResponseDto>? Logs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logs = await AuditService.GetAllLogsAsync();
+    }
+}

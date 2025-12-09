@@ -1,0 +1,123 @@
+﻿@page "/admin/users"
+@layout MainLayout
+
+@using CRM.Client.DTOs.Users
+@using CRM.Client.Layout
+@using CRM.Client.Services.Users
+@using CRM.Client.Components.Modals
+
+@inject UserService UserService
+
+<h3>Users Management</h3>
+
+<div class="mb-3">
+    <button class="btn btn-primary me-2"
+            @onclick="OpenInviteModal">
+        Invite User
+    </button>
+</div>
+
+@if (Users == null)
+{
+    <p>Loading users...</p>
+}
+else
+{
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th style="width:220px">Actions</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var user in Users)
+            {
+                <tr>
+                    <td>@user.FullName</td>
+                    <td>@user.Email</td>
+                    <td>@user.Role</td>
+                    <td>
+                        @(user.IsActive ? "Active" : "Deactivated")
+                    </td>
+                    <td>
+
+                        <button class="btn btn-warning btn-sm me-2"
+                                @onclick="() => OpenAssignRoleModal(user.Id)">
+                            Assign Role
+                        </button>
+
+                        @if (user.IsActive)
+                        {
+                            <button class="btn btn-danger btn-sm"
+                                    @onclick="() => Deactivate(user.Id)">
+                                Deactivate
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- ✅ INVITE USER MODAL -->
+<InviteUserModal IsOpen="@IsInviteOpen"
+                 OnClose="CloseInviteModal" />
+
+<!-- ✅ ASSIGN ROLE MODAL -->
+<AssignRoleModal IsOpen="@IsAssignRoleOpen"
+                 UserId="@SelectedUserId"
+                 OnClose="CloseAssignRoleModal" />
+
+@code {
+
+    private List<UserResponseDto>? Users;
+
+    private bool IsInviteOpen;
+    private bool IsAssignRoleOpen;
+
+    private string? SelectedUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ Invite Modal
+    private void OpenInviteModal()
+    {
+        IsInviteOpen = true;
+    }
+
+    private async Task CloseInviteModal(bool _)
+    {
+        IsInviteOpen = false;
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ Assign Role Modal
+    private void OpenAssignRoleModal(string userId)
+    {
+        SelectedUserId = userId;
+        IsAssignRoleOpen = true;
+    }
+
+    private async Task CloseAssignRoleModal(bool _)
+    {
+        IsAssignRoleOpen = false;
+        SelectedUserId = null;
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ Deactivate
+    private async Task Deactivate(string userId)
+    {
+        await UserService.DeactivateUserAsync(userId);
+        Users = await UserService.GetAllUsersAsync();
+    }
+}

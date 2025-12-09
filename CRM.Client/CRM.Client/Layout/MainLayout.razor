@@ -1,0 +1,38 @@
+﻿@inherits LayoutComponentBase
+
+<div class="crm-app-container">
+
+    <!-- ✅ SIDEBAR -->
+    <aside class="crm-sidebar">
+        <div class="sidebar-header">
+            <img src="/images/logo.svg" class="sidebar-logo" />
+            <span class="sidebar-title">CRM System</span>
+        </div>
+
+        <nav class="sidebar-menu">
+            <!-- Navigation will be rendered via Sidebar component later -->
+            <slot name="sidebar"></slot>
+        </nav>
+    </aside>
+
+    <!-- ✅ MAIN CONTENT AREA -->
+    <div class="crm-main">
+
+        <!-- ✅ TOPBAR -->
+        <header class="crm-topbar">
+            <div class="topbar-left">
+                <slot name="breadcrumbs"></slot>
+            </div>
+
+            <div class="topbar-right">
+                <slot name="topbar"></slot>
+            </div>
+        </header>
+
+        <!-- ✅ PAGE CONTENT -->
+        <main class="crm-content">
+            @Body
+        </main>
+
+    </div>
+</div>

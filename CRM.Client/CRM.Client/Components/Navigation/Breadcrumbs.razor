@@ -1,0 +1,26 @@
+﻿@inject NavigationManager Navigation
+
+<div class="breadcrumb-container">
+    <span class="breadcrumb-text">
+        @GetBreadcrumb()
+    </span>
+</div>
+
+@code {
+
+    private string GetBreadcrumb()
+    {
+        var uri = Navigation.Uri.ToLower();
+
+        if (uri.Contains("admin/users")) return "Admin / Users";
+        if (uri.Contains("admin/roles")) return "Admin / Roles";
+        if (uri.Contains("admin/audit-logs")) return "Admin / Audit Logs";
+
+        if (uri.Contains("/manager")) return "Manager Dashboard";
+        if (uri.Contains("/user")) return "User Dashboard";
+
+        if (uri.Contains("/dashboard")) return "Dashboard";
+
+        return "Home";
+    }
+}

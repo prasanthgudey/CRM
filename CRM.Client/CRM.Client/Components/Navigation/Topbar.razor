@@ -1,0 +1,43 @@
+﻿@using CRM.Client.Services.Auth
+@using CRM.Client.State
+@inject AuthService AuthService
+@inject AppState AppState
+@inject NavigationManager Navigation
+
+<div class="topbar-container">
+
+    <div class="topbar-user-info">
+        <img src="/images/avatar.png" class="topbar-avatar" />
+
+        <div class="topbar-user-details">
+            <div class="topbar-username">
+                @GetUserEmail()
+            </div>
+            <div class="topbar-role">
+                @AppState.Auth.Role
+            </div>
+        </div>
+    </div>
+
+    <button class="topbar-logout-btn" @onclick="Logout">
+        Logout
+    </button>
+
+</div>
+
+@code {
+
+    private string GetUserEmail()
+    {
+        var claim = AppState.Auth.User?
+            .Claims.FirstOrDefault(c => c.Type.Contains("email"));
+
+        return claim?.Value ?? "Unknown";
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", true);
+    }
+}

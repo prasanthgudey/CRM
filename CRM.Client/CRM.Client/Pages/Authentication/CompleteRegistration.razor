@@ -1,0 +1,115 @@
+﻿@page "/complete-registration"
+@layout AuthLayout
+
+@using CRM.Client.DTOs.Auth
+@using CRM.Client.Layout
+@using CRM.Client.Services.Auth
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.WebUtilities
+
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<h3 class="auth-title">Complete Registration</h3>
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="auth-info">
+        @Message
+    </div>
+}
+
+@if (!IsCompleted)
+{
+    <EditForm Model="RegisterModel" OnValidSubmit="HandleRegistration">
+        <DataAnnotationsValidator />
+
+        <div class="form-group">
+            <label>Email</label>
+            <InputText class="form-control"
+                       @bind-Value="RegisterModel.Email" />
+        </div>
+
+        <div class="form-group">
+            <label>Password</label>
+            <InputText type="password"
+                       class="form-control"
+                       @bind-Value="RegisterModel.Password" />
+        </div>
+
+        <button class="btn btn-success w-100"
+                disabled="@IsLoading">
+            @GetButtonText()
+        </button>
+    </EditForm>
+}
+
+@code {
+
+    private CompleteRegistrationDto RegisterModel { get; set; } = new CompleteRegistrationDto();
+
+    private bool IsLoading { get; set; }
+
+    private bool IsCompleted { get; set; }
+
+    private string? Message { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+
+        // ✅ Correct usage of static QueryHelpers (NO INJECTION)
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.ContainsKey("token"))
+        {
+            RegisterModel.Token = query["token"];
+        }
+        else
+        {
+            Message = "Invalid registration link.";
+            IsCompleted = true;
+        }
+    }
+
+    private async Task HandleRegistration()
+    {
+        IsLoading = true;
+        Message = null;
+
+        try
+        {
+            var response = await AuthService.CompleteRegistrationAsync(RegisterModel);
+
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                Message = "Registration failed.";
+                return;
+            }
+
+            Message = response;
+            IsCompleted = true;
+
+            NavigateToLoginAfterDelay();
+        }
+        catch
+        {
+            Message = "Something went wrong. Please try again.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async void NavigateToLoginAfterDelay()
+    {
+        await Task.Delay(2000);
+        Navigation.NavigateTo("/login", true);
+    }
+
+    private string GetButtonText()
+    {
+        return IsLoading ? "Processing..." : "Complete Registration";
+    }
+}

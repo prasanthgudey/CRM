@@ -25,7 +25,6 @@ builder.Services.AddControllers();
 
 // ✅ Swagger with JWT Support
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -34,7 +33,6 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1"
     });
 
-    // ✅ Add JWT Bearer Authorization
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -63,17 +61,30 @@ builder.Services.AddSwaggerGen(c =>
 
 
 
+// =========================
+// ✅ ✅ ✅ CORS CONFIG (MUST BE BEFORE BUILD)
+// =========================
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("LocalDev", policy =>
+    {
+        policy.WithOrigins("https://localhost:5128")   // ✅ Blazor Client URL
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+
 
 // =========================
 // ✅ DATABASE CONFIGURATION (WITH RETRY ✅)
 // =========================
-
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         sqlOptions =>
         {
-            // ✅ FIX FOR YOUR TRANSIENT FAILURE ERROR
             sqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 5,
                 maxRetryDelay: TimeSpan.FromSeconds(10),
@@ -88,7 +99,6 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // =========================
 // ✅ IDENTITY + ROLES CONFIG
 // =========================
-
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.Password.RequiredLength = 8;
@@ -107,7 +117,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 // =========================
 // ✅ JWT SETTINGS BINDING
 // =========================
-
 builder.Services.Configure<JwtSettings>(
     builder.Configuration.GetSection("JwtSettings"));
 
@@ -122,7 +131,6 @@ builder.Services.Configure<MfaSettings>(
 // =========================
 // ✅ JWT AUTHENTICATION
 // =========================
-
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 
 builder.Services.AddAuthentication(options =>
@@ -174,7 +182,6 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 // =========================
 // ✅ BUILD APPLICATION
 // =========================
-
 var app = builder.Build();
 
 
@@ -182,7 +189,6 @@ var app = builder.Build();
 // =========================
 // ✅ ROLE SEEDING (Admin, Manager, User)
 // =========================
-
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -191,7 +197,6 @@ using (var scope = app.Services.CreateScope())
     await RoleSeedData.SeedRolesAsync(roleManager);
     await AdminSeedData.SeedAdminUserAsync(userManager);
 }
-
 
 
 
@@ -207,7 +212,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ✅ Global exception handling (top priority)
+// ✅ ✅ ✅ CORS MUST BE HERE
+app.UseCors("LocalDev");
+
+// ✅ Global exception handling
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // ✅ Audit logging middleware
