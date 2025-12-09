@@ -85,6 +85,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 
 
+
 // =========================
 // ✅ IDENTITY + ROLES CONFIG
 // =========================
@@ -161,6 +162,8 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IAuditRepository, AuditRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+
 
 // ✅ Services
 builder.Services.AddScoped<IUserService, UserService>();
@@ -168,6 +171,7 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 
 
