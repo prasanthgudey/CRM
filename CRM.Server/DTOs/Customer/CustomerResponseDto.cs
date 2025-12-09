@@ -7,7 +7,7 @@ namespace CRM.Server.DTOs
     {
         public Guid CustomerId { get; set; }
         public string FirstName { get; set; }
-        public string Surname { get; set; }
+        public string SurName { get; set; }
         public string? MiddleName { get; set; } //optional
         public string? PreferredName { get; set; } //optional
         public string Email { get; set; }

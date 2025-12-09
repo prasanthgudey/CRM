@@ -12,7 +12,7 @@ namespace CRM.Server.DTOs
 
         [Required(ErrorMessage = "Surname is required")]
         [StringLength(100, ErrorMessage = "Surname can't exceed 100 characters")]
-        public string Surname { get; set; }
+        public string SurName { get; set; }
 
         public string? MiddleName { get; set; } //optional
         public string? PreferredName { get; set; } //optional

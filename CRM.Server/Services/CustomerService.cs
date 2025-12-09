@@ -18,7 +18,7 @@ namespace CRM.Server.Services
                 CustomerId = c.CustomerId,
                 //FullName = c.FullName,
                 FirstName = c.FirstName,
-                Surname = c.Surname,
+                SurName = c.SurName,
                 MiddleName = c.MiddleName,
                 PreferredName = c.PreferredName,
                 Email = c.Email,
@@ -37,7 +37,7 @@ namespace CRM.Server.Services
                 CustomerId = c.CustomerId,
                 //FullName = c.FullName,
                 FirstName = c.FirstName,
-                Surname = c.Surname,
+                SurName = c.SurName,
                 MiddleName = c.MiddleName,
                 PreferredName = c.PreferredName,
                 Email = c.Email,
@@ -55,7 +55,7 @@ namespace CRM.Server.Services
                 CustomerId = Guid.NewGuid(),
                 //FullName = dto.FullName,
                 FirstName = dto.FirstName,
-                Surname = dto.Surname,
+                SurName = dto.SurName,
                 MiddleName = dto.MiddleName,
                 PreferredName = dto.PreferredName,
                 Email = dto.Email,
@@ -71,7 +71,7 @@ namespace CRM.Server.Services
                 CustomerId = c.CustomerId,
                 //FullName = c.FullName,
                 FirstName = c.FirstName,
-                Surname = c.Surname,
+                SurName = c.SurName,
                 MiddleName = c.MiddleName,
                 PreferredName = c.PreferredName,
                 Email = c.Email,
@@ -88,7 +88,7 @@ namespace CRM.Server.Services
             if (c is null) return false;
             //c.FullName = dto.FullName;
             c.FirstName = dto.FirstName;
-            c.Surname = dto.Surname;
+            c.SurName = dto.SurName;
             c.MiddleName = dto.MiddleName;
             c.PreferredName = dto.PreferredName;
             c.Email = dto.Email;
@@ -114,7 +114,7 @@ namespace CRM.Server.Services
         {
             var customers = await _repo.GetAllAsync();
 
-            // Filter by name across FullName, MiddleName, PreferredName
+            // Filter by name across FullName, MiddleName, PreferredName, SurName
             if (!string.IsNullOrWhiteSpace(name))
             {
                 name = name.Trim();
@@ -122,6 +122,8 @@ namespace CRM.Server.Services
                     .Where(c =>
                         (!string.IsNullOrEmpty(c.FirstName) &&
                             c.FirstName.Contains(name, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrEmpty(c.SurName) &&
+                            c.SurName.Contains(name, StringComparison.OrdinalIgnoreCase))||
                         (!string.IsNullOrEmpty(c.MiddleName) &&
                             c.MiddleName.Contains(name, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.PreferredName) &&
@@ -166,6 +168,8 @@ namespace CRM.Server.Services
                             c.FirstName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.MiddleName) &&
                             c.MiddleName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrEmpty(c.SurName) &&
+                            c.SurName.Contains(search, StringComparison.OrdinalIgnoreCase))||
                         (!string.IsNullOrEmpty(c.PreferredName) &&
                             c.PreferredName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.Email) &&
@@ -182,6 +186,7 @@ namespace CRM.Server.Services
                 {
                     CustomerId = c.CustomerId,
                     FirstName = c.FirstName,
+                    SurName=c.SurName,
                     MiddleName = c.MiddleName,
                     PreferredName = c.PreferredName,
                     Email = c.Email,
