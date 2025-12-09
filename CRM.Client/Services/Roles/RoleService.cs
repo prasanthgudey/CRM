@@ -15,13 +15,19 @@ namespace CRM.Client.Services.Roles
         // ✅ CREATE ROLE
         public async Task CreateRoleAsync(CreateRoleDto dto)
         {
-            await _api.PostAsync<CreateRoleDto, object>("api/role/create", dto);
+            await _api.PostAsync<CreateRoleDto>(
+                "api/role/create", dto
+            );
         }
+
 
         // ✅ ASSIGN ROLE
         public async Task AssignRoleAsync(AssignRoleDto dto)
         {
-            await _api.PostAsync<AssignRoleDto, object>("api/role/assign", dto);
+            await _api.PostAsync<AssignRoleDto>(
+                "api/role/assign", dto
+            );
         }
+
     }
 }

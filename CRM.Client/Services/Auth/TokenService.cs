@@ -1,22 +1,43 @@
 ﻿using CRM.Client.State;
+using Microsoft.JSInterop;
 
 namespace CRM.Client.Services.Auth
 {
-    // ✅ USER-DEFINED: Token access abstraction
+    // ✅ USER-DEFINED: Token persistence + access layer
     public class TokenService
     {
+        private const string TOKEN_KEY = "authToken";
+
+        private readonly IJSRuntime _js;
         private readonly AppState _appState;
 
-        public TokenService(AppState appState)
+        public TokenService(IJSRuntime js, AppState appState)
         {
+            _js = js;
             _appState = appState;
         }
 
-        public string? GetToken()
+        // ✅ SAVE TOKEN to localStorage + memory
+        public async Task SaveTokenAsync(string token)
         {
-            return _appState.Auth.Token;
+            await _js.InvokeVoidAsync("localStorage.setItem", TOKEN_KEY, token);
+            _appState.Auth.SetAuthenticated(token, _appState.Auth.User!);
         }
 
+        // ✅ READ TOKEN from localStorage
+        public async Task<string?> GetTokenAsync()
+        {
+            return await _js.InvokeAsync<string?>("localStorage.getItem", TOKEN_KEY);
+        }
+
+        // ✅ CLEAR TOKEN everywhere
+        public async Task ClearAsync()
+        {
+            await _js.InvokeVoidAsync("localStorage.removeItem", TOKEN_KEY);
+            _appState.Auth.Clear();
+        }
+
+        // ✅ SAFE Auth check
         public bool IsAuthenticated()
         {
             return _appState.Auth.IsAuthenticated;
@@ -25,11 +46,6 @@ namespace CRM.Client.Services.Auth
         public string? GetRole()
         {
             return _appState.Auth.Role;
-        }
-
-        public void Clear()
-        {
-            _appState.Auth.Clear();
         }
     }
 }

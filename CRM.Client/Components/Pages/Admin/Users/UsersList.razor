@@ -45,7 +45,6 @@ else
                         @(user.IsActive ? "Active" : "Deactivated")
                     </td>
                     <td>
-
                         <button class="btn btn-warning btn-sm me-2"
                                 @onclick="() => OpenAssignRoleModal(user.Id)">
                             Assign Role
@@ -83,9 +82,14 @@ else
 
     private string? SelectedUserId;
 
-    protected override async Task OnInitializedAsync()
+    // ✅ ✅ ✅ PRERENDER-SAFE LIFECYCLE METHOD
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Users = await UserService.GetAllUsersAsync();
+        if (firstRender)
+        {
+            Users = await UserService.GetAllUsersAsync();
+            StateHasChanged(); // 🔴 VERY IMPORTANT
+        }
     }
 
     // ✅ Invite Modal

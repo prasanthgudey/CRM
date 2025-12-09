@@ -3,6 +3,9 @@ using System.Text;
 using System.Text.Json;
 using CRM.Client.Config;
 using CRM.Client.State;
+using CRM.Client.Services.Auth;
+using CRM.Client.Security;
+using Microsoft.Extensions.Options;
 
 namespace CRM.Client.Services.Http
 {
@@ -12,15 +15,21 @@ namespace CRM.Client.Services.Http
         private readonly HttpClient _httpClient;
         private readonly ApiSettings _apiSettings;
         private readonly AppState _appState;
+        private readonly TokenService _tokenService;
+        private readonly JwtAuthStateProvider _jwtAuthStateProvider;
 
         public ApiClientService(
             HttpClient httpClient,
-            ApiSettings apiSettings,
-            AppState appState)
+            IOptions<ApiSettings> apiOptions,
+            AppState appState,
+            TokenService tokenService,
+            JwtAuthStateProvider jwtAuthStateProvider)
         {
             _httpClient = httpClient;
-            _apiSettings = apiSettings;
+            _apiSettings = apiOptions.Value;
             _appState = appState;
+            _tokenService = tokenService;
+            _jwtAuthStateProvider = jwtAuthStateProvider;
 
             _httpClient.BaseAddress = new Uri(_apiSettings.BaseUrl);
             _httpClient.Timeout = TimeSpan.FromSeconds(_apiSettings.TimeoutSeconds);
@@ -28,12 +37,27 @@ namespace CRM.Client.Services.Http
             Console.WriteLine($"[HTTP INIT] BaseUrl = {_httpClient.BaseAddress}");
         }
 
-        // ✅ USER-DEFINED: Prepares Authorization header
-        private void AttachToken()
+        // ✅ RESTORE + ATTACH JWT
+        private async Task AttachTokenAsync()
         {
             _httpClient.DefaultRequestHeaders.Authorization = null;
 
-            if (_appState.Auth.IsAuthenticated && !string.IsNullOrWhiteSpace(_appState.Auth.Token))
+            if (_appState.Auth == null || !_appState.Auth.IsAuthenticated)
+            {
+                var token = await _tokenService.GetTokenAsync();
+
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    var user = _jwtAuthStateProvider.BuildClaimsPrincipal(token);
+                    _appState.Auth.SetAuthenticated(token, user);
+
+                    Console.WriteLine("[HTTP] Auth restored from localStorage");
+                }
+            }
+
+            if (_appState.Auth != null &&
+                _appState.Auth.IsAuthenticated &&
+                !string.IsNullOrWhiteSpace(_appState.Auth.Token))
             {
                 _httpClient.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", _appState.Auth.Token);
@@ -46,10 +70,12 @@ namespace CRM.Client.Services.Http
             }
         }
 
-        // ✅ GENERIC GET
+        // ✅ =========================
+        // ✅ GENERIC GET (RETURNS DATA)
+        // ✅ =========================
         public async Task<T?> GetAsync<T>(string endpoint)
         {
-            AttachToken();
+            await AttachTokenAsync();
 
             Console.WriteLine($"[GET] {endpoint}");
 
@@ -66,10 +92,12 @@ namespace CRM.Client.Services.Http
             return JsonSerializer.Deserialize<T>(content, JsonOptions());
         }
 
-        // ✅ ✅ ✅ FIXED GENERIC POST (LOGIN SAFE)
+        // ✅ =====================================
+        // ✅ GENERIC POST (RETURNS DATA — LOGIN)
+        // ✅ =====================================
         public async Task<TResponse?> PostAsync<TRequest, TResponse>(string endpoint, TRequest data)
         {
-            AttachToken();
+            await AttachTokenAsync();
 
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -84,20 +112,46 @@ namespace CRM.Client.Services.Http
             var responseJson = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"[POST RESPONSE] {responseJson}");
 
-            // ✅ IMPORTANT FIX: Do NOT crash on 401/403
             if (!response.IsSuccessStatusCode)
-            {
-                Console.WriteLine("[POST] Request failed, returning null safely.");
                 return default;
-            }
+
+            // ✅ CRITICAL SAFETY CHECK (prevents ghost failures)
+            if (string.IsNullOrWhiteSpace(responseJson))
+                return default;
 
             return JsonSerializer.Deserialize<TResponse>(responseJson, JsonOptions());
         }
 
-        // ✅ GENERIC PUT
+        // ✅ ======================================
+        // ✅ GENERIC POST (NO DATA — ACTION ONLY)
+        // ✅ ======================================
+        public async Task PostAsync<TRequest>(string endpoint, TRequest data)
+        {
+            await AttachTokenAsync();
+
+            var json = JsonSerializer.Serialize(data, JsonOptions());
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[POST] {endpoint}");
+            Console.WriteLine($"[POST BODY] {json}");
+
+            var response = await _httpClient.PostAsync(endpoint, content);
+
+            Console.WriteLine($"[POST STATUS] {(int)response.StatusCode} {response.StatusCode}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception(error);
+            }
+        }
+
+        // ✅ =========================
+        // ✅ GENERIC PUT (SAFE)
+        // ✅ =========================
         public async Task<TResponse?> PutAsync<TRequest, TResponse>(string endpoint, TRequest data)
         {
-            AttachToken();
+            await AttachTokenAsync();
 
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -109,18 +163,26 @@ namespace CRM.Client.Services.Http
 
             Console.WriteLine($"[PUT STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+                return default;
 
             var responseJson = await response.Content.ReadAsStringAsync();
+
             Console.WriteLine($"[PUT RESPONSE] {responseJson}");
+
+            // ✅ SAFETY CHECK
+            if (string.IsNullOrWhiteSpace(responseJson))
+                return default;
 
             return JsonSerializer.Deserialize<TResponse>(responseJson, JsonOptions());
         }
 
-        // ✅ GENERIC DELETE
+        // ✅ =========================
+        // ✅ GENERIC DELETE (NO DATA)
+        // ✅ =========================
         public async Task DeleteAsync(string endpoint)
         {
-            AttachToken();
+            await AttachTokenAsync();
 
             Console.WriteLine($"[DELETE] {endpoint}");
 

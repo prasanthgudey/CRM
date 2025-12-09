@@ -25,7 +25,9 @@ namespace CRM.Client.Security
 
             if (string.IsNullOrWhiteSpace(token))
             {
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return new AuthenticationState(
+                    new ClaimsPrincipal(new ClaimsIdentity())
+                );
             }
 
             var identity = new ClaimsIdentity(ParseClaims(token), "jwt");
@@ -57,6 +59,13 @@ namespace CRM.Client.Security
             NotifyAuthenticationStateChanged(
                 Task.FromResult(new AuthenticationState(anonymous))
             );
+        }
+
+        // ✅ USER-DEFINED: Used by ApiClientService to rebuild ClaimsPrincipal from token
+        public ClaimsPrincipal BuildClaimsPrincipal(string token)
+        {
+            var identity = new ClaimsIdentity(ParseClaims(token), "jwt");
+            return new ClaimsPrincipal(identity);
         }
 
         // ✅ USER-DEFINED: Decodes JWT and extracts claims

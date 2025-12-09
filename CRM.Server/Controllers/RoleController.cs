@@ -28,8 +28,16 @@ namespace CRM.Server.Controllers
         [HttpPost("assign")]
         public async Task<IActionResult> AssignRole(AssignRoleDto dto)
         {
-            await _roleService.AssignRoleAsync(dto.UserId, dto.RoleName);
-            return Ok("Role assigned successfully");
+            try
+            {
+                await _roleService.AssignRoleAsync(dto.UserId, dto.RoleName);
+                return Ok("Role assigned successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
+
     }
 }
