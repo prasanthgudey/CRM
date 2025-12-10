@@ -4,6 +4,9 @@ using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using CRM.Server.DTOs.Auth;
+//using Microsoft.AspNetCore.Identity;
+using System.Text.Encodings.Web;
 
 namespace CRM.Server.Services
 {
@@ -84,7 +87,8 @@ namespace CRM.Server.Services
                     FullName = user.FullName ?? "",
                     Email = user.Email ?? "",
                     IsActive = user.IsActive,
-                    Role = roles.FirstOrDefault() ?? ""
+                    Role = roles.FirstOrDefault() ?? "",
+                    TwoFactorEnabled = user.TwoFactorEnabled
                 });
             }
 
@@ -201,6 +205,87 @@ namespace CRM.Server.Services
         }
 
 
+
+        // ============================================================
+        // ✅ FORGOT PASSWORD
+        // ============================================================
+        public async Task ForgotPasswordAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+
+            // ✅ Security: Do not reveal if user exists
+            if (user == null)
+                return;
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            var resetLink =
+                $"{_config["Client:Url"]}/reset-password?token={Uri.EscapeDataString(token)}&email={user.Email}";
+
+            await _emailService.SendAsync(
+                user.Email!,
+                "CRM Password Reset",
+                $"Click the link below to reset your password:\n\n{resetLink}"
+            );
+        }
+
+        // ============================================================
+        // ✅ RESET PASSWORD
+        // ============================================================
+        public async Task ResetPasswordAsync(string email, string token, string newPassword)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                throw new Exception("Invalid reset request");
+
+            var decodedToken = Uri.UnescapeDataString(token);
+
+            var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
+
+             if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+        }
+
+        // ============================================================
+        // ✅ CHANGE PASSWORD (LOGGED-IN USER)
+        // ============================================================
+        public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var result = await _userManager.ChangePasswordAsync(
+                user, currentPassword, newPassword);
+
+            if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+        }
+
+
+        // ============================================================
+        // ✅ GET USER BY ID (PROFILE)
+        // ============================================================
+        public async Task<UserResponseDto> GetUserByIdAsync(string userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                FullName = user.FullName ?? "",
+                Email = user.Email ?? "",
+                IsActive = user.IsActive,
+                Role = roles.FirstOrDefault() ?? "",
+                TwoFactorEnabled = user.TwoFactorEnabled
+            };
+        }
+
         // ============================================================
         // ✅ 5️⃣ FILTER USERS (BY ROLE & ACTIVE STATUS)
         // ============================================================
@@ -226,12 +311,81 @@ namespace CRM.Server.Services
                         FullName = user.FullName ?? "",
                         Email = user.Email ?? "",
                         IsActive = user.IsActive,
-                        Role = roles.FirstOrDefault() ?? ""
+                        Role = roles.FirstOrDefault() ?? "",
+                        TwoFactorEnabled = user.TwoFactorEnabled
                     });
                 }
             }
 
             return result;
         }
+        public async Task<EnableMfaResponseDto> EnableMfaAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            // ✅ RESET any existing key
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+
+            var key = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            var email = user.Email!;
+            var issuer = "CRM";
+
+            // ✅ STANDARD TOTP URI FORMAT
+            var qrCodeUri =
+                $"otpauth://totp/{UrlEncoder.Default.Encode(issuer)}:" +
+                $"{UrlEncoder.Default.Encode(email)}" +
+                $"?secret={key}&issuer={UrlEncoder.Default.Encode(issuer)}&digits=6";
+
+            return new EnableMfaResponseDto
+            {
+                SharedKey = key!,
+                QrCodeImageUrl = qrCodeUri
+            };
+        }
+
+        public async Task VerifyMfaAsync(string userId, string code)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                code);
+
+            if (!isValid)
+                throw new Exception("Invalid verification code");
+
+            user.TwoFactorEnabled = true;
+            await _userManager.UpdateAsync(user);
+        }
+
+        public async Task DisableMfaAsync(string userId, string code)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            // ✅ OTP MUST BE VERIFIED BEFORE DISABLING
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                code);
+
+            if (!isValid)
+                throw new Exception("Invalid verification code");
+
+            user.TwoFactorEnabled = false;
+            await _userManager.UpdateAsync(user);
+
+            // ✅ REMOVE SECRET
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+        }
+
+
     }
 }

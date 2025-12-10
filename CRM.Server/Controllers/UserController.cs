@@ -2,6 +2,7 @@
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
@@ -195,6 +196,40 @@ namespace CRM.Server.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+
+        // =====================================================
+        // ✅ GET USER BY ID (ADMIN / PROFILE VIEW)
+        // =====================================================
+        [HttpGet("{userId}")]
+        public async Task<IActionResult> GetUserById(string userId)
+        {
+            try
+            {
+                var user = await _userService.GetUserByIdAsync(userId);
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        // =====================================================
+        // ✅ GET MY PROFILE (LOGGED-IN USER)
+        // =====================================================
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+            var user = await _userService.GetUserByIdAsync(userId!);
+
+            return Ok(user);
+        }
+
 
         // =====================================================
         // ✅ FILTER USERS BY ROLE & ACTIVE STATUS

@@ -102,16 +102,27 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // =========================
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
+    // ✅ PASSWORD POLICY
     options.Password.RequiredLength = 8;
     options.Password.RequireUppercase = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireDigit = true;
     options.Password.RequireNonAlphanumeric = true;
 
+    // ✅ USER SETTINGS
     options.User.RequireUniqueEmail = true;
+
+    // ✅ SIGN-IN SETTINGS (CRITICAL FOR MFA)
+    options.SignIn.RequireConfirmedEmail = false;   // you are not using email confirmation
+    options.SignIn.RequireConfirmedPhoneNumber = false;
+
+    // ✅ MFA SETTINGS (VERY IMPORTANT)
+    options.Tokens.AuthenticatorTokenProvider = TokenOptions.DefaultAuthenticatorProvider;
+    options.Tokens.ProviderMap[TokenOptions.DefaultAuthenticatorProvider] =
+        new TokenProviderDescriptor(typeof(AuthenticatorTokenProvider<ApplicationUser>));
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders();
+.AddDefaultTokenProviders(); // ✅ REQUIRED for MFA
 
 
 
@@ -171,6 +182,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 
 
 // ✅ Services
@@ -180,8 +192,7 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
-
-
+builder.Services.AddScoped<ITaskService, TaskService>();
 
 // =========================
 // ✅ BUILD APPLICATION

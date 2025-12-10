@@ -4,6 +4,7 @@ using CRM.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CRM.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251210055505_FixTaskCreatedBy")]
+    partial class FixTaskCreatedBy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -245,6 +248,97 @@ namespace CRM.Server.Migrations
                     b.HasIndex("CustomerId");
 
                     b.ToTable("Tasks");
+
+                    b.HasData(
+                        new
+                        {
+                            TaskId = new Guid("7d44afb1-7ac7-4e0a-9d5f-3bb31a1bc1a5"),
+                            CreatedAt = new DateTime(2025, 12, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedByUserId = "a3083067-9822-4cb2-8c8a-dcb5eb6a6c10",
+                            CustomerId = new Guid("d2e2e38b-6a44-4b19-8c4a-4f8fd3869c35"),
+                            Description = "Understand client needs and expectations",
+                            DueDate = new DateTime(2025, 12, 5, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsRecurring = false,
+                            Priority = 3,
+                            RecurrenceType = 0,
+                            State = 1,
+                            Title = "Initial discovery call"
+                        },
+                        new
+                        {
+                            TaskId = new Guid("3b526d93-1db3-48ac-aef8-d1c28436e2a7"),
+                            CreatedAt = new DateTime(2025, 12, 2, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedByUserId = "a3083067-9822-4cb2-8c8a-dcb5eb6a6c11",
+                            CustomerId = new Guid("d2e2e38b-6a44-4b19-8c4a-4f8fd3869c36"),
+                            Description = "Send pricing and proposal document",
+                            DueDate = new DateTime(2025, 12, 6, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsRecurring = false,
+                            Priority = 2,
+                            RecurrenceType = 0,
+                            State = 2,
+                            Title = "Prepare quotation"
+                        },
+                        new
+                        {
+                            TaskId = new Guid("f72bf8d4-fe53-4d5e-bc7a-c7a0bdf9c3c4"),
+                            CompletedAt = new DateTime(2025, 12, 4, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedAt = new DateTime(2025, 12, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedByUserId = "a3083067-9822-4cb2-8c8a-dcb5eb6a6c13",
+                            CustomerId = new Guid("d2e2e38b-6a44-4b19-8c4a-4f8fd3869c37"),
+                            Description = "Confirm next meeting and timelines",
+                            DueDate = new DateTime(2025, 12, 4, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsRecurring = false,
+                            Priority = 1,
+                            RecurrenceType = 0,
+                            State = 3,
+                            Title = "Follow-up call"
+                        },
+                        new
+                        {
+                            TaskId = new Guid("f72bf8d4-fe53-4d5e-bc7a-c7a0bdf9c3c5"),
+                            CreatedAt = new DateTime(2025, 12, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedByUserId = "e64e41f7-b723-4801-a97a-0a2f5f8f8480",
+                            CustomerId = new Guid("d2e2e38b-6a44-4b19-8c4a-4f8fd3869c38"),
+                            Description = "Share final agreement via email",
+                            DueDate = new DateTime(2025, 12, 8, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsRecurring = false,
+                            Priority = 3,
+                            RecurrenceType = 0,
+                            State = 1,
+                            Title = "Send agreement"
+                        },
+                        new
+                        {
+                            TaskId = new Guid("f72bf8d4-fe53-4d5e-bc7a-c7a0bdf9c3c6"),
+                            CreatedAt = new DateTime(2025, 12, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedByUserId = "c5f6bcfa-c607-4a55-9d8d-e1f3cba797df",
+                            CustomerId = new Guid("d2e2e38b-6a44-4b19-8c4a-4f8fd3869c39"),
+                            Description = "Regular monthly feedback call",
+                            DueDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsRecurring = true,
+                            Priority = 2,
+                            RecurrenceEndDate = new DateTime(2026, 12, 31, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            RecurrenceInterval = 1,
+                            RecurrenceType = 3,
+                            State = 1,
+                            Title = "Monthly check-in"
+                        },
+                        new
+                        {
+                            TaskId = new Guid("f72bf8d4-fe53-4d5e-bc7a-c7a0bdf9c3c7"),
+                            CreatedAt = new DateTime(2025, 12, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            CreatedByUserId = "4a19b68c-6767-4bbd-93ee-2ea49ccd65f2",
+                            CustomerId = new Guid("d2e2e38b-6a44-4b19-8c4a-4f8fd3869c30"),
+                            Description = "Track service progress and issues",
+                            DueDate = new DateTime(2025, 12, 10, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsRecurring = true,
+                            Priority = 4,
+                            RecurrenceEndDate = new DateTime(2026, 6, 30, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            RecurrenceInterval = 1,
+                            RecurrenceType = 2,
+                            State = 2,
+                            Title = "Weekly support meeting"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

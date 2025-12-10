@@ -13,6 +13,18 @@ namespace CRM.Client.Services.Users
             _api = api;
         }
 
+        // ✅ GET MY PROFILE (logged-in user)
+        public async Task<UserResponseDto?> GetMyProfileAsync()
+        {
+            return await _api.GetAsync<UserResponseDto>("api/user/me");
+        }
+
+        // ✅ GET USER BY ID (admin / detail)
+        public async Task<UserResponseDto?> GetUserByIdAsync(string userId)
+        {
+            return await _api.GetAsync<UserResponseDto>($"api/user/{userId}");
+        }
+
         // ✅ GET ALL USERS
         public async Task<List<UserResponseDto>?> GetAllUsersAsync()
         {
@@ -48,6 +60,7 @@ namespace CRM.Client.Services.Users
         {
             await _api.PutAsync<object, object>($"api/user/activate/{userId}", new { });
         }
+
         // ✅ FILTER USERS
         public async Task<List<UserResponseDto>?> FilterUsersAsync(string? role, bool? isActive)
         {
