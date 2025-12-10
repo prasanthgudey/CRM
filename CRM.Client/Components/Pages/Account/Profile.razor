@@ -1,9 +1,13 @@
 ﻿@page "/profile"
+
 @layout MainLayout
 
 @using CRM.Client.DTOs.Users
+
 @using CRM.Client.Components.Layout
+
 @using CRM.Client.Services.Users
+
 @using CRM.Client.Components.Modals.ProfileModals
 
 @inject UserService UserService
@@ -11,12 +15,16 @@
 <h3>My Profile</h3>
 
 @if (UserProfile == null)
+
 {
     <p>Loading profile...</p>
+
 }
+
 else
+
 {
-    <div class="card shadow-sm p-3 mb-4" style="max-width: 520px;">
+    @* <div class="card shadow-sm p-3 mb-4" style="max-width: 520px;">
         <div class="mb-3">
             <label class="form-label fw-bold">Full Name</label>
             <div class="form-control bg-light">@UserProfile.FullName</div>
@@ -37,13 +45,19 @@ else
         <div class="mb-3">
             <label class="form-label fw-bold">Status</label>
             <div>
+
                 @if (UserProfile.IsActive)
+
                 {
                     <span class="badge bg-success">Active</span>
+
                 }
+
                 else
+
                 {
                     <span class="badge bg-secondary">Deactivated</span>
+
                 }
             </div>
         </div>
@@ -51,10 +65,57 @@ else
         <div class="mt-4">
             <button class="btn btn-warning"
                     @onclick="OpenChangePasswordModal">
+
                 Change Password
             </button>
         </div>
+    </div> *@
+
+    <div class="profile-page">
+        <div class="profile-card">
+
+            <div class="profile-card-header">
+                <div class="profile-avatar-circle">
+                    @GetInitials(UserProfile.FullName ?? UserProfile.Email)
+                </div>
+                <div class="profile-header-text">
+                    <div class="profile-name">@UserProfile.FullName</div>
+                    <div class="profile-email">@UserProfile.Email</div>
+                </div>
+            </div>
+
+            <div class="profile-divider"></div>
+
+            <div class="profile-fields">
+                <div class="profile-field">
+                    <label>Role</label>
+                    <span class="profile-pill role-pill">@UserProfile.Role</span>
+                </div>
+
+                <div class="profile-field">
+                    <label>Status</label>
+                    @if (UserProfile.IsActive)
+                    {
+                        <span class="profile-pill status-pill-active">Active</span>
+                    }
+                    else
+                    {
+                        <span class="profile-pill status-pill-inactive">Deactivated</span>
+                    }
+                </div>
+            </div>
+
+            <div class="profile-actions">
+                <button class="profile-btn-primary"
+                        @onclick="OpenChangePasswordModal">
+                    Change Password
+                </button>
+            </div>
+        </div>
     </div>
+
+   
+
 }
 
 <!-- ✅ CHANGE PASSWORD MODAL -->
@@ -68,22 +129,54 @@ else
     private bool IsChangePasswordOpen;
 
     // ✅ LOAD PROFILE SAFELY
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
+
     {
+
         if (firstRender)
+
         {
+
             UserProfile = await UserService.GetMyProfileAsync();
+
             StateHasChanged();
+
         }
+
     }
 
-    private void OpenChangePasswordModal()
+    private string GetInitials(string? source)
     {
+        if (string.IsNullOrWhiteSpace(source))
+            return "U";
+
+        var beforeAt = source.Split('@')[0];
+        var parts = beforeAt
+            .Split(new[] { ' ', '.', '_' }, StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 1)
+            return parts[0][0].ToString().ToUpperInvariant();
+
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+    }
+
+
+    private void OpenChangePasswordModal()
+
+    {
+
         IsChangePasswordOpen = true;
+
     }
 
     private void CloseChangePasswordModal(bool _)
+
     {
+
         IsChangePasswordOpen = false;
+
     }
+
 }
+

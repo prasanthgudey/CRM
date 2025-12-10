@@ -1,43 +1,148 @@
-﻿@using CRM.Client.Services.Auth
+﻿@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using CRM.Client.Services.Auth
 @using CRM.Client.State
+
+@implements IDisposable
+
+@inject AuthenticationStateProvider AuthStateProvider
 @inject AuthService AuthService
 @inject AppState AppState
 @inject NavigationManager Navigation
 
 <div class="topbar-container">
 
-    <div class="topbar-user-info">
-        <img src="/images/avatar.png" class="topbar-avatar" />
-
-        <div class="topbar-user-details">
-            <div class="topbar-username">
-                @GetUserEmail()
+    @if (!_isAuthenticated)
+    {
+        <!-- NOT LOGGED IN: show Login button on the right -->
+        <button class="topbar-login-btn" @onclick="GoToLogin">
+            Login
+        </button>
+    }
+    else
+    {
+        <!-- LOGGED IN: show profile + Logout -->
+        <div class="topbar-user-info" @onclick="GoToProfile" style="cursor:pointer">
+            <div class="topbar-avatar">
+                @_initials
             </div>
-            <div class="topbar-role">
-                @AppState.Auth.Role
+
+            <div class="topbar-user-details">
+                <div class="topbar-username">
+                    @_emailDisplay
+                </div>
+                <div class="topbar-role">
+                    @_roleDisplay
+                </div>
             </div>
         </div>
-    </div>
 
-    <button class="topbar-logout-btn" @onclick="Logout">
-        Logout
-    </button>
-
+        <button class="topbar-logout-btn" @onclick="Logout">
+            Logout
+        </button>
+    }
 </div>
 
 @code {
+    private bool _isAuthenticated;
+    private string _emailDisplay = "Unknown User";
+    private string _roleDisplay = string.Empty;
+    private string _initials = "U";
 
-    private string GetUserEmail()
+    protected override void OnInitialized()
     {
-        var claim = AppState.Auth.User?
-            .Claims.FirstOrDefault(c => c.Type.Contains("email"));
+        AuthStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
 
-        return claim?.Value ?? "Unknown";
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var state = await AuthStateProvider.GetAuthenticationStateAsync();
+            UpdateFromPrincipal(state.User);
+            StateHasChanged();
+        }
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        var state = await task;
+        UpdateFromPrincipal(state.User);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateFromPrincipal(ClaimsPrincipal? principal)
+    {
+        if (principal is null || principal.Identity is not { IsAuthenticated: true })
+        {
+            _isAuthenticated = false;
+            _emailDisplay = "Unknown User";
+            _roleDisplay = string.Empty;
+            _initials = "U";
+            return;
+        }
+
+        _isAuthenticated = true;
+
+        // EMAIL
+        var emailClaim = principal.Claims.FirstOrDefault(c =>
+            c.Type.Contains("email", StringComparison.OrdinalIgnoreCase) ||
+            c.Type.Contains("mail", StringComparison.OrdinalIgnoreCase));
+
+        var email = emailClaim?.Value ?? principal.Identity?.Name;
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            _emailDisplay = email;
+            _initials = ComputeInitials(email);
+        }
+        else
+        {
+            _emailDisplay = "Unknown User";
+            _initials = "U";
+        }
+
+        // ROLE – try claims first, then AppState
+        var roleClaim = principal.Claims.FirstOrDefault(c =>
+            c.Type == ClaimTypes.Role ||
+            c.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase) ||
+            c.Type.Equals("role", StringComparison.OrdinalIgnoreCase));
+
+        _roleDisplay = roleClaim?.Value ?? AppState.Auth?.Role ?? string.Empty;
+    }
+
+    private string ComputeInitials(string source)
+    {
+        var beforeAt = source.Split('@')[0];
+        var parts = beforeAt.Split(new[] { ' ', '.', '_' }, StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+            return "U";
+
+        if (parts.Length == 1)
+            return parts[0][0].ToString().ToUpperInvariant();
+
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
     }
 
     private async Task Logout()
     {
         await AuthService.LogoutAsync();
         Navigation.NavigateTo("/login", true);
+    }
+
+    private void GoToProfile()
+    {
+        Navigation.NavigateTo("/profile");
+    }
+
+    private void GoToLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
     }
 }
