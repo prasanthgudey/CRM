@@ -1,4 +1,5 @@
 ﻿using CRM.Server.Models;
+using CRM.Server.Models.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,8 @@ namespace CRM.Server.Data
         public DbSet<AuditLog> AuditLogs { get; set; }
         // Database tables
         public DbSet<Customer> Customers { get; set; }
-
+        //Tasks Database table
+        public DbSet<TaskItem> Tasks { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -64,6 +66,49 @@ namespace CRM.Server.Data
                           .IsRequired();
                 });
             });
+
+            //For Tasks
+            // TaskItem configuration
+           
+builder.Entity<TaskItem>(entity =>
+{
+    entity.HasKey(t => t.TaskId);
+
+    entity.Property(t => t.Title)
+          .IsRequired()
+          .HasMaxLength(200);
+
+    entity.Property(t => t.Description)
+          .HasMaxLength(1000);
+
+    entity.Property(t => t.DueDate)
+          .IsRequired();
+
+    entity.Property(t => t.Priority)
+          .IsRequired();
+
+    entity.Property(t => t.State)
+          .IsRequired();
+
+    entity.Property(t => t.CreatedByUserId)
+          .IsRequired();
+
+    // 🔹 RELATIONSHIPS
+
+    // Task → Customer (many tasks per customer)
+    entity.HasOne(t => t.Customer)
+          .WithMany()                       // or .WithMany(c => c.Tasks) if you add a collection
+          .HasForeignKey(t => t.CustomerId)
+          .OnDelete(DeleteBehavior.Cascade);
+
+    // Task → ApplicationUser (CreatedByUserId)
+    entity.HasOne(t => t.CreatedBy)
+          .WithMany()                       // or .WithMany(u => u.TasksCreated) if you add a collection
+          .HasForeignKey(t => t.CreatedByUserId)
+          .OnDelete(DeleteBehavior.NoAction);
+});
+
+
         }
 
     }
