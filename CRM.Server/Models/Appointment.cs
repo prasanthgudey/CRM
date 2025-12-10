@@ -4,11 +4,11 @@
 //    {
 //        public Guid AppointmentId { get; set; } = Guid.NewGuid();
 
-        public Guid CustomerId { get; set; }
-        public Customer Customer { get; set; }
+        //public Guid CustomerId { get; set; }
+        //public Customer Customer { get; set; }
 
-        public Guid UserId { get; set; }
-        public User User { get; set; }
+        //public Guid UserId { get; set; }
+        //public User User { get; set; }
 
 //        public DateTime StartDateTime { get; set; }
 //        public DateTime EndDateTime { get; set; }
