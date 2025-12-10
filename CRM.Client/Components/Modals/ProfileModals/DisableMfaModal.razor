@@ -1,0 +1,51 @@
+﻿@if (IsOpen)
+{
+    <div class="modal-backdrop">
+        <div class="modal-card p-3">
+
+            <h5 class="mb-2">Disable MFA</h5>
+            <p class="text-muted small mb-2">
+                Enter the 6-digit code from your authenticator app.
+            </p>
+
+            <input class="form-control mb-3"
+                   placeholder="Enter 6-digit code"
+                   @bind="Code" />
+
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-outline-secondary btn-sm"
+                        @onclick="Cancel">
+                    Cancel
+                </button>
+
+                <button class="btn btn-danger btn-sm"
+                        @onclick="Confirm">
+                    Disable MFA
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<string> OnConfirm { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private string Code { get; set; } = string.Empty;
+
+    private async Task Confirm()
+    {
+        if (string.IsNullOrWhiteSpace(Code))
+            return;
+
+        await OnConfirm.InvokeAsync(Code);
+        Code = string.Empty;
+    }
+
+    private async Task Cancel()
+    {
+        Code = string.Empty;
+        await OnClose.InvokeAsync(false);
+    }
+}

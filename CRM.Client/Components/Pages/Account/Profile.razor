@@ -1,12 +1,15 @@
 ﻿@page "/profile"
 @layout MainLayout
 
-@using CRM.Client.DTOs.Users
 @using CRM.Client.Components.Layout
+@using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Users
+@using CRM.Client.Services.Auth
 @using CRM.Client.Components.Modals.ProfileModals
 
 @inject UserService UserService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
 
 <h3>My Profile</h3>
 
@@ -17,42 +20,78 @@
 else
 {
     <div class="card shadow-sm p-3 mb-4" style="max-width: 520px;">
+
+        <!-- ✅ FULL NAME -->
         <div class="mb-3">
             <label class="form-label fw-bold">Full Name</label>
             <div class="form-control bg-light">@UserProfile.FullName</div>
         </div>
 
+        <!-- ✅ EMAIL -->
         <div class="mb-3">
             <label class="form-label fw-bold">Email</label>
             <div class="form-control bg-light">@UserProfile.Email</div>
         </div>
 
+        <!-- ✅ ROLE -->
         <div class="mb-3">
             <label class="form-label fw-bold">Role</label>
-            <div>
-                <span class="badge bg-primary">@UserProfile.Role</span>
-            </div>
+            <span class="badge bg-primary">@UserProfile.Role</span>
         </div>
 
+        <!-- ✅ STATUS -->
         <div class="mb-3">
             <label class="form-label fw-bold">Status</label>
+            @if (UserProfile.IsActive)
+            {
+                <span class="badge bg-success">Active</span>
+            }
+            else
+            {
+                <span class="badge bg-secondary">Deactivated</span>
+            }
+        </div>
+
+        <!-- ✅ MFA STATUS -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">Multi-Factor Authentication</label>
             <div>
-                @if (UserProfile.IsActive)
+                @if (UserProfile.TwoFactorEnabled)
                 {
-                    <span class="badge bg-success">Active</span>
+                    <span class="badge bg-success">Enabled</span>
                 }
                 else
                 {
-                    <span class="badge bg-secondary">Deactivated</span>
+                    <span class="badge bg-secondary">Disabled</span>
                 }
             </div>
         </div>
 
-        <div class="mt-4">
+        <!-- ✅ ACTION BUTTONS -->
+        <div class="mt-4 d-flex gap-2">
+
+            <!-- CHANGE PASSWORD -->
             <button class="btn btn-warning"
                     @onclick="OpenChangePasswordModal">
                 Change Password
             </button>
+
+            <!-- ENABLE / DISABLE MFA -->
+            @if (!UserProfile.TwoFactorEnabled)
+            {
+                <button class="btn btn-outline-primary"
+                        @onclick="GoToEnableMfa">
+                    Enable MFA
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-outline-danger"
+                        @onclick="OpenDisableMfaModal">
+                    Disable MFA
+                </button>
+            }
+
         </div>
     </div>
 }
@@ -61,13 +100,19 @@ else
 <ChangePasswordModal IsOpen="@IsChangePasswordOpen"
                      OnClose="CloseChangePasswordModal" />
 
+<!-- ✅ DISABLE MFA OTP MODAL -->
+<DisableMfaModal IsOpen="@IsDisableMfaOpen"
+                 OnConfirm="ConfirmDisableMfa"
+                 OnClose="CloseDisableMfaModal" />
+
 @code {
 
     private UserResponseDto? UserProfile;
 
     private bool IsChangePasswordOpen;
+    private bool IsDisableMfaOpen;
 
-    // ✅ LOAD PROFILE SAFELY
+    // ✅ LOAD PROFILE
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -77,6 +122,7 @@ else
         }
     }
 
+    // ✅ CHANGE PASSWORD MODAL
     private void OpenChangePasswordModal()
     {
         IsChangePasswordOpen = true;
@@ -85,5 +131,34 @@ else
     private void CloseChangePasswordModal(bool _)
     {
         IsChangePasswordOpen = false;
+    }
+
+    // ✅ ENABLE MFA → QR PAGE
+    private void GoToEnableMfa()
+    {
+        Navigation.NavigateTo("/enable-mfa");
+    }
+
+    // ✅ OPEN DISABLE MFA MODAL
+    private void OpenDisableMfaModal()
+    {
+        IsDisableMfaOpen = true;
+    }
+
+    // ✅ USER ENTERS OTP → CALL SECURE API
+    private async Task ConfirmDisableMfa(string code)
+    {
+        await AuthService.DisableMfaAsync(code);
+
+        IsDisableMfaOpen = false;
+
+        // ✅ Refresh profile after disabling
+        UserProfile = await UserService.GetMyProfileAsync();
+        StateHasChanged();
+    }
+
+    private void CloseDisableMfaModal(bool _)
+    {
+        IsDisableMfaOpen = false;
     }
 }

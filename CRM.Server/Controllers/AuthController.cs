@@ -1,10 +1,14 @@
-﻿using CRM.Server.DTOs.Auth;
+﻿
+using CRM.Server.DTOs.Auth;
 using CRM.Server.Models;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+
+
+
 
 namespace CRM.Server.Controllers
 {
@@ -37,7 +41,6 @@ namespace CRM.Server.Controllers
             if (user == null)
                 return Unauthorized("Invalid credentials");
 
-            // ✅ BLOCK DEACTIVATED USERS
             if (!user.IsActive)
                 return Unauthorized("Account is deactivated");
 
@@ -45,15 +48,27 @@ namespace CRM.Server.Controllers
             if (!isValid)
                 return Unauthorized("Invalid credentials");
 
+            // ✅✅✅ MFA CHECK (CRITICAL)
+            if (user.TwoFactorEnabled)
+            {
+                return Ok(new AuthResponseDto
+                {
+                    MfaRequired = true,
+                    Email = user.Email
+                });
+            }
+
+            // ✅ NORMAL LOGIN (NO MFA)
             var roles = await _userManager.GetRolesAsync(user);
             var token = _jwtTokenService.GenerateToken(user, roles);
 
             return Ok(new AuthResponseDto
             {
                 Token = token,
-                Expiration = DateTime.UtcNow.AddMinutes(30) // Consider moving to JwtSettings later
+                Expiration = DateTime.UtcNow.AddMinutes(30)
             });
         }
+
 
         // =====================================================
         // ✅ COMPLETE REGISTRATION FROM INVITE LINK (SECURE)
@@ -125,6 +140,66 @@ namespace CRM.Server.Controllers
             return Ok(new { message = "Password changed successfully" });
         }
 
+        [HttpPost("mfa/enable")]
+        [Authorize]
+        public async Task<IActionResult> EnableMfa()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var result = await _userService.EnableMfaAsync(userId!);
+
+            return Ok(result);
+        }
+
+        [HttpPost("mfa/verify")]
+        [Authorize]
+        public async Task<IActionResult> VerifyMfa(VerifyMfaDto dto)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            await _userService.VerifyMfaAsync(userId!, dto.Code);
+
+            return Ok(new { message = "MFA enabled successfully" });
+        }
+
+        [HttpPost("mfa/disable")]
+        [Authorize]
+        public async Task<IActionResult> DisableMfa(VerifyMfaDto dto)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            await _userService.DisableMfaAsync(userId!, dto.Code);
+
+            return Ok(new { message = "MFA disabled successfully" });
+        }
+
+        [HttpPost("mfa/login")]
+        public async Task<IActionResult> MfaLogin(MfaLoginDto dto)
+        {
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user == null)
+                return Unauthorized("Invalid credentials");
+
+            if (!user.IsActive)
+                return Unauthorized("Account is deactivated");
+
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                dto.Code);
+
+            if (!isValid)
+                return Unauthorized("Invalid verification code");
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var token = _jwtTokenService.GenerateToken(user, roles);
+
+            return Ok(new AuthResponseDto
+            {
+                Token = token,
+                Expiration = DateTime.UtcNow.AddMinutes(30)
+            });
+        }
 
     }
 }

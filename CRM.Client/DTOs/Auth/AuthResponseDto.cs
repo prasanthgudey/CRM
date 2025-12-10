@@ -1,17 +1,16 @@
-﻿// Backend returns:
-// return Ok(new AuthResponseDto
-// {
-//     Token = token,
-//     Expiration = DateTime.UtcNow.AddMinutes(30)
-// });
-
-namespace CRM.Client.DTOs.Auth
+﻿namespace CRM.Client.DTOs.Auth
 {
-    // ✅ USER-DEFINED: JWT login response model
+    // ✅ USER-DEFINED: JWT login response model (MFA-aware)
     public class AuthResponseDto
     {
-        public string Token { get; set; } = string.Empty;
+        public string? Token { get; set; }
 
-        public DateTime Expiration { get; set; }
+        public DateTime? Expiration { get; set; }
+
+        // ✅ NEW: tells frontend whether OTP is required
+        public bool MfaRequired { get; set; }
+
+        // ✅ NEW: used to pass email to /mfa-login page
+        public string? Email { get; set; }
     }
 }

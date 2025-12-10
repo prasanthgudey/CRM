@@ -1,4 +1,5 @@
-﻿using CRM.Server.DTOs.Users;
+﻿using CRM.Server.DTOs.Auth;
+using CRM.Server.DTOs.Users;
 
 namespace CRM.Server.Services.Interfaces
 {
@@ -21,6 +22,10 @@ namespace CRM.Server.Services.Interfaces
         Task<UserResponseDto> GetUserByIdAsync(string userId);
 
         Task<List<UserResponseDto>> FilterUsersAsync(string? role, bool? isActive);
+
+        Task<EnableMfaResponseDto> EnableMfaAsync(string userId);
+        Task VerifyMfaAsync(string userId, string code);
+        Task DisableMfaAsync(string userId, string code);
 
     }
 }
