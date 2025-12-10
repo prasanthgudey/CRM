@@ -6,7 +6,7 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
+    //[Authorize(Roles = "Admin")]
     public class AuditController : ControllerBase
     {
         private readonly IAuditRepository _auditRepository;

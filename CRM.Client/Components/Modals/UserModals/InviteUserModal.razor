@@ -1,0 +1,111 @@
+﻿@using CRM.Client.DTOs.Users
+@using CRM.Client.Services.Users
+@inject UserService UserService
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow"
+             style="width: 380px; border-radius: 12px; padding: 20px; background: white;">
+
+            <h5 class="mb-3 text-center">Invite New User</h5>
+
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="alert alert-info py-2">
+                    @Message
+                </div>
+            }
+
+            <EditForm Model="InviteModel" OnValidSubmit="SendInvite">
+                <DataAnnotationsValidator />
+
+                <!-- ✅ FULL NAME -->
+                <div class="form-group mt-2">
+                    <label class="small text-muted">Full Name</label>
+                    <InputText class="form-control"
+                               placeholder="Enter user's full name"
+                               @bind-Value="InviteModel.FullName" />
+                </div>
+
+                <!-- ✅ EMAIL -->
+                <div class="form-group mt-2">
+                    <label class="small text-muted">Email Address</label>
+                    <InputText class="form-control"
+                               placeholder="Enter user's email address"
+                               @bind-Value="InviteModel.Email" />
+                </div>
+
+                <!-- ✅ ROLE -->
+                <div class="form-group mt-3">
+                    <label class="small text-muted">Select Role</label>
+                    <InputSelect class="form-control"
+                                 @bind-Value="InviteModel.Role">
+                        <option value="">-- Select a role --</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Manager">Manager</option>
+                        <option value="User">User</option>
+                    </InputSelect>
+                </div>
+
+                <!-- ✅ ACTION BUTTONS -->
+                <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="Close">
+                        Cancel
+                    </button>
+
+                    <button class="btn btn-primary"
+                            disabled="@IsLoading">
+                        @(IsLoading ? "Sending..." : "Send Invite")
+                    </button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private InviteUserDto InviteModel { get; set; } = new InviteUserDto();
+    private bool IsLoading { get; set; }
+    private string? Message { get; set; }
+
+    private async Task SendInvite()
+    {
+        IsLoading = true;
+        Message = null;
+
+        try
+        {
+            await UserService.InviteUserAsync(InviteModel);
+            Message = "Invitation sent successfully.";
+
+            InviteModel = new InviteUserDto();
+
+            await Task.Delay(1200);
+            await OnClose.InvokeAsync(false);
+        }
+        catch (Exception ex)
+        {
+            // show server message if available
+            Message = "Failed to send invitation. " + (ex.Message ?? string.Empty);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        InviteModel = new InviteUserDto();
+        Message = null;
+        await OnClose.InvokeAsync(false);
+    }
+}

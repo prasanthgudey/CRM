@@ -1,0 +1,64 @@
+﻿@using CRM.Client.Services.Roles
+@inject RoleService RoleService
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card">
+
+            <h5 class="mb-3 text-center text-danger">Delete Role</h5>
+
+            <p class="text-center mb-1">
+                Are you sure you want to permanently delete this role?
+            </p>
+
+            <p class="text-center fw-bold text-dark">
+                @RoleName
+            </p>
+
+            <p class="text-center small text-muted">
+                This action cannot be undone.
+            </p>
+
+            <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="Close">
+                    Cancel
+                </button>
+
+                <button class="btn btn-danger"
+                        disabled="@IsLoading"
+                        @onclick="DeleteRole">
+                    @(IsLoading ? "Deleting..." : "Delete")
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? RoleName { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private bool IsLoading;
+
+    private async Task DeleteRole()
+    {
+        IsLoading = true;
+
+        await RoleService.DeleteRoleAsync(RoleName!);
+        await Task.Delay(800);
+
+        await OnClose.InvokeAsync(false);
+        IsLoading = false;
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync(false);
+    }
+}

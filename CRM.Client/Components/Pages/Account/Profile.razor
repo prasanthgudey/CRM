@@ -1,0 +1,89 @@
+﻿@page "/profile"
+@layout MainLayout
+
+@using CRM.Client.DTOs.Users
+@using CRM.Client.Components.Layout
+@using CRM.Client.Services.Users
+@using CRM.Client.Components.Modals.ProfileModals
+
+@inject UserService UserService
+
+<h3>My Profile</h3>
+
+@if (UserProfile == null)
+{
+    <p>Loading profile...</p>
+}
+else
+{
+    <div class="card shadow-sm p-3 mb-4" style="max-width: 520px;">
+        <div class="mb-3">
+            <label class="form-label fw-bold">Full Name</label>
+            <div class="form-control bg-light">@UserProfile.FullName</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">Email</label>
+            <div class="form-control bg-light">@UserProfile.Email</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">Role</label>
+            <div>
+                <span class="badge bg-primary">@UserProfile.Role</span>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">Status</label>
+            <div>
+                @if (UserProfile.IsActive)
+                {
+                    <span class="badge bg-success">Active</span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary">Deactivated</span>
+                }
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-warning"
+                    @onclick="OpenChangePasswordModal">
+                Change Password
+            </button>
+        </div>
+    </div>
+}
+
+<!-- ✅ CHANGE PASSWORD MODAL -->
+<ChangePasswordModal IsOpen="@IsChangePasswordOpen"
+                     OnClose="CloseChangePasswordModal" />
+
+@code {
+
+    private UserResponseDto? UserProfile;
+
+    private bool IsChangePasswordOpen;
+
+    // ✅ LOAD PROFILE SAFELY
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            UserProfile = await UserService.GetMyProfileAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void OpenChangePasswordModal()
+    {
+        IsChangePasswordOpen = true;
+    }
+
+    private void CloseChangePasswordModal(bool _)
+    {
+        IsChangePasswordOpen = false;
+    }
+}

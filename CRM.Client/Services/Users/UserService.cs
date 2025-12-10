@@ -12,6 +12,18 @@ namespace CRM.Client.Services.Users
             _api = api;
         }
 
+        // ✅ GET MY PROFILE (logged-in user)
+        public async Task<UserResponseDto?> GetMyProfileAsync()
+        {
+            return await _api.GetAsync<UserResponseDto>("api/user/me");
+        }
+
+        // ✅ GET USER BY ID (admin / detail)
+        public async Task<UserResponseDto?> GetUserByIdAsync(string userId)
+        {
+            return await _api.GetAsync<UserResponseDto>($"api/user/{userId}");
+        }
+
         // ✅ GET ALL USERS
         public async Task<List<UserResponseDto>?> GetAllUsersAsync()
         {
@@ -36,11 +48,29 @@ namespace CRM.Client.Services.Users
             await _api.PutAsync<object, object>($"api/user/deactivate/{userId}", new { });
         }
 
+        public async Task ActivateUserAsync(string userId)
+        {
+            await _api.PutAsync<object, object>($"api/user/activate/{userId}", new { });
+        }
+
         // ✅ FILTER USERS
         public async Task<List<UserResponseDto>?> FilterUsersAsync(string? role, bool? isActive)
         {
             var url = $"api/user/filter?role={role}&isActive={isActive}";
             return await _api.GetAsync<List<UserResponseDto>>(url);
         }
+
+        // PUT /api/user/update/{userId}
+        public async Task UpdateUserAsync(string userId, UpdateUserDto dto)
+        {
+            await _api.PutAsync<UpdateUserDto, object?>($"api/user/update/{userId}", dto);
+        }
+
+        // DELETE /api/user/{userId}
+        public async Task DeleteUserAsync(string userId)
+        {
+            await _api.DeleteAsync($"api/user/{userId}");
+        }
+
     }
 }

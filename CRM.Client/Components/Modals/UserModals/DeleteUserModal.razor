@@ -1,0 +1,52 @@
+﻿@using CRM.Client.Services.Users
+@inject UserService UserService
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow" style="width: 360px; border-radius: 12px; padding: 18px; background: white;">
+            <h5 class="mb-2 text-center">Delete User</h5>
+
+            <p>Are you sure you want to permanently delete this user?</p>
+
+            <div class="modal-actions mt-3 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+                <button class="btn btn-danger" disabled="@IsLoading" @onclick="Delete">@((IsLoading) ? "Deleting..." : "Delete")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? UserId { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private bool IsLoading;
+
+    private async Task Delete()
+    {
+        if (string.IsNullOrWhiteSpace(UserId)) return;
+
+        IsLoading = true;
+        try
+        {
+            await UserService.DeleteUserAsync(UserId);
+            await Task.Delay(800);
+            await OnClose.InvokeAsync(false);
+        }
+        catch
+        {
+            // optionally show message, but keep small to match pattern
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await OnClose.InvokeAsync(false);
+    }
+}

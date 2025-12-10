@@ -7,7 +7,7 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")] // ✅ Admin only
+    //[Authorize(Roles = "Admin")] // ✅ Admin only
     public class RoleController : ControllerBase
     {
         private readonly IRoleService _roleService;
@@ -37,6 +37,34 @@ namespace CRM.Server.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var roles = await _roleService.GetAllRolesAsync();
+            return Ok(roles);
+        }
+
+        [HttpGet("{name}")]
+        public async Task<IActionResult> Get(string name)
+        {
+            var role = await _roleService.GetRoleAsync(name);
+            if (role == null) return NotFound("Role not found");
+            return Ok(role);
+        }
+
+        [HttpPut("update")]
+        public async Task<IActionResult> UpdateRole(UpdateRoleDto dto)
+        {
+            await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName);
+            return Ok("Role updated successfully");
+        }
+
+        [HttpDelete("{name}")]
+        public async Task<IActionResult> Delete(string name)
+        {
+            await _roleService.DeleteRoleAsync(name);
+            return Ok("Role deleted successfully");
         }
 
     }

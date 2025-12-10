@@ -2,12 +2,13 @@
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")] // ✅ Admin only
+    //[Authorize(Roles = "Admin")] // ✅ Admin only
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -84,6 +85,97 @@ namespace CRM.Server.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+
+        // ✅ ACTIVATE USER
+        // =====================================================
+        [HttpPut("activate/{userId}")]
+        public async Task<IActionResult> Activate(string userId)
+        {
+            try
+            {
+                await _userService.ActivateUserAsync(userId);
+                return Ok(new { message = "User activated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        // =====================================================
+        // ✅ UPDATE USER
+        // =====================================================
+        [HttpPut("update/{userId}")]
+        public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                await _userService.UpdateUserAsync(userId, dto);
+                return Ok(new { message = "User updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+
+
+        // =====================================================
+        // ✅ DELETE USER
+        // =====================================================
+        [HttpDelete("{userId}")]
+        public async Task<IActionResult> DeleteUser(string userId)
+        {
+            try
+            {
+                await _userService.DeleteUserAsync(userId);
+                return Ok(new { message = "User deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        // =====================================================
+        // ✅ GET USER BY ID (ADMIN / PROFILE VIEW)
+        // =====================================================
+        [HttpGet("{userId}")]
+        public async Task<IActionResult> GetUserById(string userId)
+        {
+            try
+            {
+                var user = await _userService.GetUserByIdAsync(userId);
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        // =====================================================
+        // ✅ GET MY PROFILE (LOGGED-IN USER)
+        // =====================================================
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+            var user = await _userService.GetUserByIdAsync(userId!);
+
+            return Ok(user);
+        }
+
 
         // =====================================================
         // ✅ FILTER USERS BY ROLE & ACTIVE STATUS
