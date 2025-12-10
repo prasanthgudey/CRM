@@ -66,5 +66,39 @@ namespace CRM.Client.Services.Auth
             await _authProvider.MarkUserAsLoggedOut();
             _appState.Auth.Clear();
         }
+
+
+        // =====================================================
+        // ✅ CHANGE PASSWORD → POST api/auth/change-password
+        // =====================================================
+        public async Task ChangePasswordAsync(ChangePasswordDto dto)
+        {
+            await _api.PostAsync<ChangePasswordDto, object>(
+                "api/auth/change-password", dto);
+        }
+
+
+        // =====================================================
+        // ✅ FORGOT PASSWORD → POST api/auth/forgot-password
+        // =====================================================
+        public async Task ForgotPasswordAsync(ForgotPasswordDto dto)
+        {
+            await _api.PostAsync<ForgotPasswordDto, object>(
+                "api/auth/forgot-password", dto);
+        }
+
+
+        // =====================================================
+        // ✅ RESET PASSWORD → POST api/auth/reset-password
+        // =====================================================
+        public async Task ResetPasswordAsync(ResetPasswordDto dto)
+        {
+            await _api.PostAsync<ResetPasswordDto, object>(
+                "api/auth/reset-password", dto);
+        }
+
+
+
+
     }
 }

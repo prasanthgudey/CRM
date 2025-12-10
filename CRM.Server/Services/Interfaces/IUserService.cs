@@ -14,6 +14,12 @@ namespace CRM.Server.Services.Interfaces
 
         Task DeleteUserAsync(string userId);
 
+        Task ForgotPasswordAsync(string email);
+        Task ResetPasswordAsync(string email, string token, string newPassword);
+        Task ChangePasswordAsync(string userId, string currentPassword, string newPassword);
+
+        Task<UserResponseDto> GetUserByIdAsync(string userId);
+
         Task<List<UserResponseDto>> FilterUsersAsync(string? role, bool? isActive);
 
     }

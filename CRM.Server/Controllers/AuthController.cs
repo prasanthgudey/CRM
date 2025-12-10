@@ -1,9 +1,10 @@
 ﻿using CRM.Server.DTOs.Auth;
 using CRM.Server.Models;
 using CRM.Server.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
@@ -13,15 +14,17 @@ namespace CRM.Server.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IJwtTokenService _jwtTokenService;
+            private readonly IUserService _userService;
 
         // ✅ Built-in: UserManager
         // ✅ Custom: IJwtTokenService
         public AuthController(
             UserManager<ApplicationUser> userManager,
-            IJwtTokenService jwtTokenService)
+            IJwtTokenService jwtTokenService, IUserService userService)
         {
             _userManager = userManager;
             _jwtTokenService = jwtTokenService;
+            _userService = userService;
         }
 
         // =====================================================
@@ -86,5 +89,42 @@ namespace CRM.Server.Controllers
 
             return Ok("Registration completed successfully");
         }
+
+        // =====================================================
+        // ✅ FORGOT PASSWORD
+        // =====================================================
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
+        {
+            await _userService.ForgotPasswordAsync(dto.Email);
+            return Ok(new { message = "If the email is registered, a reset link has been sent." });
+        }
+
+        // =====================================================
+        // ✅ RESET PASSWORD
+        // =====================================================
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
+        {
+            await _userService.ResetPasswordAsync(dto.Email, dto.Token, dto.NewPassword);
+            return Ok(new { message = "Password reset successful" });
+        }
+
+        // =====================================================
+        // ✅ CHANGE PASSWORD (LOGGED-IN USER)
+        // =====================================================
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            await _userService.ChangePasswordAsync(
+                userId!, dto.CurrentPassword, dto.NewPassword);
+
+            return Ok(new { message = "Password changed successfully" });
+        }
+
+
     }
 }

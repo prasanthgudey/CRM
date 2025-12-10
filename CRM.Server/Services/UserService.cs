@@ -201,6 +201,86 @@ namespace CRM.Server.Services
         }
 
 
+
+        // ============================================================
+        // ✅ FORGOT PASSWORD
+        // ============================================================
+        public async Task ForgotPasswordAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+
+            // ✅ Security: Do not reveal if user exists
+            if (user == null)
+                return;
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            var resetLink =
+                $"{_config["Client:Url"]}/reset-password?token={Uri.EscapeDataString(token)}&email={user.Email}";
+
+            await _emailService.SendAsync(
+                user.Email!,
+                "CRM Password Reset",
+                $"Click the link below to reset your password:\n\n{resetLink}"
+            );
+        }
+
+        // ============================================================
+        // ✅ RESET PASSWORD
+        // ============================================================
+        public async Task ResetPasswordAsync(string email, string token, string newPassword)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                throw new Exception("Invalid reset request");
+
+            var decodedToken = Uri.UnescapeDataString(token);
+
+            var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
+
+             if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+        }
+
+        // ============================================================
+        // ✅ CHANGE PASSWORD (LOGGED-IN USER)
+        // ============================================================
+        public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var result = await _userManager.ChangePasswordAsync(
+                user, currentPassword, newPassword);
+
+            if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+        }
+
+
+        // ============================================================
+        // ✅ GET USER BY ID (PROFILE)
+        // ============================================================
+        public async Task<UserResponseDto> GetUserByIdAsync(string userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                FullName = user.FullName ?? "",
+                Email = user.Email ?? "",
+                IsActive = user.IsActive,
+                Role = roles.FirstOrDefault() ?? ""
+            };
+        }
+
         // ============================================================
         // ✅ 5️⃣ FILTER USERS (BY ROLE & ACTIVE STATUS)
         // ============================================================
