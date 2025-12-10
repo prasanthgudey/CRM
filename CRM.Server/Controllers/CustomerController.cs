@@ -39,7 +39,7 @@ namespace CRM.Server.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin,Manager")]
+        //[Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Create(CustomerCreateDto dto)
         {
             var result = await _service.CreateAsync(dto);
@@ -47,7 +47,7 @@ namespace CRM.Server.Controllers
         }
 
         [HttpPut("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        //[Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Update(Guid id, CustomerUpdateDto dto)
         {
             var updated = await _service.UpdateAsync(id, dto);
@@ -55,7 +55,7 @@ namespace CRM.Server.Controllers
         }
 
         [HttpDelete("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        //[Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var deleted = await _service.DeleteAsync(id);
