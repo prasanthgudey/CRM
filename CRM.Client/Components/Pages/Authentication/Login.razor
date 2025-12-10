@@ -95,6 +95,7 @@
 
             Console.WriteLine("===== SERVICE RESPONSE CHECK =====");
             Console.WriteLine(response is null ? "Response is NULL" : "Response RECEIVED");
+            Console.WriteLine($"MfaRequired: {response?.MfaRequired}");
             Console.WriteLine("===================================");
 
             if (response == null)
@@ -103,6 +104,15 @@
                 return;
             }
 
+            // If server requires MFA, redirect to MFA page with email pre-filled
+            if (response.MfaRequired)
+            {
+                var emailToSend = Uri.EscapeDataString(response.Email ?? LoginModel.Email ?? "");
+                Navigation.NavigateTo($"/mfa-login?email={emailToSend}", true);
+                return;
+            }
+
+            // Otherwise user is authenticated (AuthService already set auth state)
             RedirectByRole();
         }
         catch (Exception ex)
@@ -117,6 +127,7 @@
             StateHasChanged();
         }
     }
+
 
     private void RedirectByRole()
     {

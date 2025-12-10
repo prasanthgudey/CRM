@@ -4,6 +4,9 @@ using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using CRM.Server.DTOs.Auth;
+//using Microsoft.AspNetCore.Identity;
+using System.Text.Encodings.Web;
 
 namespace CRM.Server.Services
 {
@@ -84,7 +87,8 @@ namespace CRM.Server.Services
                     FullName = user.FullName ?? "",
                     Email = user.Email ?? "",
                     IsActive = user.IsActive,
-                    Role = roles.FirstOrDefault() ?? ""
+                    Role = roles.FirstOrDefault() ?? "",
+                    TwoFactorEnabled = user.TwoFactorEnabled
                 });
             }
 
@@ -277,7 +281,8 @@ namespace CRM.Server.Services
                 FullName = user.FullName ?? "",
                 Email = user.Email ?? "",
                 IsActive = user.IsActive,
-                Role = roles.FirstOrDefault() ?? ""
+                Role = roles.FirstOrDefault() ?? "",
+                TwoFactorEnabled = user.TwoFactorEnabled
             };
         }
 
@@ -306,12 +311,81 @@ namespace CRM.Server.Services
                         FullName = user.FullName ?? "",
                         Email = user.Email ?? "",
                         IsActive = user.IsActive,
-                        Role = roles.FirstOrDefault() ?? ""
+                        Role = roles.FirstOrDefault() ?? "",
+                        TwoFactorEnabled = user.TwoFactorEnabled
                     });
                 }
             }
 
             return result;
         }
+        public async Task<EnableMfaResponseDto> EnableMfaAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            // ✅ RESET any existing key
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+
+            var key = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            var email = user.Email!;
+            var issuer = "CRM";
+
+            // ✅ STANDARD TOTP URI FORMAT
+            var qrCodeUri =
+                $"otpauth://totp/{UrlEncoder.Default.Encode(issuer)}:" +
+                $"{UrlEncoder.Default.Encode(email)}" +
+                $"?secret={key}&issuer={UrlEncoder.Default.Encode(issuer)}&digits=6";
+
+            return new EnableMfaResponseDto
+            {
+                SharedKey = key!,
+                QrCodeImageUrl = qrCodeUri
+            };
+        }
+
+        public async Task VerifyMfaAsync(string userId, string code)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                code);
+
+            if (!isValid)
+                throw new Exception("Invalid verification code");
+
+            user.TwoFactorEnabled = true;
+            await _userManager.UpdateAsync(user);
+        }
+
+        public async Task DisableMfaAsync(string userId, string code)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            // ✅ OTP MUST BE VERIFIED BEFORE DISABLING
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                code);
+
+            if (!isValid)
+                throw new Exception("Invalid verification code");
+
+            user.TwoFactorEnabled = false;
+            await _userManager.UpdateAsync(user);
+
+            // ✅ REMOVE SECRET
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+        }
+
+
     }
 }
