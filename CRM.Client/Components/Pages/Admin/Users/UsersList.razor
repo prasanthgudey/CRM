@@ -7,6 +7,7 @@
 @using CRM.Client.Components.Modals.UserModals
 
 @inject UserService UserService
+@inject IJSRuntime JSRuntime      // new code - SweetAlert
 
 <h3>Users Management</h3>
 
@@ -103,7 +104,6 @@ else
                             </svg>
                         </button>
                     </td>
-
                 </tr>
             }
         </tbody>
@@ -167,6 +167,7 @@ else
     {
         IsInviteOpen = false;
         Users = await UserService.GetAllUsersAsync();
+        // no alert here (invite just closes)
     }
 
     // ✅ Create User Modal
@@ -179,6 +180,7 @@ else
     {
         IsCreateUserOpen = false;
         Users = await UserService.GetAllUsersAsync();
+        // ❌ removed alert here – success alert handled inside CreateUserModal
     }
 
     // ✅ Assign Role Modal
@@ -193,6 +195,7 @@ else
         IsAssignRoleOpen = false;
         SelectedUserId = null;
         Users = await UserService.GetAllUsersAsync();
+        // success alert handled in AssignRoleModal
     }
 
     // ✅ Deactivate
@@ -200,6 +203,11 @@ else
     {
         await UserService.DeactivateUserAsync(userId);
         Users = await UserService.GetAllUsersAsync();
+
+        await JSRuntime.InvokeVoidAsync(
+            "crmAlerts.showSuccess",
+            "User deactivated"
+        );
     }
 
     // ✅ NEW: Activate
@@ -207,6 +215,11 @@ else
     {
         await UserService.ActivateUserAsync(userId);
         Users = await UserService.GetAllUsersAsync();
+
+        await JSRuntime.InvokeVoidAsync(
+            "crmAlerts.showSuccess",
+            "User activated"
+        );
     }
 
     // ✅ Edit user
@@ -221,9 +234,10 @@ else
         IsEditOpen = false;
         SelectedUser = null;
         Users = await UserService.GetAllUsersAsync();
+        // ❌ removed alert – success alert handled inside EditUserModal.Save()
     }
 
-    // ✅ Delete user
+    // ✅ Delete user (handled inside DeleteUserModal)
     private void OpenDeleteModal(string userId)
     {
         SelectedUserId = userId;
@@ -235,5 +249,6 @@ else
         IsDeleteOpen = false;
         SelectedUserId = null;
         Users = await UserService.GetAllUsersAsync();
+        // ❌ removed alert – success alert handled inside DeleteUserModal.Delete()
     }
 }

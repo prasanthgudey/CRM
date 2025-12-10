@@ -22,6 +22,21 @@ namespace CRM.Server.Controllers
         // =====================================================
         // ✅ MANUAL USER CREATION (TEMP PASSWORD)
         // =====================================================
+        //[HttpPost("create")]
+        //public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
+        //{
+        //    if (!ModelState.IsValid)
+        //        return BadRequest(ModelState);
+
+        //    try
+        //    {
+        //        await _userService.CreateUserAsync(dto);
+        //        return Ok(new { message = "User created successfully" });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(new { error = ex.Message });
+        //  
         [HttpPost("create")]
         public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
         {
@@ -31,13 +46,24 @@ namespace CRM.Server.Controllers
             try
             {
                 await _userService.CreateUserAsync(dto);
-                return Ok(new { message = "User created successfully" });
+
+                return Ok(new
+                {
+                    success = true,                 // ⭐ NEW
+                    message = "User created successfully" // ⭐ NEW
+                });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return Ok(new                      // ⭐ CHANGED FROM BadRequest to Ok
+                {                                  //   so frontend always receives JSON safely
+                    success = false,               // ⭐ NEW
+                    message = ex.Message           // ⭐ NEW (eg: "Email already exists")
+                });
             }
         }
+
+        //}
 
         // =====================================================
         // ✅ GET ALL USERS
@@ -52,6 +78,23 @@ namespace CRM.Server.Controllers
         // =====================================================
         // ✅ INVITE USER (EMAIL REGISTRATION LINK)
         // =====================================================
+        //[HttpPost("invite")]
+        //public async Task<IActionResult> InviteUser([FromBody] InviteUserDto dto)
+        //{
+        //    if (!ModelState.IsValid)
+        //        return BadRequest(ModelState);
+
+        //    try
+        //    {
+        //        await _userService.InviteUserAsync(dto);
+        //        return Ok(new { message = "Invitation sent successfully" });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(new { error = ex.Message });
+        //    }
+        //}
+
         [HttpPost("invite")]
         public async Task<IActionResult> InviteUser([FromBody] InviteUserDto dto)
         {
@@ -61,11 +104,22 @@ namespace CRM.Server.Controllers
             try
             {
                 await _userService.InviteUserAsync(dto);
-                return Ok(new { message = "Invitation sent successfully" });
+
+                // ✅ ALWAYS JSON, includes success flag
+                return Ok(new
+                {
+                    success = true,
+                    message = "Invitation sent successfully"
+                });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { error = ex.Message });
+                // ✅ ALSO JSON on error (eg: "Email already exists")
+                return Ok(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
             }
         }
 

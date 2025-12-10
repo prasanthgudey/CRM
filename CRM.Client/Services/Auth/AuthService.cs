@@ -1,4 +1,5 @@
 ﻿using CRM.Client.DTOs.Auth;
+using CRM.Client.DTOs.Users;
 using CRM.Client.Security;
 using CRM.Client.Services.Http;
 using CRM.Client.State;
@@ -53,13 +54,12 @@ namespace CRM.Client.Services.Auth
         // =====================================================
         // ✅ COMPLETE REGISTRATION → POST api/auth/complete-registration
         // =====================================================
-        public async Task<string?> CompleteRegistrationAsync(CompleteRegistrationDto dto)
+        public async Task<OperationResultDto?> CompleteRegistrationAsync(CompleteRegistrationDto dto)
         {
-            // ✅ Your backend returns plain string
-            var response = await _api.PostAsync<CompleteRegistrationDto, string>(
-                "api/auth/complete-registration", dto);
+            var response = await _api.PostAsync<CompleteRegistrationDto, OperationResultDto>(
+                "api/auth/complete-registration", dto);   // new code
 
-            return response;
+            return response;                               // new code
         }
 
         // =====================================================

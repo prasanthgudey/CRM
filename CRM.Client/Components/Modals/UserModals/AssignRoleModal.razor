@@ -1,6 +1,7 @@
 ﻿@using CRM.Client.DTOs.Roles
 @using CRM.Client.Services.Roles
 @inject RoleService RoleService
+@inject IJSRuntime JSRuntime    
 
 @if (IsOpen)
 {
@@ -88,20 +89,28 @@
         {
             await RoleService.AssignRoleAsync(AssignModel);
 
-            Message = "Role assigned successfully.";
+            // ⭐ NEW – SweetAlert success popup
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role assigned successfully.");
 
-            await Task.Delay(1000);
+            // (optional) no need to show message inside modal now, SweetAlert already shows it
+            // Message = "Role assigned successfully.";
+
+            await Task.Delay(500);
             await OnClose.InvokeAsync(false);
         }
         catch
         {
             Message = "Failed to assign role.";
+
+            // ⭐ NEW – SweetAlert error popup
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to assign role.");
         }
         finally
         {
             IsLoading = false;
         }
     }
+
 
     private async Task Close()
     {

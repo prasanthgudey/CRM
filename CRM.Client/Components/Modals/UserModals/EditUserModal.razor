@@ -1,6 +1,7 @@
 ﻿@using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Users
 @inject UserService UserService
+@inject IJSRuntime JSRuntime     
 
 @if (IsOpen && User != null)
 {
@@ -77,13 +78,25 @@
         try
         {
             await UserService.UpdateUserAsync(User.Id, EditModel);
-            Message = "User updated successfully.";
+
+            Message = "User updated successfully.";                    // your original message
+
+            await JSRuntime.InvokeVoidAsync(                            // new code - SweetAlert success
+                "crmAlerts.showSuccess",
+                "User updated successfully."
+            );
+
             await Task.Delay(900);
             await OnClose.InvokeAsync(false);
         }
         catch
         {
             Message = "Failed to update user.";
+
+            await JSRuntime.InvokeVoidAsync(                            // new code - SweetAlert error
+                "crmAlerts.showError",
+                "Failed to update user."
+            );
         }
         finally
         {
@@ -94,6 +107,6 @@
     private async Task Cancel()
     {
         Message = null;
-        await OnClose.InvokeAsync(false);
+        await OnClose.InvokeAsync(false);   // cancel -> no alert
     }
 }

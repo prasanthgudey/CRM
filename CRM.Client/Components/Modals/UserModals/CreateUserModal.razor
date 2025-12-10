@@ -1,6 +1,7 @@
 ﻿@using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Users
 @inject UserService UserService
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
@@ -76,6 +77,30 @@
     private bool IsLoading { get; set; }
     private string? Message { get; set; }
 
+    // private async Task CreateUser()
+    // {
+    //     IsLoading = true;
+    //     Message = null;
+
+    //     try
+    //     {
+    //         await UserService.CreateUserAsync(CreateModel);
+    //         Message = "User created successfully.";
+
+    //         CreateModel = new CreateUserDto();
+
+    //         await Task.Delay(1200);
+    //         await OnClose.InvokeAsync(false);
+    //     }
+    //     catch
+    //     {
+    //         Message = "Failed to create user.";
+    //     }
+    //     finally
+    //     {
+    //         IsLoading = false;
+    //     }
+    // }
     private async Task CreateUser()
     {
         IsLoading = true;
@@ -83,17 +108,24 @@
 
         try
         {
-            await UserService.CreateUserAsync(CreateModel);
-            Message = "User created successfully.";
+            var result = await UserService.CreateUserAsync(CreateModel);   /* ⭐ NEW */
 
-            CreateModel = new CreateUserDto();
+            if (result != null && result.Success)
+            {
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", result.Message);  /* ⭐ NEW SUCCESS ALERT */
+                CreateModel = new CreateUserDto();   /* reset form */
 
-            await Task.Delay(1200);
-            await OnClose.InvokeAsync(false);
+                await Task.Delay(800);
+                await OnClose.InvokeAsync(false); /* close modal */
+            }
+            else if (result != null)
+            {
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message);    /* ⭐ NEW ERROR ALERT */
+            }
         }
         catch
         {
-            Message = "Failed to create user.";
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Something went wrong"); /* ⭐ fallback */
         }
         finally
         {
