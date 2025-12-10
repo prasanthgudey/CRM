@@ -84,7 +84,12 @@ namespace CRM.Server.Controllers
 
             await _userManager.UpdateAsync(user);
 
-            return Ok("Registration completed successfully");
+            // ⭐ new code – JSON success instead of plain string
+            return Ok(new
+            {
+                success = true,
+                message = "Registration completed successfully"
+            });
         }
     }
 }

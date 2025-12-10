@@ -1,4 +1,5 @@
 ﻿using CRM.Client.DTOs.Users;
+using CRM.Client.DTOs.Auth;
 using CRM.Client.Services.Http;
 
 namespace CRM.Client.Services.Users
@@ -19,15 +20,22 @@ namespace CRM.Client.Services.Users
         }
 
         // ✅ CREATE USER
-        public async Task CreateUserAsync(CreateUserDto dto)
+        //public async Task CreateUserAsync(CreateUserDto dto)
+        //{
+        //    await _api.PostAsync<CreateUserDto, object>("api/user/create", dto);
+        //}
+        // ⭐ UPDATED METHOD - now returns OperationResultDto instead of void
+        public async Task<OperationResultDto?> CreateUserAsync(CreateUserDto dto)
         {
-            await _api.PostAsync<CreateUserDto, object>("api/user/create", dto);
+            return await _api.PostAsync<CreateUserDto, OperationResultDto>("api/user/create", dto);  // ⭐ new return type
         }
 
+
         // ✅ INVITE USER
-        public async Task InviteUserAsync(InviteUserDto dto)
+        public async Task<OperationResultDto?> InviteUserAsync(InviteUserDto dto)   // ⭐ new code
         {
-            await _api.PostAsync<InviteUserDto, object>("api/user/invite", dto);
+            return await _api.PostAsync<InviteUserDto, OperationResultDto>(
+                "api/user/invite", dto);                                            // ⭐ new code
         }
 
         // ✅ DEACTIVATE USER
