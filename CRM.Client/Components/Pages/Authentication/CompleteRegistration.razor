@@ -2,13 +2,16 @@
 @layout AuthLayout
 
 @using CRM.Client.DTOs.Auth
+@using CRM.Client.DTOs.Users
 @using CRM.Client.Components.Layout
 @using CRM.Client.Services.Auth
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.JSInterop     
 
 @inject AuthService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime      
 
 <h3 class="auth-title">Complete Registration</h3>
 
@@ -58,7 +61,6 @@
     {
         var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
 
-        // ✅ Correct usage of static QueryHelpers (NO INJECTION)
         var query = QueryHelpers.ParseQuery(uri.Query);
 
         if (query.ContainsKey("token"))
@@ -70,6 +72,12 @@
             Message = "Invalid registration link.";
             IsCompleted = true;
         }
+
+        // optional: if email is also in query
+        if (query.ContainsKey("email"))
+        {
+            RegisterModel.Email = query["email"];
+        }
     }
 
     private async Task HandleRegistration()
@@ -79,22 +87,37 @@
 
         try
         {
-            var response = await AuthService.CompleteRegistrationAsync(RegisterModel);
+            // ⭐ new code - use DTO result instead of string
+            var result = await AuthService.CompleteRegistrationAsync(RegisterModel);
 
-            if (string.IsNullOrWhiteSpace(response))
+            if (result == null)
             {
-                Message = "Registration failed.";
+                Message = "Something went wrong.";
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Something went wrong.");
                 return;
             }
 
-            Message = response;
-            IsCompleted = true;
+            if (result.Success)
+            {
+                // ✅ SweetAlert success
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", result.Message);
 
-            NavigateToLoginAfterDelay();
+                Message = result.Message;
+                IsCompleted = true;
+
+                NavigateToLoginAfterDelay();     // ⭐ this method is defined below
+            }
+            else
+            {
+                // ❌ SweetAlert error
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message);
+                Message = result.Message;
+            }
         }
         catch
         {
             Message = "Something went wrong. Please try again.";
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Something went wrong.");
         }
         finally
         {
@@ -102,6 +125,7 @@
         }
     }
 
+    // ⭐ new code - make sure this is INSIDE @code { }
     private async void NavigateToLoginAfterDelay()
     {
         await Task.Delay(2000);

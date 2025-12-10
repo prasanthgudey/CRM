@@ -1,4 +1,5 @@
 ﻿using CRM.Client.DTOs.Auth;
+using CRM.Client.DTOs.Users;
 using CRM.Client.Security;
 using CRM.Client.Services.Http;
 using CRM.Client.State;

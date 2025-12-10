@@ -1,34 +1,31 @@
 ﻿@using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Users
 @inject UserService UserService
+@inject IJSRuntime JSRuntime   
 
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
         <div class="modal-card shadow"
-             style="width: 380px; border-radius: 12px; padding: 20px; background: white;">
+             style="width: 380px; padding: 20px; border-radius: 12px; background:white;">
 
-            <h5 class="mb-3 text-center">Invite New User</h5>
+            <h5 class="text-center mb-3">Invite New User</h5>
 
             @if (!string.IsNullOrWhiteSpace(Message))
             {
-                <div class="alert alert-info py-2">
-                    @Message
-                </div>
+                <div class="alert alert-info py-2">@Message</div>
             }
 
             <EditForm Model="InviteModel" OnValidSubmit="SendInvite">
                 <DataAnnotationsValidator />
 
-                <!-- ✅ FULL NAME -->
-                <div class="form-group mt-2">
+                <div class="form-group">
                     <label class="small text-muted">Full Name</label>
                     <InputText class="form-control"
                                placeholder="Enter user's full name"
                                @bind-Value="InviteModel.FullName" />
                 </div>
 
-                <!-- ✅ EMAIL -->
                 <div class="form-group mt-2">
                     <label class="small text-muted">Email Address</label>
                     <InputText class="form-control"
@@ -36,8 +33,7 @@
                                @bind-Value="InviteModel.Email" />
                 </div>
 
-                <!-- ✅ ROLE -->
-                <div class="form-group mt-3">
+                <div class="form-group mt-2">
                     <label class="small text-muted">Select Role</label>
                     <InputSelect class="form-control"
                                  @bind-Value="InviteModel.Role">
@@ -48,11 +44,10 @@
                     </InputSelect>
                 </div>
 
-                <!-- ✅ ACTION BUTTONS -->
-                <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                <div class="modal-actions mt-3 d-flex justify-content-end gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary"
-                            @onclick="Close">
+                            @onclick="Cancel">
                         Cancel
                     </button>
 
@@ -62,19 +57,17 @@
                     </button>
                 </div>
             </EditForm>
-
         </div>
     </div>
 }
 
 @code {
-
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private InviteUserDto InviteModel { get; set; } = new InviteUserDto();
-    private bool IsLoading { get; set; }
-    private string? Message { get; set; }
+    private InviteUserDto InviteModel { get; set; } = new();
+    private bool IsLoading;
+    private string? Message;
 
     private async Task SendInvite()
     {
@@ -83,18 +76,30 @@
 
         try
         {
-            await UserService.InviteUserAsync(InviteModel);
-            Message = "Invitation sent successfully.";
+            // ⭐ NEW — Call service and receive result (must return success, message)
+            var result = await UserService.InviteUserAsync(InviteModel);
 
+            // ⭐ NEW — If backend says user already exists
+            if (result != null && result.Success == false)
+            {
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message ?? "User already exists");
+                IsLoading = false;
+                return;  // modal should NOT close
+            }
+
+            // ⭐ Success alert
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Invitation sent successfully!");
+
+            // Optional — Reset form
             InviteModel = new InviteUserDto();
 
-            await Task.Delay(1200);
-            await OnClose.InvokeAsync(false);
+            await Task.Delay(400);
+            await OnClose.InvokeAsync(true);  // close only on success
         }
-        catch (Exception ex)
+        catch
         {
-            // show server message if available
-            Message = "Failed to send invitation. " + (ex.Message ?? string.Empty);
+            // ⭐ NEW - show error alert if something fails
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to send invite");
         }
         finally
         {
@@ -102,10 +107,9 @@
         }
     }
 
-    private async Task Close()
+    private async Task Cancel()
     {
-        InviteModel = new InviteUserDto();
         Message = null;
-        await OnClose.InvokeAsync(false);
+        await OnClose.InvokeAsync(false);   // ❗ no alert here (cancel should do nothing visually)
     }
 }

@@ -1,5 +1,6 @@
 ﻿@using CRM.Client.Services.Users
 @inject UserService UserService
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
@@ -32,12 +33,16 @@
         try
         {
             await UserService.DeleteUserAsync(UserId);
-            await Task.Delay(800);
-            await OnClose.InvokeAsync(false);
+
+            // ⭐ SweetAlert on delete success
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "User deleted successfully");
+
+            await Task.Delay(500);
+            await OnClose.InvokeAsync(true);    // close modal (true means action taken)
         }
         catch
         {
-            // optionally show message, but keep small to match pattern
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Deletion failed");
         }
         finally
         {
