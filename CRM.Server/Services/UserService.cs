@@ -120,11 +120,11 @@ namespace CRM.Server.Services
             // ✅ Generate secure registration token
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-            //var inviteLink =
-            //    $"{_config["Client:Url"]}/register?token={Uri.EscapeDataString(token)}&email={user.Email}";
-
             var inviteLink =
-            $"https://localhost:7194/api/auth/complete-registration?token={Uri.EscapeDataString(token)}&email={user.Email}";
+                $"{_config["Client:Url"]}/register?token={Uri.EscapeDataString(token)}&email={user.Email}";
+
+            //var inviteLink =
+            //$"https://localhost:7194/api/auth/complete-registration?token={Uri.EscapeDataString(token)}&email={user.Email}";
 
 
 
@@ -148,6 +148,58 @@ namespace CRM.Server.Services
             user.IsActive = false;
             await _userManager.UpdateAsync(user);
         }
+
+
+        public async Task ActivateUserAsync(string userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            user.IsActive = true;
+
+            await _userRepository.UpdateAsync(user);
+        }
+
+
+
+        public async Task UpdateUserAsync(string userId, UpdateUserDto dto)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            user.FullName = dto.FullName;
+            user.Email = dto.Email;
+
+            if (!string.IsNullOrWhiteSpace(dto.Role))
+            {
+                // Using roleManager or your RoleService logic
+                var currentRoles = await _userManager.GetRolesAsync(user);
+                if (currentRoles.Any())
+                    await _userManager.RemoveFromRolesAsync(user, currentRoles);
+
+                await _userManager.AddToRoleAsync(user, dto.Role);
+            }
+
+            if (dto.IsActive.HasValue)
+                user.IsActive = dto.IsActive.Value;
+
+            await _userRepository.UpdateAsync(user);
+        }
+
+        public async Task DeleteUserAsync(string userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            await _userRepository.DeleteAsync(user);
+        }
+
 
         // ============================================================
         // ✅ 5️⃣ FILTER USERS (BY ROLE & ACTIVE STATUS)

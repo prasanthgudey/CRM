@@ -7,5 +7,8 @@ namespace CRM.Server.Repositories.Interfaces
         Task<List<IdentityRole>> GetAllAsync();
         Task<IdentityRole?> GetByNameAsync(string roleName);
         Task CreateAsync(string roleName);
+        Task UpdateAsync(IdentityRole role);
+        Task DeleteAsync(IdentityRole role);
     }
+
 }

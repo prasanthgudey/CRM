@@ -1,0 +1,99 @@
+﻿@using CRM.Client.DTOs.Users
+@using CRM.Client.Services.Users
+@inject UserService UserService
+
+@if (IsOpen && User != null)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow" style="width: 420px; border-radius: 12px; padding: 18px; background: white;">
+            <h5 class="mb-3 text-center">Edit User</h5>
+
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="alert alert-info py-2">@Message</div>
+            }
+
+            <EditForm Model="EditModel" OnValidSubmit="Save">
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label class="small text-muted">Full Name</label>
+                    <InputText class="form-control" placeholder="Enter full name" @bind-Value="EditModel.FullName" />
+                </div>
+
+                <div class="form-group mt-2">
+                    <label class="small text-muted">Email</label>
+                    <InputText class="form-control" placeholder="Enter email address" @bind-Value="EditModel.Email" />
+                </div>
+
+                <div class="form-group mt-2">
+                    <label class="small text-muted">Role</label>
+                    <InputSelect class="form-control" @bind-Value="EditModel.Role">
+                        <option value="">-- Select a role --</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Manager">Manager</option>
+                        <option value="User">User</option>
+                    </InputSelect>
+                </div>
+
+                <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+                    <button class="btn btn-primary" disabled="@IsLoading">@((IsLoading) ? "Saving..." : "Save")</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public UserResponseDto? User { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private UpdateUserDto EditModel { get; set; } = new UpdateUserDto();
+    private bool IsLoading { get; set; }
+    private string? Message { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (User != null)
+        {
+            EditModel = new UpdateUserDto
+            {
+                FullName = User.FullName,
+                Email = User.Email,
+                Role = User.Role
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        if (User == null) return;
+
+        IsLoading = true;
+        Message = null;
+
+        try
+        {
+            await UserService.UpdateUserAsync(User.Id, EditModel);
+            Message = "User updated successfully.";
+            await Task.Delay(900);
+            await OnClose.InvokeAsync(false);
+        }
+        catch
+        {
+            Message = "Failed to update user.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        Message = null;
+        await OnClose.InvokeAsync(false);
+    }
+}

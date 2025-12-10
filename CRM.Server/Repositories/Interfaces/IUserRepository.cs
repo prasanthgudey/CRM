@@ -9,5 +9,8 @@ namespace CRM.Server.Repositories.Interfaces
         Task<List<ApplicationUser>> GetAllAsync();
         Task AddAsync(ApplicationUser user);
         Task UpdateAsync(ApplicationUser user);
+        Task DeleteAsync(ApplicationUser user);
+        //Task<List<ApplicationUser>> FilterAsync(string? role, bool? isActive);
+
     }
 }

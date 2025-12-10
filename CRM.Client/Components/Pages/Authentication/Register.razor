@@ -1,0 +1,159 @@
+﻿@page "/register"
+@inject NavigationManager Navigation
+@inject CRM.Client.Services.Auth.AuthService AuthService
+@using Microsoft.AspNetCore.WebUtilities
+@using System.ComponentModel.DataAnnotations
+@using CRM.Client.DTOs.Auth
+
+<PageTitle>Complete Registration</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center" style="min-height:70vh;">
+    <div class="card shadow" style="width:420px; border-radius:12px; padding:20px;">
+        <h5 class="mb-3 text-center">Set your password</h5>
+
+        @if (!string.IsNullOrWhiteSpace(PageMessage))
+        {
+            <div class="alert alert-info py-2">@PageMessage</div>
+        }
+
+        <EditForm Model="Model" OnValidSubmit="OnSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group mt-2">
+                <label class="small text-muted">Email</label>
+                <InputText class="form-control"
+                           @bind-Value="Model.Email"
+                           disabled />
+            </div>
+
+            <div class="form-group mt-2">
+                <label class="small text-muted">Password</label>
+                <InputText class="form-control"
+                           type="password"
+                           placeholder="Choose a strong password"
+                           @bind-Value="Model.Password" />
+                <small class="form-text text-muted">
+                    Minimum 6 characters (check backend policy).
+                </small>
+            </div>
+
+            <div class="form-group mt-2">
+                <label class="small text-muted">Confirm Password</label>
+                <InputText class="form-control"
+                           type="password"
+                           placeholder="Repeat the password"
+                           @bind-Value="Model.ConfirmPassword" />
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="Cancel">
+                    Cancel
+                </button>
+
+                <button class="btn btn-primary"
+                        disabled="@IsLoading">
+                    @(IsLoading ? "Completing..." : "Complete Registration")
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+
+    private RegisterModel Model { get; set; } = new RegisterModel();
+    private bool IsLoading;
+    private string? PageMessage;
+
+    protected override void OnInitialized()
+    {
+        // ✅ READ TOKEN & EMAIL FROM QUERY STRING
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var qs = QueryHelpers.ParseQuery(uri.Query);
+
+        if (qs.TryGetValue("token", out var token))
+            Model.Token = token.ToString();
+
+        if (qs.TryGetValue("email", out var email))
+            Model.Email = email.ToString();
+    }
+
+    private async Task OnSubmit()
+    {
+        PageMessage = null;
+
+        // ✅ BASIC VALIDATION
+        if (string.IsNullOrWhiteSpace(Model.Token) ||
+            string.IsNullOrWhiteSpace(Model.Email))
+        {
+            PageMessage = "Invalid registration link.";
+            return;
+        }
+
+        if (Model.Password != Model.ConfirmPassword)
+        {
+            PageMessage = "Passwords do not match.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Model.Password) ||
+            Model.Password.Length < 6)
+        {
+            PageMessage = "Password must be at least 6 characters.";
+            return;
+        }
+
+        IsLoading = true;
+
+        try
+        {
+            // ✅ ✅ ✅ CRITICAL FIX:
+            // BACKEND DOES UrlDecode → SO FRONTEND MUST UrlEncode
+            var encodedToken =
+                System.Net.WebUtility.UrlEncode(Model.Token);
+
+            var dto = new CompleteRegistrationDto
+            {
+                Email = Model.Email,
+                Token = encodedToken,
+                Password = Model.Password
+            };
+
+            await AuthService.CompleteRegistrationAsync(dto);
+
+            // ✅ REDIRECT TO LOGIN WITH SUCCESS FLAG
+            Navigation.NavigateTo("/login?registered=true");
+        }
+        catch (Exception ex)
+        {
+            PageMessage =
+                "Failed to complete registration. " +
+                (ex.Message ?? string.Empty);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    // ✅ LOCAL VIEW MODEL
+    private class RegisterModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

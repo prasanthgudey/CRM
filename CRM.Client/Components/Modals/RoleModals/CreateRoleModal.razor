@@ -1,0 +1,90 @@
+﻿@using CRM.Client.DTOs.Roles
+@using CRM.Client.Services.Roles
+@inject RoleService RoleService
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow">
+             @* style="width: 100%; max-width: 360px; border-radius: 12px; padding: 20px; background: white;"> *@
+
+            <h5 class="mb-3 text-center">Create New Role</h5>
+
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="alert alert-info py-2">
+                    @Message
+                </div>
+            }
+
+            <EditForm Model="RoleModel" OnValidSubmit="CreateRole">
+                <DataAnnotationsValidator />
+
+                <!-- ✅ ROLE NAME -->
+                <div class="form-group mt-3">
+                    <label class="small text-muted">Role Name</label>
+                    <InputText class="form-control"
+                               placeholder="Enter role name (e.g. Admin, Manager)"
+                               @bind-Value="RoleModel.RoleName" />
+                </div>
+
+                <!-- ✅ ACTION BUTTONS -->
+                <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="Close">
+                        Cancel
+                    </button>
+
+                    <button class="btn btn-success"
+                            disabled="@IsLoading">
+                        @(IsLoading ? "Creating..." : "Create Role")
+                    </button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private CreateRoleDto RoleModel { get; set; } = new CreateRoleDto();
+    private bool IsLoading;
+    private string? Message;
+
+    private async Task CreateRole()
+    {
+        IsLoading = true;
+        Message = null;
+
+        try
+        {
+            await RoleService.CreateRoleAsync(RoleModel);
+            Message = "Role created successfully.";
+
+            RoleModel = new CreateRoleDto();
+
+            await Task.Delay(1000);
+            await OnClose.InvokeAsync(false);
+        }
+        catch
+        {
+            Message = "Failed to create role.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        RoleModel = new CreateRoleDto();
+        Message = null;
+        await OnClose.InvokeAsync(false);
+    }
+}

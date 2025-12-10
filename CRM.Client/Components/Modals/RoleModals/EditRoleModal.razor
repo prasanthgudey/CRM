@@ -1,0 +1,88 @@
+﻿@using CRM.Client.DTOs.Roles
+@using CRM.Client.Services.Roles
+@inject RoleService RoleService
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card">
+
+            <h5 class="mb-3 text-center">Edit Role</h5>
+
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="alert alert-info py-2">
+                    @Message
+                </div>
+            }
+
+            <EditForm Model="Model" OnValidSubmit="UpdateRole">
+                <DataAnnotationsValidator />
+
+                <!-- ✅ NEW ROLE NAME -->
+                <div class="form-group mt-3">
+                    <label class="small text-muted">New Role Name</label>
+                    <InputText class="form-control"
+                               placeholder="Enter new role name (e.g. Manager, Supervisor)"
+                               @bind-Value="Model.NewName" />
+                </div>
+
+                <!-- ✅ ACTION BUTTONS -->
+                <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="Close">
+                        Cancel
+                    </button>
+
+                    <button class="btn btn-warning"
+                            disabled="@IsLoading">
+                        @(IsLoading ? "Updating..." : "Update")
+                    </button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? OldRoleName { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private UpdateRoleDto Model { get; set; } = new UpdateRoleDto();
+    private bool IsLoading;
+    private string? Message;
+
+    private async Task UpdateRole()
+    {
+        IsLoading = true;
+        Message = null;
+
+        try
+        {
+            Model.OldName = OldRoleName!;
+            await RoleService.UpdateRoleAsync(Model);
+            Message = "Role updated successfully.";
+
+            await Task.Delay(1000);
+            await OnClose.InvokeAsync(false);
+        }
+        catch
+        {
+            Message = "Failed to update role.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        Message = null;
+        await OnClose.InvokeAsync(false);
+    }
+}

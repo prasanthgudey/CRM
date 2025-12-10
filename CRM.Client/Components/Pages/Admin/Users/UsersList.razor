@@ -4,16 +4,23 @@
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Components.Layout
 @using CRM.Client.Services.Users
-@using CRM.Client.Components.Modals
+@using CRM.Client.Components.Modals.UserModals
 
 @inject UserService UserService
 
 <h3>Users Management</h3>
 
-<div class="mb-3">
-    <button class="btn btn-primary me-2"
+<!-- ✅ ACTION BUTTONS -->
+<div class="mb-3 d-flex gap-2">
+    <button type="button" class="btn btn-primary"
             @onclick="OpenInviteModal">
         Invite User
+    </button>
+
+    <!-- ✅ NEW: CREATE USER BUTTON -->
+    <button type="button" class="btn btn-success"
+            @onclick="OpenCreateUserModal">
+        Create New User
     </button>
 </div>
 
@@ -23,14 +30,14 @@
 }
 else
 {
-    <table class="table table-bordered">
-        <thead>
+    <table class="table table-bordered align-middle">
+        <thead class="table-light">
             <tr>
                 <th>Full Name</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
-                <th style="width:220px">Actions</th>
+                <th style="width:260px">Actions</th>
             </tr>
         </thead>
 
@@ -42,22 +49,61 @@ else
                     <td>@user.Email</td>
                     <td>@user.Role</td>
                     <td>
-                        @(user.IsActive ? "Active" : "Deactivated")
+                        @if (user.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Deactivated</span>
+                        }
                     </td>
                     <td>
-                        <button class="btn btn-warning btn-sm me-2"
+                        <button type="button"
+                                class="btn btn-warning btn-sm me-2"
                                 @onclick="() => OpenAssignRoleModal(user.Id)">
                             Assign Role
                         </button>
 
                         @if (user.IsActive)
                         {
-                            <button class="btn btn-danger btn-sm"
+                            <button type="button"
+                                    class="btn btn-danger btn-sm me-2"
                                     @onclick="() => Deactivate(user.Id)">
                                 Deactivate
                             </button>
                         }
+                        else
+                        {
+                            <!-- ✅ NEW: ACTIVATE BUTTON -->
+                            <button type="button"
+                                    class="btn btn-success btn-sm me-2"
+                                    @onclick="() => Activate(user.Id)">
+                                Activate
+                            </button>
+                        }
+
+                        <!-- ✅ PENCIL (EDIT) -->
+                        <button type="button"
+                                class="btn btn-light btn-sm me-1"
+                                title="Edit user"
+                                @onclick="() => OpenEditModal(user)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708L5.207 13.793 2 14l.207-3.207L12.146.854zM11.207 3L4 10.207V12h1.793L13 4.793 11.207 3z" />
+                            </svg>
+                        </button>
+
+                        <!-- ✅ TRASH (DELETE) -->
+                        <button type="button"
+                                class="btn btn-light btn-sm"
+                                title="Delete user"
+                                @onclick="() => OpenDeleteModal(user.Id)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 5h4a.5.5 0 0 1 .5.5V6h1v8a2 2 0 0 1-2 2H4.5a2 2 0 0 1-2-2V6h1v-.5zM4.118 4 4 4.059V5h8V4.059L11.882 4H9.5l-.5-.5h-2l-.5.5H4.118zM2.5 3a1 1 0 0 1 1-1h1.11l.4-.8A1 1 0 0 1 6 0h4a1 1 0 0 1 .99.2l.4.8H12.5a1 1 0 0 1 1 1v.5h-11V3z" />
+                            </svg>
+                        </button>
                     </td>
+
                 </tr>
             }
         </tbody>
@@ -73,14 +119,33 @@ else
                  UserId="@SelectedUserId"
                  OnClose="CloseAssignRoleModal" />
 
+<!-- ✅ NEW: CREATE USER MODAL -->
+<CreateUserModal IsOpen="@IsCreateUserOpen"
+                 OnClose="CloseCreateUserModal" />
+
+<!-- ✅ EDIT USER MODAL -->
+<EditUserModal IsOpen="@IsEditOpen"
+               User="@SelectedUser"
+               OnClose="CloseEditModal" />
+
+<!-- ✅ DELETE USER MODAL -->
+<DeleteUserModal IsOpen="@IsDeleteOpen"
+                 UserId="@SelectedUserId"
+                 OnClose="CloseDeleteModal" />
+
 @code {
 
     private List<UserResponseDto>? Users;
 
     private bool IsInviteOpen;
     private bool IsAssignRoleOpen;
+    private bool IsCreateUserOpen; // ✅ NEW
 
     private string? SelectedUserId;
+    private UserResponseDto? SelectedUser;   // for edit modal
+
+    private bool IsEditOpen;                 // NEW
+    private bool IsDeleteOpen;               // NEW
 
     // ✅ ✅ ✅ PRERENDER-SAFE LIFECYCLE METHOD
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -88,7 +153,7 @@ else
         if (firstRender)
         {
             Users = await UserService.GetAllUsersAsync();
-            StateHasChanged(); // 🔴 VERY IMPORTANT
+            StateHasChanged();
         }
     }
 
@@ -101,6 +166,18 @@ else
     private async Task CloseInviteModal(bool _)
     {
         IsInviteOpen = false;
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ Create User Modal
+    private void OpenCreateUserModal()
+    {
+        IsCreateUserOpen = true;
+    }
+
+    private async Task CloseCreateUserModal(bool _)
+    {
+        IsCreateUserOpen = false;
         Users = await UserService.GetAllUsersAsync();
     }
 
@@ -122,6 +199,41 @@ else
     private async Task Deactivate(string userId)
     {
         await UserService.DeactivateUserAsync(userId);
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ NEW: Activate
+    private async Task Activate(string userId)
+    {
+        await UserService.ActivateUserAsync(userId);
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ Edit user
+    private void OpenEditModal(UserResponseDto user)
+    {
+        SelectedUser = user;
+        IsEditOpen = true;
+    }
+
+    private async Task CloseEditModal(bool _)
+    {
+        IsEditOpen = false;
+        SelectedUser = null;
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    // ✅ Delete user
+    private void OpenDeleteModal(string userId)
+    {
+        SelectedUserId = userId;
+        IsDeleteOpen = true;
+    }
+
+    private async Task CloseDeleteModal(bool _)
+    {
+        IsDeleteOpen = false;
+        SelectedUserId = null;
         Users = await UserService.GetAllUsersAsync();
     }
 }

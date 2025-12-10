@@ -4,14 +4,15 @@
 
 @if (IsOpen)
 {
-    <div class="modal-backdrop">
-        <div class="modal-card">
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow"
+             style="width: 360px; border-radius: 12px; padding: 20px; background: white;">
 
-            <h5>Assign Role</h5>
+            <h5 class="mb-3 text-center">Assign Role</h5>
 
             @if (!string.IsNullOrWhiteSpace(Message))
             {
-                <div class="alert alert-info">
+                <div class="alert alert-info py-2">
                     @Message
                 </div>
             }
@@ -19,19 +20,22 @@
             <EditForm Model="AssignModel" OnValidSubmit="AssignRole">
                 <DataAnnotationsValidator />
 
+                <!-- ✅ ROLE SELECTION -->
                 <div class="form-group mt-3">
-                    <label>Role</label>
-                    <select class="form-control" @bind="AssignModel.RoleName">
-                        <option value="">-- Select Role --</option>
+                    <label class="small text-muted">Select Role</label>
+                    <select class="form-control"
+                            @bind="AssignModel.RoleName">
+                        <option value="">-- Choose a role --</option>
                         <option value="Admin">Admin</option>
                         <option value="Manager">Manager</option>
                         <option value="User">User</option>
                     </select>
                 </div>
 
-                <div class="modal-actions mt-4">
-                    <button class="btn btn-secondary me-2"
-                            type="button"
+                <!-- ✅ ACTION BUTTONS -->
+                <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
                             @onclick="Close">
                         Cancel
                     </button>

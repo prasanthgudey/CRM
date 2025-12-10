@@ -8,7 +8,6 @@ namespace CRM.Server.Repositories
     {
         private readonly RoleManager<IdentityRole> _roleManager;
 
-        // ✅ Built-in Identity dependency
         public RoleRepository(RoleManager<IdentityRole> roleManager)
         {
             _roleManager = roleManager;
@@ -26,8 +25,17 @@ namespace CRM.Server.Repositories
 
         public async Task CreateAsync(string roleName)
         {
-            var role = new IdentityRole(roleName);
-            await _roleManager.CreateAsync(role);
+            await _roleManager.CreateAsync(new IdentityRole(roleName));
+        }
+
+        public async Task UpdateAsync(IdentityRole role)
+        {
+            await _roleManager.UpdateAsync(role);
+        }
+
+        public async Task DeleteAsync(IdentityRole role)
+        {
+            await _roleManager.DeleteAsync(role);
         }
     }
 }

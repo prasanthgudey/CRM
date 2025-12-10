@@ -12,22 +12,55 @@ namespace CRM.Client.Services.Roles
             _api = api;
         }
 
-        // ✅ CREATE ROLE
+        // ============================================
+        // CREATE ROLE
+        // ============================================
         public async Task CreateRoleAsync(CreateRoleDto dto)
         {
-            await _api.PostAsync<CreateRoleDto>(
-                "api/role/create", dto
+            await _api.PostAsync("api/role/create", dto);
+        }
+
+        // ============================================
+        // GET ALL ROLES
+        // ============================================
+        public async Task<List<RoleResponseDto>?> GetAllRolesAsync()
+        {
+            return await _api.GetAsync<List<RoleResponseDto>>("api/role");
+        }
+
+        // ============================================
+        // GET ROLE BY NAME
+        // ============================================
+        public async Task<RoleResponseDto?> GetRoleAsync(string roleName)
+        {
+            return await _api.GetAsync<RoleResponseDto>($"api/role/{roleName}");
+        }
+
+        // ============================================
+        // UPDATE / RENAME ROLE
+        // ============================================
+        public async Task UpdateRoleAsync(UpdateRoleDto dto)
+        {
+            await _api.PutAsync<UpdateRoleDto, object?>(
+                "api/role/update",
+                dto
             );
         }
 
+        // ============================================
+        // DELETE ROLE
+        // ============================================
+        public async Task DeleteRoleAsync(string roleName)
+        {
+            await _api.DeleteAsync($"api/role/{roleName}");
+        }
 
-        // ✅ ASSIGN ROLE
+        // ============================================
+        // ASSIGN ROLE TO USER
+        // ============================================
         public async Task AssignRoleAsync(AssignRoleDto dto)
         {
-            await _api.PostAsync<AssignRoleDto>(
-                "api/role/assign", dto
-            );
+            await _api.PostAsync("api/role/assign", dto);
         }
-
     }
 }

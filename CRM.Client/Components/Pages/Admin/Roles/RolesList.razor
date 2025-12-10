@@ -4,10 +4,18 @@
 @using CRM.Client.DTOs.Roles
 @using CRM.Client.Components.Layout
 @using CRM.Client.Services.Roles
-@using Microsoft.AspNetCore.Components.Forms
+@using CRM.Client.Components.Modals.RoleModals
 @inject RoleService RoleService
 
 <h3>Roles Management</h3>
+
+<!-- ✅ ACTION BUTTONS (LIKE USERS PAGE) -->
+<div class="mb-3 d-flex gap-2">
+    <button class="btn btn-success"
+            @onclick="OpenCreateRoleModal">
+        Create New Role
+    </button>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(Message))
 {
@@ -16,56 +24,118 @@
     </div>
 }
 
-<EditForm Model="RoleModel" OnValidSubmit="CreateRole">
-    <DataAnnotationsValidator />
+<!-- ✅ ROLES LIST -->
+@if (Roles == null)
+{
+    <p>Loading roles...</p>
+}
+else
+{
+    <table class="table table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Role Name</th>
+                <th style="width:220px">Actions</th>
+            </tr>
+        </thead>
 
-    <div class="row">
-        <div class="col-md-6">
+        <tbody>
+            @foreach (var role in Roles)
+            {
+                <tr>
+                    <td>@role.Name</td>
+                    <td>
+                        <button type="button"
+                                class="btn btn-warning btn-sm me-2"
+                                @onclick="() => OpenEditModal(role.Name)">
+                            Edit
+                        </button>
 
-            <div class="form-group mb-3">
-                <label>Role Name</label>
-                <InputText class="form-control"
-                           @bind-Value="RoleModel.RoleName"
-                           placeholder="Enter role name" />
-            </div>
+                        <button type="button"
+                                class="btn btn-danger btn-sm"
+                                @onclick="() => OpenDeleteModal(role.Name)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
 
-            <button class="btn btn-success"
-                    disabled="@IsLoading">
-                @(IsLoading ? "Creating..." : "Create Role")
-            </button>
+<!-- ✅ CREATE ROLE MODAL -->
+<CreateRoleModal IsOpen="@IsCreateOpen"
+                 OnClose="CloseCreateRoleModal" />
 
-        </div>
-    </div>
-</EditForm>
+<!-- ✅ EDIT ROLE MODAL -->
+<EditRoleModal IsOpen="@IsEditOpen"
+               OldRoleName="@SelectedRole"
+               OnClose="CloseEditModal" />
+
+<!-- ✅ DELETE ROLE MODAL -->
+<DeleteRoleModal IsOpen="@IsDeleteOpen"
+                 RoleName="@SelectedRole"
+                 OnClose="CloseDeleteModal" />
 
 @code {
 
-    private CreateRoleDto RoleModel { get; set; } = new CreateRoleDto();
+    private List<RoleResponseDto>? Roles;
 
-    private bool IsLoading { get; set; }
+    private string? Message;
 
-    private string? Message { get; set; }
+    private bool IsCreateOpen;
+    private bool IsEditOpen;
+    private bool IsDeleteOpen;
 
-    private async Task CreateRole()
+    private string? SelectedRole;
+
+    // ✅ Load roles
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        IsLoading = true;
-        Message = null;
-
-        try
+        if (firstRender)
         {
-            await RoleService.CreateRoleAsync(RoleModel);
+            Roles = await RoleService.GetAllRolesAsync();
+            StateHasChanged();
+        }
+    }
 
-            Message = "Role created successfully.";
+    // ✅ CREATE ROLE MODAL
+    private void OpenCreateRoleModal()
+    {
+        IsCreateOpen = true;
+    }
 
-            RoleModel = new CreateRoleDto();
-        }
-        catch
-        {
-            Message = "Failed to create role.";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+    private async Task CloseCreateRoleModal(bool _)
+    {
+        IsCreateOpen = false;
+        Roles = await RoleService.GetAllRolesAsync();
+    }
+
+    // ✅ EDIT ROLE MODAL
+    private void OpenEditModal(string roleName)
+    {
+        SelectedRole = roleName;
+        IsEditOpen = true;
+    }
+
+    private async Task CloseEditModal(bool _)
+    {
+        IsEditOpen = false;
+        SelectedRole = null;
+        Roles = await RoleService.GetAllRolesAsync();
+    }
+
+    // ✅ DELETE ROLE MODAL
+    private void OpenDeleteModal(string roleName)
+    {
+        SelectedRole = roleName;
+        IsDeleteOpen = true;
+    }
+
+    private async Task CloseDeleteModal(bool _)
+    {
+        IsDeleteOpen = false;
+        SelectedRole = null;
+        Roles = await RoleService.GetAllRolesAsync();
     }
 }

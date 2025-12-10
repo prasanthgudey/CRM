@@ -7,7 +7,7 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")] // ✅ Admin only
+    //[Authorize(Roles = "Admin")] // ✅ Admin only
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -78,6 +78,63 @@ namespace CRM.Server.Controllers
             {
                 await _userService.DeactivateUserAsync(userId);
                 return Ok(new { message = "User deactivated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        // ✅ ACTIVATE USER
+        // =====================================================
+        [HttpPut("activate/{userId}")]
+        public async Task<IActionResult> Activate(string userId)
+        {
+            try
+            {
+                await _userService.ActivateUserAsync(userId);
+                return Ok(new { message = "User activated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        // =====================================================
+        // ✅ UPDATE USER
+        // =====================================================
+        [HttpPut("update/{userId}")]
+        public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                await _userService.UpdateUserAsync(userId, dto);
+                return Ok(new { message = "User updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+
+
+        // =====================================================
+        // ✅ DELETE USER
+        // =====================================================
+        [HttpDelete("{userId}")]
+        public async Task<IActionResult> DeleteUser(string userId)
+        {
+            try
+            {
+                await _userService.DeleteUserAsync(userId);
+                return Ok(new { message = "User deleted successfully" });
             }
             catch (Exception ex)
             {
