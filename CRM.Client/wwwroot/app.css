@@ -167,143 +167,150 @@ h1:focus {
     }
 
 
-/* ===== Profile Card ===== */
+/* ========== Profile layout ========== */
 
-.profile-card-wrapper {
+.profile-title {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-bottom: 1.6rem;
+    color: #111827;
+}
+
+.profile-page {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
     padding-top: 1rem;
 }
 
-/* Main card shell */
+/* Card */
 .profile-card {
-    max-width: 520px;
     width: 100%;
-    border-radius: 16px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: radial-gradient(circle at top left, #f9fafb 0, #ffffff 45%, #f3f4f6 100%);
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(148, 163, 184, 0.12);
-    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, border-color 0.18s ease-out, background 0.25s ease-out;
+    max-width: 600px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }
 
-    .profile-card:hover {
-        transform: translateY(-3px);
-        border-color: rgba(59, 130, 246, 0.55);
-        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(59, 130, 246, 0.35);
+/* Rows */
+.profile-row {
+    margin-bottom: 1.1rem;
+}
+
+/* Split rows: two equal columns (for Role/Status and buttons) */
+.profile-row--split {
+    display: flex;
+    gap: 1rem;
+}
+
+    .profile-row--split .profile-col,
+    .profile-row--actions .profile-btn {
+        flex: 1;
     }
 
-    /* Section spacing */
-    .profile-card .mb-3 {
-        margin-bottom: 1rem !important;
+/* Labels + values */
+.profile-label {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 0.3rem;
+}
+
+.profile-value {
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.92rem;
+    color: #111827;
+}
+
+/* Badges */
+.profile-badge {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.profile-badge--primary {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.profile-badge--success {
+    background-color: #16a34a;
+    color: #ffffff;
+}
+
+.profile-badge--secondary {
+    background-color: #9ca3af;
+    color: #ffffff;
+}
+
+/* Buttons */
+.profile-row--actions {
+    margin-top: 1.6rem;
+}
+
+.profile-btn {
+    border-radius: 4px;
+    border: 1px solid transparent;
+    padding: 0.65rem 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+/* Change Password */
+.profile-btn--warning {
+    background-color: #ffc107;
+    border-color: #ffca2c;
+    color: #1f2933;
+}
+
+    .profile-btn--warning:hover {
+        background-color: #ffcd39;
+        transform: translateY(-1px);
     }
 
-    /* Label styling */
-    .profile-card .form-label {
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: 600;
-        color: #6b7280;
-        margin-bottom: 0.25rem;
+/* Enable MFA */
+.profile-btn--primary-outline {
+    background-color: #ffffff;
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+    .profile-btn--primary-outline:hover {
+        background-color: #2563eb;
+        color: #ffffff;
+        transform: translateY(-1px);
     }
 
-    /* Value “pill” fields */
-    .profile-card .form-control {
-        border-radius: 999px;
-        border: 1px solid #e5e7eb;
-        background-color: #f9fafb;
-        font-size: 0.9rem;
-        padding: 0.55rem 0.9rem;
-        color: #111827;
-        box-shadow: none;
+/* Disable MFA */
+.profile-btn--danger-outline {
+    background-color: #ffffff;
+    border-color: #dc2626;
+    color: #dc2626;
+}
+
+    .profile-btn--danger-outline:hover {
+        background-color: #dc2626;
+        color: #ffffff;
+        transform: translateY(-1px);
     }
 
-        .profile-card .form-control.bg-light {
-            background-color: #f9fafb !important;
-        }
-
-    /* Badges */
-    .profile-card .badge {
-        border-radius: 999px;
-        padding: 0.35rem 0.8rem;
-        font-weight: 500;
-        font-size: 0.78rem;
+/* Small-screen: stack split rows */
+@media (max-width: 640px) {
+    .profile-row--split {
+        flex-direction: column;
     }
+}
 
-        /* Override bootstrap badge colors for a softer look */
-        .profile-card .badge.bg-primary {
-            background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
-        }
-
-        .profile-card .badge.bg-success {
-            background: linear-gradient(135deg, #16a34a, #22c55e) !important;
-        }
-
-        .profile-card .badge.bg-secondary {
-            background: #e5e7eb !important;
-            color: #374151 !important;
-        }
-
-    /* Action buttons row */
-    .profile-card .mt-4.d-flex {
-        margin-top: 1.5rem !important;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-    }
-
-    /* Buttons */
-    .profile-card .btn {
-        border-radius: 999px;
-        font-size: 0.88rem;
-        padding: 0.45rem 1rem;
-        font-weight: 500;
-        transition: transform 0.14s ease-out, box-shadow 0.14s ease-out, background-color 0.14s ease-out, color 0.14s ease-out, border-color 0.14s ease-out;
-    }
-
-        .profile-card .btn:focus {
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
-            outline: none;
-        }
-
-        /* Change Password (warning) */
-        .profile-card .btn.btn-warning {
-            background: linear-gradient(135deg, #f97316, #facc15);
-            border: none;
-            color: #111827;
-            box-shadow: 0 10px 20px rgba(248, 158, 37, 0.35);
-        }
-
-            .profile-card .btn.btn-warning:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 14px 30px rgba(248, 158, 37, 0.45);
-            }
-
-        /* Enable MFA – outline primary */
-        .profile-card .btn.btn-outline-primary {
-            border-color: rgba(59, 130, 246, 0.8);
-            color: #1d4ed8;
-            background-color: transparent;
-        }
-
-            .profile-card .btn.btn-outline-primary:hover {
-                background: rgba(59, 130, 246, 0.06);
-                border-color: #2563eb;
-                transform: translateY(-1px);
-            }
-
-        /* Disable MFA – outline danger */
-        .profile-card .btn.btn-outline-danger {
-            border-color: rgba(239, 68, 68, 0.85);
-            color: #b91c1c;
-            background-color: transparent;
-        }
-
-            .profile-card .btn.btn-outline-danger:hover {
-                background: rgba(239, 68, 68, 0.06);
-                border-color: #ef4444;
-                transform: translateY(-1px);
-            }
 
 /* Page heading (optional) */
 .page-title,
