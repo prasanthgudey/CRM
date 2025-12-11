@@ -1,14 +1,10 @@
-﻿
-using CRM.Server.DTOs.Auth;
+﻿using CRM.Server.DTOs.Auth;
 using CRM.Server.Models;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-
-
-
 
 namespace CRM.Server.Controllers
 {
@@ -18,37 +14,56 @@ namespace CRM.Server.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IJwtTokenService _jwtTokenService;
-            private readonly IUserService _userService;
+        private readonly IUserService _userService;
+        private readonly IAuditLogService _auditLogService; // ✅ ADDED
 
-        // ✅ Built-in: UserManager
-        // ✅ Custom: IJwtTokenService
         public AuthController(
             UserManager<ApplicationUser> userManager,
-            IJwtTokenService jwtTokenService, IUserService userService)
+            IJwtTokenService jwtTokenService,
+            IUserService userService,
+            IAuditLogService auditLogService) // ✅ ADDED
         {
             _userManager = userManager;
             _jwtTokenService = jwtTokenService;
             _userService = userService;
+            _auditLogService = auditLogService;
         }
 
         // =====================================================
-        // ✅ LOGIN WITH JWT + ROLE + ACTIVE CHECK
+        // ✅ LOGIN WITH JWT + ROLE + ACTIVE CHECK + AUDIT
         // =====================================================
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginRequestDto dto)
         {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
             var user = await _userManager.FindByEmailAsync(dto.Email);
             if (user == null)
+            {
+                await SafeAudit(null, "Login Failed", "Authentication", false, ip,
+                    null, $"Invalid email: {dto.Email}");
+
                 return Unauthorized("Invalid credentials");
+            }
 
             if (!user.IsActive)
+            {
+                await SafeAudit(user.Id, "Login Failed", "Authentication", false, ip,
+                    null, "Account is deactivated");
+
                 return Unauthorized("Account is deactivated");
+            }
 
             var isValid = await _userManager.CheckPasswordAsync(user, dto.Password);
             if (!isValid)
-                return Unauthorized("Invalid credentials");
+            {
+                await SafeAudit(user.Id, "Login Failed", "Authentication", false, ip,
+                    null, "Invalid password");
 
-            // ✅✅✅ MFA CHECK (CRITICAL)
+                return Unauthorized("Invalid credentials");
+            }
+
+            // ✅ MFA CHECK
             if (user.TwoFactorEnabled)
             {
                 return Ok(new AuthResponseDto
@@ -58,9 +73,11 @@ namespace CRM.Server.Controllers
                 });
             }
 
-            // ✅ NORMAL LOGIN (NO MFA)
             var roles = await _userManager.GetRolesAsync(user);
             var token = _jwtTokenService.GenerateToken(user, roles);
+
+            await SafeAudit(user.Id, "Login Success", "Authentication", true, ip,
+                null, user.Email);
 
             return Ok(new AuthResponseDto
             {
@@ -69,84 +86,103 @@ namespace CRM.Server.Controllers
             });
         }
 
-
         // =====================================================
-        // ✅ COMPLETE REGISTRATION FROM INVITE LINK (SECURE)
+        // ✅ MFA LOGIN + AUDIT
         // =====================================================
-        [HttpPost("complete-registration")]
-        public async Task<IActionResult> CompleteRegistration(CompleteRegistrationDto dto)
+        [HttpPost("mfa/login")]
+        public async Task<IActionResult> MfaLogin(MfaLoginDto dto)
         {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
             var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user == null)
+            {
+                await SafeAudit(null, "MFA Login Failed", "Authentication", false, ip,
+                    null, "Invalid email");
 
-            if (user == null || !user.IsInvitePending)
-                return BadRequest("Invalid or already completed invite");
+                return Unauthorized("Invalid credentials");
+            }
 
-            // ✅ CHECK INVITE EXPIRY
-            if (user.InviteExpiry.HasValue && user.InviteExpiry < DateTime.UtcNow)
-                return BadRequest("Invitation link has expired");
+            if (!user.IsActive)
+            {
+                await SafeAudit(user.Id, "MFA Login Failed", "Authentication", false, ip,
+                    null, "Account is deactivated");
 
-            // ✅ IMPORTANT FIX: URL DECODE TOKEN
-            var decodedToken = System.Net.WebUtility.UrlDecode(dto.Token);
+                return Unauthorized("Account is deactivated");
+            }
 
-            var result = await _userManager.ResetPasswordAsync(
-                 user, decodedToken, dto.Password);
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                dto.Code);
 
+            if (!isValid)
+            {
+                await SafeAudit(user.Id, "MFA Login Failed", "Authentication", false, ip,
+                    null, "Invalid MFA code");
 
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
+                return Unauthorized("Invalid verification code");
+            }
 
-            // ✅ ACTIVATE ACCOUNT
-            user.IsInvitePending = false;
-            user.IsActive = true;
-            user.InviteExpiry = null;
+            var roles = await _userManager.GetRolesAsync(user);
+            var token = _jwtTokenService.GenerateToken(user, roles);
 
-            await _userManager.UpdateAsync(user);
+            await SafeAudit(user.Id, "MFA Login Success", "Authentication", true, ip,
+                null, user.Email);
 
-            return Ok("Registration completed successfully");
+            return Ok(new AuthResponseDto
+            {
+                Token = token,
+                Expiration = DateTime.UtcNow.AddMinutes(30)
+            });
         }
 
         // =====================================================
-        // ✅ FORGOT PASSWORD
+        // ✅ FORGOT PASSWORD  
         // =====================================================
-        [HttpPost("forgot-password")]
-        public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
         {
-            await _userService.ForgotPasswordAsync(dto.Email);
-            return Ok(new { message = "If the email is registered, a reset link has been sent." });
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+            await SafeAudit(userId, "Logout", "Authentication", true, ip, null, null);
+
+            return Ok(new { message = "Logged out successfully" });
         }
 
         // =====================================================
-        // ✅ RESET PASSWORD
-        // =====================================================
-        [HttpPost("reset-password")]
-        public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
-        {
-            await _userService.ResetPasswordAsync(dto.Email, dto.Token, dto.NewPassword);
-            return Ok(new { message = "Password reset successful" });
-        }
-
-        // =====================================================
-        // ✅ CHANGE PASSWORD (LOGGED-IN USER)
+        // ✅ CHANGE PASSWORD + AUDIT
         // =====================================================
         [HttpPost("change-password")]
         [Authorize]
         public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
             await _userService.ChangePasswordAsync(
                 userId!, dto.CurrentPassword, dto.NewPassword);
 
+            await SafeAudit(userId, "Password Changed", "Authentication", true, ip, null, null);
+
             return Ok(new { message = "Password changed successfully" });
         }
 
+        // =====================================================
+        // ✅ MFA ENABLE / VERIFY / DISABLE + AUDIT
+        // =====================================================
         [HttpPost("mfa/enable")]
         [Authorize]
         public async Task<IActionResult> EnableMfa()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
             var result = await _userService.EnableMfaAsync(userId!);
+
+            await SafeAudit(userId, "MFA Enabled", "Authentication", true, ip, null, null);
 
             return Ok(result);
         }
@@ -156,8 +192,11 @@ namespace CRM.Server.Controllers
         public async Task<IActionResult> VerifyMfa(VerifyMfaDto dto)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
             await _userService.VerifyMfaAsync(userId!, dto.Code);
+
+            await SafeAudit(userId, "MFA Verified", "Authentication", true, ip, null, null);
 
             return Ok(new { message = "MFA enabled successfully" });
         }
@@ -167,39 +206,44 @@ namespace CRM.Server.Controllers
         public async Task<IActionResult> DisableMfa(VerifyMfaDto dto)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
             await _userService.DisableMfaAsync(userId!, dto.Code);
+
+            await SafeAudit(userId, "MFA Disabled", "Authentication", true, ip, null, null);
 
             return Ok(new { message = "MFA disabled successfully" });
         }
 
-        [HttpPost("mfa/login")]
-        public async Task<IActionResult> MfaLogin(MfaLoginDto dto)
+        // =====================================================
+        // ✅ SAFE AUDIT WRAPPER (PROTECTS AUTH FLOW)
+        // =====================================================
+        private async Task SafeAudit(
+            string? performedByUserId,
+            string action,
+            string entityName,
+            bool isSuccess,
+            string? ipAddress,
+            string? oldValue,
+            string? newValue)
         {
-            var user = await _userManager.FindByEmailAsync(dto.Email);
-            if (user == null)
-                return Unauthorized("Invalid credentials");
-
-            if (!user.IsActive)
-                return Unauthorized("Account is deactivated");
-
-            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
-                user,
-                TokenOptions.DefaultAuthenticatorProvider,
-                dto.Code);
-
-            if (!isValid)
-                return Unauthorized("Invalid verification code");
-
-            var roles = await _userManager.GetRolesAsync(user);
-            var token = _jwtTokenService.GenerateToken(user, roles);
-
-            return Ok(new AuthResponseDto
+            try
             {
-                Token = token,
-                Expiration = DateTime.UtcNow.AddMinutes(30)
-            });
+                await _auditLogService.LogAsync(
+                    performedByUserId,
+                    null,
+                    action,
+                    entityName,
+                    isSuccess,
+                    ipAddress,
+                    oldValue,
+                    newValue
+                );
+            }
+            catch
+            {
+                // ✅ Never allow audit failure to break authentication
+            }
         }
-
     }
 }

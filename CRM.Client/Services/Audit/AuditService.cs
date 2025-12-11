@@ -3,7 +3,6 @@ using CRM.Client.Services.Http;
 
 namespace CRM.Client.Services.Audit
 {
-    // ✅ USER-DEFINED: Read-only audit service
     public class AuditService
     {
         private readonly ApiClientService _api;
@@ -14,7 +13,7 @@ namespace CRM.Client.Services.Audit
         }
 
         // ✅ GET ALL AUDIT LOGS
-        public async Task<List<AuditLogResponseDto>?> GetAllLogsAsync()
+        public async Task<List<AuditLogResponseDto>?> GetAllAsync()
         {
             return await _api.GetAsync<List<AuditLogResponseDto>>("api/audit");
         }
