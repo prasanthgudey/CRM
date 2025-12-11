@@ -91,6 +91,7 @@ namespace CRM.Server.Controllers
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             var task = await _service.CreateAsync(dto, performedBy!);
+            _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
             return CreatedAtAction(nameof(GetById), new { id = task.TaskId }, task);
         }
 
