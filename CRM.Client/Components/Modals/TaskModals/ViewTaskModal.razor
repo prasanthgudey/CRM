@@ -1,0 +1,154 @@
+﻿@using CRM.Client.DTOs.Tasks
+
+@if (IsOpen && Model != null)
+{
+    <div class="modal fade show d-block task-modal-backdrop" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered task-modal-dialog">
+            <div class="modal-content task-modal-content">
+                <div class="modal-header task-modal-header">
+                    <h5 class="modal-title task-modal-title">Task — View</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+                </div>
+
+                <div class="modal-body task-modal-body">
+                    <div class="row g-3">
+
+                        <!-- BASIC INFO -->
+                        <div class="col-12">
+                            <label class="form-label text-muted small">Title</label>
+                            <div class="form-control-plaintext">@Model.Title</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label text-muted small">Description</label>
+                            <div class="form-control-plaintext">@DisplayOrDash(Model.Description)</div>
+                        </div>
+
+                        <!-- ASSIGNMENT -->
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Customer ID</label>
+                            <div class="form-control-plaintext">@Model.CustomerId</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Assigned User ID</label>
+                            <div class="form-control-plaintext">@Model.UserId</div>
+                        </div>
+
+                        <!-- STATUS -->
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">State</label>
+                            <div class="form-control-plaintext">@Model.State</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Priority</label>
+                            <div class="form-control-plaintext">@Model.Priority</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Due Date</label>
+                            <div class="form-control-plaintext">@FormatDate(Model.DueDate)</div>
+                        </div>
+
+                        <!-- TIMESTAMPS -->
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Created At</label>
+                            <div class="form-control-plaintext">@FormatDate(Model.CreatedAt)</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Completed At</label>
+                            <div class="form-control-plaintext">@FormatNullable(Model.CompletedAt)</div>
+                        </div>
+
+                        <!-- RECURRENCE -->
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Is Recurring</label>
+                            <div class="form-control-plaintext">@Model.IsRecurring</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Recurrence Type</label>
+                            <div class="form-control-plaintext">@Model.RecurrenceType</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Recurrence Interval</label>
+                            <div class="form-control-plaintext">@DisplayOrDash(Model.RecurrenceInterval?.ToString())</div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label text-muted small">Recurrence End Date</label>
+                            <div class="form-control-plaintext">@FormatNullable(Model.RecurrenceEndDate)</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="modal-footer task-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+    [Parameter] public TaskResponseDto? Model { get; set; }
+
+    private async Task Close() => await OnClose.InvokeAsync(false);
+
+    // Helpers
+    private static string DisplayOrDash(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value!;
+
+    private static string FormatDate(DateTime date) =>
+        date.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+
+    private static string FormatNullable(DateTime? date) =>
+        date.HasValue ? date.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm") : "-";
+}
+
+<style>
+    .form-control-plaintext {
+        padding: .4rem .65rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        font-size: .95rem;
+    }
+
+    .task-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 1050;
+    }
+
+    .task-modal-content {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .task-modal-header {
+        background: #0d6efd;
+        color: white;
+        padding: 12px 16px;
+    }
+
+    .btn-close-white {
+        filter: invert(1) brightness(2);
+        opacity: .9;
+    }
+
+    .task-modal-body {
+        padding: 18px;
+    }
+
+    .task-modal-footer {
+        padding: 12px 16px;
+        background: #f8f9fa;
+    }
+</style>

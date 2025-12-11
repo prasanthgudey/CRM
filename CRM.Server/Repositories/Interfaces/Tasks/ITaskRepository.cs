@@ -1,4 +1,5 @@
-﻿using CRM.Server.Dtos;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.Dtos;
 using CRM.Server.Models.Tasks;
 
 
@@ -11,4 +12,6 @@ public interface ITaskRepository
     TaskItem Add(TaskItem task);
     TaskItem Update(TaskItem task);
     void Delete(Guid id);
+
+    Task<PagedResult<TaskItem>> GetPagedAsync(PageParams parms);
 }

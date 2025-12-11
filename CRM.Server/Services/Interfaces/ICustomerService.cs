@@ -1,5 +1,6 @@
-﻿using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
 using CRM.Server.Data;
+using CRM.Server.DTOs;
 
 namespace CRM.Server.Services.Interfaces
 {
@@ -20,5 +21,23 @@ namespace CRM.Server.Services.Interfaces
         Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto, string performedByUserId);
 
         Task<bool> DeleteAsync(Guid id, string performedByUserId);
+
+        // -------------------------
+        // NEW: Dashboard-friendly helpers
+        // -------------------------
+
+        /// <summary>
+        /// Returns total number of customers.
+        /// </summary>
+        Task<int> GetTotalCountAsync();
+
+        /// <summary>
+        /// Returns number of customers created within the last `days`.
+        /// </summary>
+        Task<int> GetNewCustomersCountAsync(int days = 7);
+
+
+        Task<PagedResult<CustomerResponseDto>> GetPagedAsync(PageParams parms);
+
     }
 }

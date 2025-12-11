@@ -1,9 +1,10 @@
-﻿using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.DTOs;
 using CRM.Server.Models;
 using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
-using System.Text.Json;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace CRM.Server.Services
 {
@@ -241,6 +242,42 @@ namespace CRM.Server.Services
                 .ToList();
         }
 
+        // -------------------------
+        // NEW: Dashboard helper methods
+        // -------------------------
+
+        /// <summary>
+        /// NEW: Returns total number of customers (server-side)
+        /// </summary>
+        public async Task<int> GetTotalCountAsync()
+        {
+            var list = await _repo.GetAllAsync();
+            return list?.Count ?? 0;
+        }
+
+        /// <summary>
+        /// NEW: Returns number of customers created in the last `days` (server-side)
+        /// </summary>
+        public async Task<int> GetNewCustomersCountAsync(int days = 7)
+        {
+            var list = await _repo.GetAllAsync();
+            if (list == null || !list.Any()) return 0;
+
+            var cutoff = DateTime.UtcNow.AddDays(-days);
+
+            var count = list.Count(c =>
+            {
+                if (string.IsNullOrWhiteSpace(c.CreatedAt)) return false;
+                if (DateTime.TryParse(c.CreatedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var created))
+                {
+                    return created >= cutoff;
+                }
+                return false;
+            });
+
+            return count;
+        }
+
         // SAFE AUDIT helper
         private async Task SafeAudit(
             string? performedByUserId,
@@ -267,6 +304,32 @@ namespace CRM.Server.Services
             {
                 // swallow - auditing must not break main flow
             }
+        }
+
+        public async Task<PagedResult<CustomerResponseDto>> GetPagedAsync(PageParams parms)
+        {
+            var paged = await _repo.GetPagedAsync(parms);
+
+            return new PagedResult<CustomerResponseDto>
+            {
+                Items = paged.Items.Select(c => new CustomerResponseDto
+                {
+                    CustomerId = c.CustomerId,
+                    FirstName = c.FirstName,
+                    SurName = c.SurName,
+                    MiddleName = c.MiddleName,
+                    PreferredName = c.PreferredName,
+                    Email = c.Email,
+                    Phone = c.Phone,
+                    Address = c.Address,
+                    CreatedByUserId = c.CreatedByUserId,
+                    CreatedAt = c.CreatedAt
+                }).ToList(),
+
+                Page = paged.Page,
+                PageSize = paged.PageSize,
+                TotalCount = paged.TotalCount
+            };
         }
     }
 }

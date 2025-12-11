@@ -1,0 +1,49 @@
+﻿@using CRM.Client.DTOs.Users
+
+@if (IsOpen && Model != null)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow" style="width:480px; border-radius:12px; background:white;">
+            <div class="p-3">
+
+                <h5 class="mb-3 text-center">User — View</h5>
+
+                <dl class="row">
+                    <dt class="col-sm-4">User ID</dt>
+                    <dd class="col-sm-8">@Model.Id</dd>
+
+                    <dt class="col-sm-4">Full Name</dt>
+                    <dd class="col-sm-8">@Model.FullName</dd>
+
+                    <dt class="col-sm-4">Email</dt>
+                    <dd class="col-sm-8">@Model.Email</dd>
+
+                    <dt class="col-sm-4">Role</dt>
+                    <dd class="col-sm-8">@Model.Role</dd>
+
+                    <dt class="col-sm-4">Is Active</dt>
+                    <dd class="col-sm-8">@Model.IsActive</dd>
+
+                    <dt class="col-sm-4">MFA Enabled</dt>
+                    <dd class="col-sm-8">@Model.TwoFactorEnabled</dd>
+                </dl>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="Close">
+                        Close
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    [Parameter] public UserResponseDto? Model { get; set; }
+
+    private async Task Close() => await OnClose.InvokeAsync(false);
+}

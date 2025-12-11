@@ -1,9 +1,18 @@
 ﻿@page "/admin/audit-log"
 @layout MainLayout
 
-@using CRM.Client.DTOs.Audit
-@using CRM.Client.Services.Audit
+@using System.Text.Json
 @using CRM.Client.Components.Layout
+@using CRM.Client.Components.Modals.CustomerModals
+@using CRM.Client.Components.Modals.RoleModals
+@using CRM.Client.Components.Modals.TaskModals
+@using CRM.Client.Components.Modals.UserModals
+@using CRM.Client.DTOs.Audit
+@using CRM.Client.DTOs.Customers
+@using CRM.Client.DTOs.Tasks
+@using CRM.Client.DTOs.Users
+@using CRM.Client.DTOs.Roles
+@using CRM.Client.Services.Audit
 
 @inject AuditService AuditService
 @inject NavigationManager Nav
@@ -89,17 +98,43 @@ else
 
                         <td class="small">@log.IpAddress</td>
 
+                        <!-- OLD value cell: opens entity-specific view modal -->
                         <td>
                             @if (!string.IsNullOrWhiteSpace(log.OldValue))
                             {
-                                <pre class="audit-json">@log.OldValue</pre>
+                                <button class="btn btn-outline-secondary btn-sm audit-eye-btn"
+                                        title="@($"{log.EntityName} - Old")"
+                                        @onclick="() => OpenEntityViewModal(log, true)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8z"/>
+                                        <path d="M8 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>
+                                    </svg>
+                                    <span class="ms-1 small">Old</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <span>-</span>
                             }
                         </td>
 
+                        <!-- NEW value cell: opens entity-specific view modal -->
                         <td>
                             @if (!string.IsNullOrWhiteSpace(log.NewValue))
                             {
-                                <pre class="audit-json">@log.NewValue</pre>
+                                <button class="btn btn-outline-primary btn-sm audit-eye-btn"
+                                        title="@($"{log.EntityName} - New")"
+                                        @onclick="() => OpenEntityViewModal(log, false)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8z"/>
+                                        <path d="M8 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>
+                                    </svg>
+                                    <span class="ms-1 small">New</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <span>-</span>
                             }
                         </td>
                     </tr>
@@ -109,9 +144,54 @@ else
     </div>
 }
 
-@code {
+@* -------------------------------
+   Entity-specific view modals
+   (these are separate files you will create:
+    ViewCustomerModal, ViewTaskModal,
+    ViewUserModal, ViewRoleModal)
+   ------------------------------- *@
 
+<ViewCustomerModal @ref="viewCustomerModal"
+                   IsOpen="@isViewCustomerOpen"
+                   Model="@customerViewModel"
+                   OnClose="OnCustomerModalClosed" />
+
+<ViewTaskModal @ref="viewTaskModal"
+               IsOpen="@isViewTaskOpen"
+               Model="@taskViewModel"
+               OnClose="OnTaskModalClosed" />
+
+<ViewUserModal @ref="viewUserModal"
+              IsOpen="@isViewUserOpen"
+              Model="@userViewModel"
+              OnClose="OnUserModalClosed" />
+
+<ViewRoleModal @ref="viewRoleModal"
+              IsOpen="@isViewRoleOpen"
+              Model="@roleViewModel"
+              OnClose="OnRoleModalClosed" />
+
+@code {
     private List<AuditLogResponseDto>? Logs;
+
+    // modal refs (optional)
+    private ViewCustomerModal? viewCustomerModal;
+    private ViewTaskModal? viewTaskModal;
+    private ViewUserModal? viewUserModal;
+    private ViewRoleModal? viewRoleModal;
+
+    // modal open flags & models (USER-DEFINED)
+    private bool isViewCustomerOpen;
+    private CustomerResponseDto? customerViewModel;
+
+    private bool isViewTaskOpen;
+    private TaskResponseDto? taskViewModel;
+
+    private bool isViewUserOpen;
+    private UserResponseDto? userViewModel;
+
+    private bool isViewRoleOpen;
+    private RoleResponseDto? roleViewModel;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -128,11 +208,108 @@ else
         if (string.IsNullOrWhiteSpace(userId))
             return;
 
-        // Adjust route if your user profile route is different
         Nav.NavigateTo($"/admin/users/{userId}");
     }
 
-    // still useful for debugging if needed
+    /// <summary>
+    /// Decide which view modal to open based on log.EntityName
+    /// and deserialize the JSON into the corresponding DTO.
+    /// </summary>
+    /// <param name="log">audit log row</param>
+    /// <param name="useOld">true => OldValue, false => NewValue</param>
+    private void OpenEntityViewModal(AuditLogResponseDto log, bool useOld)
+    {
+        var json = useOld ? log.OldValue : log.NewValue;
+        if (string.IsNullOrWhiteSpace(json)) return;
+
+        var entity = (log.EntityName ?? string.Empty).Trim().ToLowerInvariant();
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // close any previously open modal models
+        CloseAllViewModels();
+
+        try
+        {
+            if (entity.Contains("task"))
+            {
+                taskViewModel = JsonSerializer.Deserialize<TaskResponseDto>(json, options);
+                isViewTaskOpen = taskViewModel != null;
+            }
+            else if (entity.Contains("customer"))
+            {
+                customerViewModel = JsonSerializer.Deserialize<CustomerResponseDto>(json, options);
+                isViewCustomerOpen = customerViewModel != null;
+            }
+            else if (entity.Contains("user"))
+            {
+                userViewModel = JsonSerializer.Deserialize<UserResponseDto>(json, options);
+                isViewUserOpen = userViewModel != null;
+            }
+            else if (entity.Contains("role"))
+            {
+                roleViewModel = JsonSerializer.Deserialize<RoleResponseDto>(json, options);
+                isViewRoleOpen = roleViewModel != null;
+            }
+            else
+            {
+                // Fallback: try parsing into CustomerResponseDto as generic viewer,
+                // or you can open a generic JSON viewer component if you have one.
+                customerViewModel = null;
+                isViewCustomerOpen = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            // parsing failed - log to console and optionally show a toast.
+            Console.WriteLine($"Audit JSON parse failed for entity '{log.EntityName}': {ex.Message}");
+            // Optionally: open a generic JSON viewer modal here if you have one.
+        }
+
+        StateHasChanged();
+    }
+
+    private void CloseAllViewModels()
+    {
+        isViewCustomerOpen = false;
+        customerViewModel = null;
+
+        isViewTaskOpen = false;
+        taskViewModel = null;
+
+        isViewUserOpen = false;
+        userViewModel = null;
+
+        isViewRoleOpen = false;
+        roleViewModel = null;
+    }
+
+    // Modal close callbacks
+    private async Task OnCustomerModalClosed(bool refresh)
+    {
+        isViewCustomerOpen = false;
+        customerViewModel = null;
+        await Task.CompletedTask;
+    }
+    private async Task OnTaskModalClosed(bool refresh)
+    {
+        isViewTaskOpen = false;
+        taskViewModel = null;
+        await Task.CompletedTask;
+    }
+    private async Task OnUserModalClosed(bool refresh)
+    {
+        isViewUserOpen = false;
+        userViewModel = null;
+        await Task.CompletedTask;
+    }
+    private async Task OnRoleModalClosed(bool refresh)
+    {
+        isViewRoleOpen = false;
+        roleViewModel = null;
+        await Task.CompletedTask;
+    }
+
+    // small helper (kept from original file - optional)
     private static string Shorten(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -162,7 +339,17 @@ else
         text-decoration: underline;
     }
 
-        .audit-user:hover {
-            color: #084298;
-        }
+    .audit-user:hover {
+        color: #084298;
+    }
+
+    /* make the eye buttons compact and aligned */
+    .audit-eye-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+    }
+
+    /* optional: keep table button width tidy */
+    .table .btn-sm { min-width: 60px; }
 </style>
