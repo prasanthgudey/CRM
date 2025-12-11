@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using CRM.Client.DTOs.Customers;
+using CRM.Client.DTOs.Shared;
 using CRM.Client.Services.Http;
 
 namespace CRM.Client.Services.Customers
@@ -88,5 +89,13 @@ namespace CRM.Client.Services.Customers
             var result = await _api.GetAsync<int?>($"api/customers/new?days={days}");
             return result ?? 0;
         }
+        public async Task<PagedResult<CustomerResponseDto>?> GetPagedAsync(
+    int page = 1,
+    int pageSize = 20)
+        {
+            var url = $"api/customers/paged?page={page}&pageSize={pageSize}";
+            return await _api.GetAsync<PagedResult<CustomerResponseDto>>(url);
+        }
+
     }
 }

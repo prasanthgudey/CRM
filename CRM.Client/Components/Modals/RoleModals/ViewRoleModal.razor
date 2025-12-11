@@ -1,0 +1,34 @@
+﻿@using CRM.Client.DTOs.Roles
+
+@if (IsOpen && Model != null)
+{
+    <div class="modal-backdrop d-flex align-items-center justify-content-center">
+        <div class="modal-card shadow" style="width:480px; border-radius:12px; background:white;">
+            <div class="p-3">
+
+                <h5 class="mb-3 text-center">Role — View</h5>
+
+                <dl class="row">
+                    <dt class="col-sm-4">Role ID</dt>
+                    <dd class="col-sm-8">@Model.Id</dd>
+
+                    <dt class="col-sm-4">Role Name</dt>
+                    <dd class="col-sm-8">@Model.Name</dd>
+                </dl>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="Close">Close</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+    [Parameter] public RoleResponseDto? Model { get; set; }
+
+    private async Task Close() => await OnClose.InvokeAsync(false);
+}

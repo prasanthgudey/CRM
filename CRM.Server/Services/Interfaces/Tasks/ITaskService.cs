@@ -1,4 +1,5 @@
-﻿using CRM.Server.Dtos;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.Dtos;
 
 namespace CRM.Server.Services
 {
@@ -33,5 +34,8 @@ namespace CRM.Server.Services
         /// Returns recent tasks for dashboards (ordered newest first).
         /// </summary>
         Task<List<TaskResponseDto>> GetRecentTasksAsync(int take = 50);
+
+        //paginig
+        Task<PagedResult<TaskResponseDto>> GetPagedAsync(PageParams parms);
     }
 }

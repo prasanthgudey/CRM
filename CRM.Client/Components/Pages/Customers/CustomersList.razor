@@ -5,30 +5,34 @@
 @using CRM.Client.DTOs.Customers
 @using CRM.Client.Services.Customers
 @using CRM.Client.Components.Modals.CustomerModals
+@using CRM.Client.DTOs.Shared
+@using CRM.Client.Components.Shared
 
 @inject CustomerService CustomerService
 
 <h3>Customers</h3>
 
-<div class="mb-3 d-flex gap-2">
+<div class="mb-3 d-flex gap-2 align-items-center">
     <button type="button"
             class="btn btn-primary"
             @onclick="OpenCreate">
         + New Customer
     </button>
+
+    <!-- PageSize selector -->
+    <select class="form-select w-auto ms-3" @bind="PageSize">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+    </select>
 </div>
 
-<!-- LIVE SEARCH -->
-<input class="form-control mb-3"
-       placeholder="Search by name, email, phone, address..."
-       value="@SearchText"
-       @oninput="OnSearchChanged" />
-
-@if (Customers == null)
+@if (IsLoading)
 {
     <p>Loading customers...</p>
 }
-else if (!Customers.Any())
+else if (Customers == null || !Customers.Any())
 {
     <p>No customers found.</p>
 }
@@ -50,7 +54,7 @@ else
             @foreach (var customer in Customers)
             {
                 <tr>
-                    <td>@customer.FullName</td>
+                    <td>@GetFullName(customer)</td>
                     <td>@(string.IsNullOrWhiteSpace(customer.PreferredName) ? "-" : customer.PreferredName)</td>
                     <td>@customer.Email</td>
                     <td>@customer.Phone</td>
@@ -72,6 +76,12 @@ else
             }
         </tbody>
     </table>
+
+    <!-- Pager -->
+    <Pager CurrentPage="@CurrentPage"
+           PageSize="@PageSize"
+           TotalCount="@TotalCount"
+           OnPageChanged="OnPageChanged" />
 }
 
 <CreateCustomerModal IsOpen="@IsCreateOpen"
@@ -86,8 +96,7 @@ else
                      OnClose="HandleDeleteClosed" />
 
 @code {
-    private List<CustomerResponseDto>? Customers;
-
+    private List<CustomerResponseDto> Customers = new();
     private CustomerResponseDto? SelectedCustomer;
     private Guid? SelectedCustomerId;
 
@@ -95,28 +104,77 @@ else
     private bool IsEditOpen;
     private bool IsDeleteOpen;
 
-    private string? SearchText;
+    // Pagination state
+    private int CurrentPage = 1;
+    private int _pageSize = 20;
+    private long TotalCount = 0;
+    private bool IsLoading = true;
+    private bool _clamping = false;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    // PageSize binder used by select; when changed reload first page
+    private int PageSize
     {
-        if (firstRender)
+        get => _pageSize;
+        set
         {
-            Customers = await CustomerService.GetAllAsync();
-            StateHasChanged();
+            if (_pageSize == value) return;
+            _pageSize = value;
+            CurrentPage = 1;
+
+            _ = InvokeAsync(async () =>
+            {
+                await LoadPage();
+                StateHasChanged();
+            });
         }
     }
 
-    private async Task OnSearchChanged(ChangeEventArgs e)
+    protected override async Task OnInitializedAsync()
     {
-        SearchText = e.Value?.ToString();
-        Customers = await CustomerService.GetAllAsync(search: SearchText);
-        StateHasChanged();
+        await LoadPage();
     }
 
-    private void OpenCreate()
+    private async Task LoadPage()
     {
-        IsCreateOpen = true;
+        IsLoading = true;
+        StateHasChanged();
+
+        var paged = await CustomerService.GetPagedAsync(CurrentPage, PageSize);
+
+        if (paged == null)
+        {
+            Customers = new();
+            TotalCount = 0;
+            IsLoading = false;
+            return;
+        }
+
+        // Clamp if page out of range
+        if (!_clamping && paged.TotalPages > 0 && CurrentPage > paged.TotalPages)
+        {
+            _clamping = true;
+            CurrentPage = paged.TotalPages;
+            await LoadPage();
+            _clamping = false;
+            return;
+        }
+
+        Customers = paged.Items;
+        TotalCount = paged.TotalCount;
+        CurrentPage = paged.Page;
+        _pageSize = paged.PageSize;
+
+        IsLoading = false;
     }
+
+    private async Task OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        await LoadPage();
+    }
+
+    // Modals and refresh logic (preserve behavior)
+    private void OpenCreate() => IsCreateOpen = true;
 
     private void OpenEdit(CustomerResponseDto customer)
     {
@@ -136,7 +194,7 @@ else
 
         if (refresh)
         {
-            Customers = await CustomerService.GetAllAsync(search: SearchText);
+            await LoadPage();
             StateHasChanged();
         }
     }
@@ -148,7 +206,7 @@ else
 
         if (refresh)
         {
-            Customers = await CustomerService.GetAllAsync(search: SearchText);
+            await LoadPage();
             StateHasChanged();
         }
     }
@@ -160,11 +218,12 @@ else
 
         if (refresh)
         {
-            Customers = await CustomerService.GetAllAsync(search: SearchText);
+            await LoadPage();
             StateHasChanged();
         }
     }
 
+    // Helpers
     private string FormatDate(string created)
     {
         if (DateTime.TryParse(created, out var dt))
@@ -173,5 +232,13 @@ else
         }
 
         return created;
+    }
+
+    private string GetFullName(CustomerResponseDto c)
+    {
+        if (!string.IsNullOrWhiteSpace(c.PreferredName))
+            return c.PreferredName;
+
+        return $"{c.FirstName} {c.SurName}".Trim();
     }
 }

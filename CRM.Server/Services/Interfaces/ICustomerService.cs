@@ -1,6 +1,6 @@
-﻿// File: CRM.Server/Services/Interfaces/ICustomerService.cs
-using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
 using CRM.Server.Data;
+using CRM.Server.DTOs;
 
 namespace CRM.Server.Services.Interfaces
 {
@@ -35,6 +35,9 @@ namespace CRM.Server.Services.Interfaces
         /// Returns number of customers created within the last `days`.
         /// </summary>
         Task<int> GetNewCustomersCountAsync(int days = 7);
+
+
+        Task<PagedResult<CustomerResponseDto>> GetPagedAsync(PageParams parms);
 
     }
 }

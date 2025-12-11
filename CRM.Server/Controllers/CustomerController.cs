@@ -1,7 +1,8 @@
-﻿using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.DTOs;
 using CRM.Server.Services.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace CRM.Server.Controllers

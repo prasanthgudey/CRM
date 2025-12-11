@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using CRM.Server.Common.Paging;
 using CRM.Server.Dtos;
 using CRM.Server.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace CRM.Server.Controllers
@@ -20,9 +21,13 @@ namespace CRM.Server.Controllers
             _logger = logger;
         }
 
-        // -----------------------
-        // Read / Query endpoints
-        // -----------------------
+        // GET api/tasks?page=1&pageSize=20&search=foo
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAll([FromQuery] PageParams parms)
+        {
+            var result = await _service.GetPagedAsync(parms);
+            return Ok(result);
+        }
 
         [HttpGet("all")]
         public async Task<IActionResult> GetAll()
