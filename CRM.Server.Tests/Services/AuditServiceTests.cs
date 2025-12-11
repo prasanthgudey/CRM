@@ -21,102 +21,114 @@ namespace CRM.Server.Tests.Services
         }
 
         // --------------------------------------------------------
-        // SUCCESS CASE: Should create an AuditLog and call AddAsync
+        // SUCCESS CASE: Should call AddAsync with correct AuditLog
         // --------------------------------------------------------
         [Fact]
         public async Task LogAsync_Should_Call_AddAsync_With_Correct_Data()
         {
             // Arrange
-            string userId = "user123";
-            string action = "Updated";
-            string oldValue = "Old Data";
-            string newValue = "New Data";
-
             AuditLog? capturedLog = null;
 
-            _repoMock
-                .Setup(r => r.AddAsync(It.IsAny<AuditLog>()))
-                .Callback<AuditLog>(log => capturedLog = log)
-                .Returns(Task.CompletedTask);
+            _repoMock.Setup(r => r.AddAsync(It.IsAny<AuditLog>()))
+                     .Callback<AuditLog>(log => capturedLog = log)
+                     .Returns(Task.CompletedTask);
 
             // Act
-            await _service.LogAsync(userId, action, oldValue, newValue);
+            await _service.LogAsync(
+                performedByUserId: "admin123",
+                targetUserId: "user456",
+                action: "Update",
+                entityName: "User",
+                isSuccess: true,
+                ipAddress: "127.0.0.1",
+                oldValue: "Old Name",
+                newValue: "New Name"
+            );
 
             // Assert
             _repoMock.Verify(r => r.AddAsync(It.IsAny<AuditLog>()), Times.Once);
-
             capturedLog.Should().NotBeNull();
-            capturedLog!.UserId.Should().Be(userId);
-            capturedLog!.Action.Should().Be(action);
-            capturedLog!.OldValue.Should().Be(oldValue);
-            capturedLog!.NewValue.Should().Be(newValue);
+
+            capturedLog!.PerformedByUserId.Should().Be("admin123");
+            capturedLog.TargetUserId.Should().Be("user456");
+            capturedLog.Action.Should().Be("Update");
+            capturedLog.EntityName.Should().Be("User");
+            capturedLog.IsSuccess.Should().BeTrue();
+            capturedLog.IpAddress.Should().Be("127.0.0.1");
+            capturedLog.OldValue.Should().Be("Old Name");
+            capturedLog.NewValue.Should().Be("New Name");
         }
 
         // --------------------------------------------------------
-        // NULL OLD/NEW VALUES: Should still log properly
+        // VALID CASE: Should allow null values
         // --------------------------------------------------------
         [Fact]
-        public async Task LogAsync_Should_Allow_Null_Values()
+        public async Task LogAsync_Should_Work_With_Null_Optional_Values()
         {
-            // Arrange
-            string userId = "user123";
-            string action = "Created";
-
             AuditLog? capturedLog = null;
 
-            _repoMock
-                .Setup(r => r.AddAsync(It.IsAny<AuditLog>()))
-                .Callback<AuditLog>(log => capturedLog = log)
-                .Returns(Task.CompletedTask);
+            _repoMock.Setup(r => r.AddAsync(It.IsAny<AuditLog>()))
+                     .Callback<AuditLog>(log => capturedLog = log)
+                     .Returns(Task.CompletedTask);
 
-            // Act
-            await _service.LogAsync(userId, action);
+            await _service.LogAsync(
+                performedByUserId: null,
+                targetUserId: null,
+                action: "Login",
+                entityName: "Auth",
+                isSuccess: true
+            );
 
-            // Assert
             capturedLog.Should().NotBeNull();
-            capturedLog!.UserId.Should().Be(userId);
-            capturedLog!.Action.Should().Be(action);
-            capturedLog!.OldValue.Should().BeNull();
-            capturedLog!.NewValue.Should().BeNull();
+            capturedLog!.PerformedByUserId.Should().BeNull();
+            capturedLog.TargetUserId.Should().BeNull();
+            capturedLog.Action.Should().Be("Login");
+            capturedLog.EntityName.Should().Be("Auth");
+            capturedLog.IsSuccess.Should().BeTrue();
+            capturedLog.IpAddress.Should().BeNull();
+            capturedLog.OldValue.Should().BeNull();
+            capturedLog.NewValue.Should().BeNull();
         }
 
         // --------------------------------------------------------
-        // FAILURE CASE: Simulate repository failure
+        // FAILURE CASE: Repository throws exception
         // --------------------------------------------------------
         [Fact]
         public async Task LogAsync_Should_Throw_When_Repository_Throws()
         {
-            // Arrange
-            _repoMock
-                .Setup(r => r.AddAsync(It.IsAny<AuditLog>()))
-                .ThrowsAsync(new Exception("Database error"));
+            _repoMock.Setup(r => r.AddAsync(It.IsAny<AuditLog>()))
+                     .ThrowsAsync(new Exception("DB error"));
 
-            // Act
-            Func<Task> act = async () => await _service.LogAsync("u1", "Delete");
+            Func<Task> act = async () => await _service.LogAsync(
+                performedByUserId: "u1",
+                targetUserId: "u2",
+                action: "Delete",
+                entityName: "User",
+                isSuccess: false
+            );
 
-            // Assert
             await act.Should().ThrowAsync<Exception>()
-                .WithMessage("Database error");
+                     .WithMessage("DB error");
         }
 
         // --------------------------------------------------------
         // MEANINGFUL FAILING TEST FOR PRESENTATION
         // --------------------------------------------------------
         [Fact]
-        public async Task LogAsync_Should_Fail_When_UserId_Is_Empty()
+        public async Task LogAsync_Should_Fail_When_Action_Is_Empty()
         {
-            // Arrange
-            string userId = ""; // INVALID on purpose
-            string action = "Update";
-
             // Act
-            Func<Task> act = async () => await _service.LogAsync(userId, action);
+            Func<Task> act = async () => await _service.LogAsync(
+                performedByUserId: "admin",
+                targetUserId: "user1",
+                action: "",       // ❌ INVALID ON PURPOSE
+                entityName: "User",
+                isSuccess: true
+            );
 
-            // ❗ EXPECTED TO FAIL ON PURPOSE
-            // Because your service does NOT validate empty userId.
-            // This test demonstrates missing validation.
+            // EXPECT FAILING TEST → service does NOT validate action
             await act.Should().ThrowAsync<Exception>(
-                "UserId should not be empty (EXPECTED FAILING TEST)"
+                "Action should not be empty — this is the intentional failing test"
             );
         }
     }
