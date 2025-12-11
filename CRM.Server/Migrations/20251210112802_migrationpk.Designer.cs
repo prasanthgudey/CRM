@@ -4,6 +4,7 @@ using CRM.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CRM.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251210112802_migrationpk")]
+    partial class migrationpk
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -119,14 +122,10 @@ namespace CRM.Server.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EntityName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("IpAddress")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsSuccess")
-                        .HasColumnType("bit");
 
                     b.Property<string>("NewValue")
                         .HasColumnType("nvarchar(max)");
@@ -134,10 +133,7 @@ namespace CRM.Server.Migrations
                     b.Property<string>("OldValue")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PerformedByUserId")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TargetUserId")
+                    b.Property<string>("UserId")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -160,10 +156,9 @@ namespace CRM.Server.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
+                    b.Property<Guid>("CreatedByUserId")
                         .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Email")
                         .IsRequired()

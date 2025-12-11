@@ -17,7 +17,7 @@ namespace CRM.Server.Models
         public string Email { get; set; }
         public string Phone { get; set; }
         public string Address { get; set; }
-        public Guid CreatedByUserId { get; set; }
+        public string CreatedByUserId { get; set; }
         public string CreatedAt { get; set; }
     }
 }

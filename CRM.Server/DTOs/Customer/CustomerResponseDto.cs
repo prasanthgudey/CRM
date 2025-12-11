@@ -13,7 +13,7 @@ namespace CRM.Server.DTOs
         public string Email { get; set; }
         public string Phone { get; set; }
         public string Address { get; set; }= string.Empty;
-        public Guid CreatedByUserId { get; set; }
+        public string CreatedByUserId { get; set; }
         public string CreatedAt { get; set; }
     }
 }

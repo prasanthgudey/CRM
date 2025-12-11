@@ -1,11 +1,14 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using CRM.Server.Dtos;
 using CRM.Server.Services;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // ✅ All task actions require login
     public class TasksController : ControllerBase
     {
         private readonly ITaskService _service;
@@ -17,38 +20,23 @@ namespace CRM.Server.Controllers
             _logger = logger;
         }
 
-        // =============================
-        // GET: /api/tasks/all
-        // =============================
-
-        /// <summary>
-        /// Retrieves all tasks, optionally filtered and sorted.
-        /// </summary>
-        /// <returns>List of tasks.</returns>
         [HttpGet("all")]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
             _logger.LogInformation("GET api/tasks/all called");
 
-            var tasks = _service.GetAll();
+            //var tasks = _service.GetAll();
+            var tasks = await _service.GetAllAsync();
             return Ok(tasks);
         }
 
-        // =============================
-        // GET: /api/tasks/{id}
-        // =============================
-
-        /// <summary>
-        /// Gets a single task by its unique identifier.
-        /// </summary>
-        /// <param name="id">The Guid of the task.</param>
-        /// <returns>Task details if found, otherwise 404.</returns>
         [HttpGet("{id:guid}")]
-        public IActionResult GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id)
         {
             _logger.LogInformation("GET api/tasks/{Id} called", id);
 
-            var task = _service.GetById(id);
+            //var task = _service.GetById(id);
+            var task = await _service.GetByIdAsync(id);
             if (task == null)
             {
                 _logger.LogWarning("Task with Id {Id} not found", id);
@@ -58,44 +46,26 @@ namespace CRM.Server.Controllers
             return Ok(task);
         }
 
-        // =============================
-        // GET: /api/tasks/customer/{customerId}
-        // =============================
-
-        /// <summary>
-        /// Gets all tasks associated with a specific customer.
-        /// </summary>
-        /// <param name="customerId">The Guid of the customer.</param>
-        /// <returns>List of tasks for that customer.</returns>
-        [HttpGet("customer/{customerId:guid}")]
-        public IActionResult GetByCustomerId(Guid customerId)
+        [HttpGet("customer/{customerId:Guid}")]
+        public async Task<IActionResult> GetByCustomerId(Guid customerId)
         {
             _logger.LogInformation("GET api/tasks/customer/{CustomerId} called", customerId);
 
-            var result = _service.GetAll(new TaskFilterDto { CustomerId = customerId });
+            //var result = _service.GetAll(new TaskFilterDto { CustomerId = customerId });
+            var result = await _service.GetAllAsync(new TaskFilterDto { CustomerId = customerId });
             return Ok(result);
         }
 
-        // =============================
-        // GET: /api/tasks/user/{userId}
-        // =============================
-
-        /// <summary>
-        /// Gets all tasks created/owned by a specific user.
-        /// </summary>
-        /// <param name="userId">The user Id (from Identity).</param>
-        /// <returns>List of tasks for that user.</returns>
         [HttpGet("user/{userId}")]
-        public IActionResult GetByUserId(string userId)
+        public async Task<IActionResult> GetByUserId(string userId)
         {
             _logger.LogInformation("GET api/tasks/user/{UserId} called", userId);
-
-            var result = _service.GetAll(new TaskFilterDto { UserId = userId });
+            var result = await _service.GetAllAsync(new TaskFilterDto { UserId = userId });
             return Ok(result);
         }
 
         // =============================
-        // POST: /api/tasks
+        // ✅ CREATE TASK (AUDITED)
         // =============================
 
         /// <summary>
@@ -104,7 +74,7 @@ namespace CRM.Server.Controllers
         /// <param name="dto">Task data to create.</param>
         /// <returns>The created task with its Id.</returns>
         [HttpPost]
-        public IActionResult Create([FromBody] CreateTaskDto dto)
+        public async Task<IActionResult> Create([FromBody] CreateTaskDto dto)
         {
             _logger.LogInformation("POST api/tasks called");
 
@@ -114,62 +84,64 @@ namespace CRM.Server.Controllers
                 return BadRequest(ModelState);
             }
 
-            var task = _service.Create(dto);
+            //var task = _service.Create(dto);
 
             _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
 
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var task = await _service.CreateAsync(dto, performedBy!);
             return CreatedAtAction(nameof(GetById), new { id = task.TaskId }, task);
         }
 
         // =============================
-        // PUT: /api/tasks/{id}
+        // ✅ UPDATE TASK (AUDITED)
         // =============================
-
-        /// <summary>
-        /// Updates an existing task.
-        /// </summary>
-        /// <param name="id">The Guid of the task to update.</param>
-        /// <param name="dto">Updated task data.</param>
-        /// <returns>The updated task.</returns>
-        [HttpPut("{id:guid}")]
-        public IActionResult Update(Guid id, [FromBody] UpdateTaskDto dto)
+        [HttpPut("{id:Guid}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTaskDto dto)
         {
-            _logger.LogInformation("PUT api/tasks/{Id} called", id);
-
-            if (!ModelState.IsValid)
+            try
             {
-                _logger.LogWarning("Task update failed for Id {Id} due to invalid model state", id);
-                return BadRequest(ModelState);
+                if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("Task update failed for Id {Id} due to invalid model state", id);
+                    return BadRequest(ModelState);
+                }
+
+                // Any exception thrown here will be handled by GlobalExceptionMiddleware
+                //var task = _service.Update(id, dto);
+
+                
+
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var task = await _service.UpdateAsync(id, dto, performedBy!);
+                _logger.LogInformation("Task updated with Id {Id}", id);
+                return Ok(task);
             }
-
-            // Any exception thrown here will be handled by GlobalExceptionMiddleware
-            var task = _service.Update(id, dto);
-
-            _logger.LogInformation("Task updated with Id {Id}", id);
-
-            return Ok(task);
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         // =============================
-        // DELETE: /api/tasks/{id}
+        // ✅ DELETE TASK (AUDITED)
         // =============================
-
-        /// <summary>
-        /// Deletes an existing task.
-        /// </summary>
-        /// <param name="id">The Guid of the task to delete.</param>
-        /// <returns>NoContent if delete succeeds.</returns>
-        [HttpDelete("{id:guid}")]
-        public IActionResult Delete(Guid id)
+        [HttpDelete("{id:Guid}")]
+        public async Task<IActionResult> Delete(Guid id)
         {
-            _logger.LogInformation("DELETE api/tasks/{Id} called", id);
-
-            // Any exception thrown here will be handled by GlobalExceptionMiddleware
-            _service.Delete(id);
-
-            _logger.LogInformation("Task deleted with Id {Id}", id);
-
-            return NoContent();
+            try
+            {
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                _logger.LogInformation("DELETE api/tasks/{Id} called", id);
+                await _service.DeleteAsync(id, performedBy!);
+                _logger.LogInformation("Task deleted with Id {Id}", id);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
     }
 }

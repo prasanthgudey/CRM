@@ -1,65 +1,168 @@
-﻿@page "/admin/audit-logs"
+﻿@page "/admin/audit-log"
 @layout MainLayout
 
 @using CRM.Client.DTOs.Audit
-@using CRM.Client.Components.Layout
 @using CRM.Client.Services.Audit
-@inject AuditService AuditService
+@using CRM.Client.Components.Layout
 
-<h3>Audit Logs</h3>
+@inject AuditService AuditService
+@inject NavigationManager Nav
+
+<h3>Audit Log</h3>
 
 @if (Logs == null)
 {
     <p>Loading audit logs...</p>
 }
-else if (!Logs.Any())
-{
-    <p>No audit logs found.</p>
-}
 else
 {
-    <table class="table table-bordered table-striped">
-        <thead>
-            <tr>
-                <th style="width:60px">#</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Old Value</th>
-                <th>New Value</th>
-                <th>User</th>
-                <th>IP</th>
-                <th style="width:160px">Timestamp</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            @foreach (var log in Logs)
-            {
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
                 <tr>
-                    <td>@log.Id</td>
-                    <td>@log.Action</td>
-                    <td>@(string.IsNullOrWhiteSpace(log.EntityName) ? "-" : log.EntityName)</td>
-                    <td class="text-muted">
-                        @(string.IsNullOrWhiteSpace(log.OldValue) ? "-" : log.OldValue)
-                    </td>
-                    <td class="fw-bold">
-                        @(string.IsNullOrWhiteSpace(log.NewValue) ? "-" : log.NewValue)
-                    </td>
-                    <td>@(string.IsNullOrWhiteSpace(log.UserId) ? "-" : log.UserId)</td>
-                    <td>@(string.IsNullOrWhiteSpace(log.IpAddress) ? "-" : log.IpAddress)</td>
-                    <td>@log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <th>Date</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Performed By</th>
+                    <th>Target</th>
+                    <th>Status</th>
+                    <th>IP</th>
+                    <th>Old</th>
+                    <th>New</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+
+            <tbody>
+                @foreach (var log in Logs)
+                {
+                    <tr>
+                        <td>@log.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+
+                        <td>
+                            <span class="fw-semibold">@log.Action</span>
+                        </td>
+
+                        <td>
+                            <span class="badge bg-info">@log.EntityName</span>
+                        </td>
+
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(log.PerformedByUserName))
+                            {
+                                <span class="audit-user"
+                                      title="@log.PerformedByUserName"
+                                      @onclick="() => OpenUserProfile(log.PerformedByUserId)">
+                                    @log.PerformedByUserName
+                                </span>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </td>
+
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(log.TargetUserName))
+                            {
+                                <span class="audit-user"
+                                      title="@log.TargetUserName"
+                                      @onclick="() => OpenUserProfile(log.TargetUserId)">
+                                    @log.TargetUserName
+                                </span>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </td>
+
+                        <td>
+                            @if (log.IsSuccess)
+                            {
+                                <span class="badge bg-success">Success</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">Failed</span>
+                            }
+                        </td>
+
+                        <td class="small">@log.IpAddress</td>
+
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(log.OldValue))
+                            {
+                                <pre class="audit-json">@log.OldValue</pre>
+                            }
+                        </td>
+
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(log.NewValue))
+                            {
+                                <pre class="audit-json">@log.NewValue</pre>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
 
     private List<AuditLogResponseDto>? Logs;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Logs = await AuditService.GetAllLogsAsync();
+        if (firstRender)
+        {
+            Logs = await AuditService.GetAllAsync();
+            StateHasChanged();
+        }
+    }
+
+    // Navigate to the user profile page (uses the hidden id)
+    private void OpenUserProfile(string? userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        // Adjust route if your user profile route is different
+        Nav.NavigateTo($"/admin/users/{userId}");
+    }
+
+    // still useful for debugging if needed
+    private static string Shorten(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "-";
+
+        return value.Length > 10
+            ? value.Substring(0, 10) + "..."
+            : value;
     }
 }
+
+<style>
+    .audit-json {
+        max-width: 250px;
+        max-height: 80px;
+        overflow: auto;
+        background: #f8f9fa;
+        padding: 6px;
+        font-size: 11px;
+        border-radius: 6px;
+    }
+
+    .audit-user {
+        color: #0d6efd;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: underline;
+    }
+
+        .audit-user:hover {
+            color: #084298;
+        }
+</style>
