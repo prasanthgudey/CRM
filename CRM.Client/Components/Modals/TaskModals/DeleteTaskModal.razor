@@ -1,0 +1,59 @@
+﻿@using CRM.Client.Services.Tasks
+@inject TaskService TaskService
+
+@if (IsOpen && TaskId.HasValue)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Task</h5>
+                    <button type="button" class="btn-close" @onclick="() => Close(false)"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this task?</p>
+                    <p class="text-muted">
+                        Task Id: <code>@TaskId</code>
+                    </p>
+                    <p class="text-danger mb-0">
+                        This action cannot be undone.
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="() => Close(false)">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="Delete">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public Guid? TaskId { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private async Task Delete()
+    {
+        if (TaskId.HasValue)
+        {
+            await TaskService.DeleteAsync(TaskId.Value);
+            await Close(true);
+        }
+    }
+
+    private async Task Close(bool refresh)
+    {
+        await OnClose.InvokeAsync(refresh);
+    }
+}

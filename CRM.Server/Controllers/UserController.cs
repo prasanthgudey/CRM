@@ -8,35 +8,16 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize(Roles = "Admin")] // ✅ Admin only
+    [Authorize(Roles = "Admin")]
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
 
-        // ✅ Custom service
         public UserController(IUserService userService)
         {
             _userService = userService;
         }
 
-        // =====================================================
-        // ✅ MANUAL USER CREATION (TEMP PASSWORD)
-        // =====================================================
-        //[HttpPost("create")]
-        //public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
-        //{
-        //    if (!ModelState.IsValid)
-        //        return BadRequest(ModelState);
-
-        //    try
-        //    {
-        //        await _userService.CreateUserAsync(dto);
-        //        return Ok(new { message = "User created successfully" });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(new { error = ex.Message });
-        //  
         [HttpPost("create")]
         public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
         {
@@ -45,7 +26,8 @@ namespace CRM.Server.Controllers
 
             try
             {
-                await _userService.CreateUserAsync(dto);
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                await _userService.CreateUserAsync(dto, performedBy!);
 
                 return Ok(new
                 {
@@ -63,37 +45,13 @@ namespace CRM.Server.Controllers
             }
         }
 
-        //}
 
-        // =====================================================
-        // ✅ GET ALL USERS
-        // =====================================================
         [HttpGet]
         public async Task<IActionResult> GetAllUsers()
         {
             var users = await _userService.GetAllUsersAsync();
             return Ok(users);
         }
-
-        // =====================================================
-        // ✅ INVITE USER (EMAIL REGISTRATION LINK)
-        // =====================================================
-        //[HttpPost("invite")]
-        //public async Task<IActionResult> InviteUser([FromBody] InviteUserDto dto)
-        //{
-        //    if (!ModelState.IsValid)
-        //        return BadRequest(ModelState);
-
-        //    try
-        //    {
-        //        await _userService.InviteUserAsync(dto);
-        //        return Ok(new { message = "Invitation sent successfully" });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(new { error = ex.Message });
-        //    }
-        //}
 
         [HttpPost("invite")]
         public async Task<IActionResult> InviteUser([FromBody] InviteUserDto dto)
@@ -103,7 +61,8 @@ namespace CRM.Server.Controllers
 
             try
             {
-                await _userService.InviteUserAsync(dto);
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                await _userService.InviteUserAsync(dto, performedBy!);
 
                 // ✅ ALWAYS JSON, includes success flag
                 return Ok(new
@@ -123,84 +82,44 @@ namespace CRM.Server.Controllers
             }
         }
 
-        // =====================================================
-        // ✅ DEACTIVATE USER
-        // =====================================================
         [HttpPut("deactivate/{userId}")]
         public async Task<IActionResult> Deactivate(string userId)
         {
-            try
-            {
-                await _userService.DeactivateUserAsync(userId);
-                return Ok(new { message = "User deactivated successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await _userService.DeactivateUserAsync(userId, performedBy!);
+            return Ok(new { message = "User deactivated successfully" });
         }
 
-
-        // ✅ ACTIVATE USER
-        // =====================================================
         [HttpPut("activate/{userId}")]
         public async Task<IActionResult> Activate(string userId)
         {
-            try
-            {
-                await _userService.ActivateUserAsync(userId);
-                return Ok(new { message = "User activated successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await _userService.ActivateUserAsync(userId, performedBy!);
+            return Ok(new { message = "User activated successfully" });
         }
 
-        // =====================================================
-        // ✅ UPDATE USER
-        // =====================================================
         [HttpPut("update/{userId}")]
         public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            try
-            {
-                await _userService.UpdateUserAsync(userId, dto);
-                return Ok(new { message = "User updated successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await _userService.UpdateUserAsync(userId, dto, performedBy!);
+            return Ok(new { message = "User updated successfully" });
         }
 
-
-
-
-        // =====================================================
-        // ✅ DELETE USER
-        // =====================================================
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteUser(string userId)
         {
-            try
-            {
-                await _userService.DeleteUserAsync(userId);
-                return Ok(new { message = "User deleted successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await _userService.DeleteUserAsync(userId, performedBy!);
+            return Ok(new { message = "User deleted successfully" });
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            return Ok(await _userService.GetAllUsersAsync());
+        }
 
-        // =====================================================
-        // ✅ GET USER BY ID (ADMIN / PROFILE VIEW)
-        // =====================================================
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetUserById(string userId)
         {
@@ -226,21 +145,15 @@ namespace CRM.Server.Controllers
             var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
 
             var user = await _userService.GetUserByIdAsync(userId!);
+            //commnt by eswar
 
             return Ok(user);
         }
 
-
-        // =====================================================
-        // ✅ FILTER USERS BY ROLE & ACTIVE STATUS
-        // =====================================================
         [HttpGet("filter")]
-        public async Task<IActionResult> Filter(
-            [FromQuery] string? role,
-            [FromQuery] bool? isActive)
+        public async Task<IActionResult> Filter([FromQuery] string? role, [FromQuery] bool? isActive)
         {
-            var users = await _userService.FilterUsersAsync(role, isActive);
-            return Ok(users);
+            return Ok(await _userService.FilterUsersAsync(role, isActive));
         }
     }
 }

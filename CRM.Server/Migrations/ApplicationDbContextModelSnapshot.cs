@@ -119,10 +119,14 @@ namespace CRM.Server.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EntityName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("IpAddress")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("bit");
 
                     b.Property<string>("NewValue")
                         .HasColumnType("nvarchar(max)");
@@ -130,7 +134,10 @@ namespace CRM.Server.Migrations
                     b.Property<string>("OldValue")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("UserId")
+                    b.Property<string>("PerformedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TargetUserId")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -153,9 +160,10 @@ namespace CRM.Server.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("CreatedByUserId")
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
                         .HasMaxLength(450)
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Email")
                         .IsRequired()

@@ -1,0 +1,220 @@
+﻿@page "/tasks"
+@layout MainLayout
+
+@using CRM.Client.Components.Layout
+@using CRM.Client.DTOs.Tasks
+@using CRM.Client.DTOs.Customers
+@using CRM.Client.Services.Tasks
+@using CRM.Client.Services.Users
+@using CRM.Client.Services.Customers
+@using CRM.Client.Components.Modals.TaskModals
+
+@inject TaskService TaskService
+@inject UserService UserService
+@inject CustomerService CustomerService
+
+<h3>Tasks</h3>
+
+<div class="mb-3 d-flex gap-2">
+    <button type="button"
+            class="btn btn-primary"
+            @onclick="OpenCreate">
+        + New Task
+    </button>
+</div>
+
+@if (Tasks == null)
+{
+    <p>Loading tasks...</p>
+}
+else if (!Tasks.Any())
+{
+    <p>No tasks found.</p>
+}
+else
+{
+    <table class="table table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Title</th>
+                <th>Customer</th>
+                <th>User</th>
+                <th>Due Date</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Recurring</th>
+                <th style="width:220px">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var task in Tasks)
+            {
+                <tr>
+                    <td>@task.Title</td>
+                    <td>@GetCustomerName(task.CustomerId)</td>
+                    <td>@GetUserName(task.UserId)</td>
+                    <td>@task.DueDate.ToShortDateString()</td>
+                    <td>@task.Priority</td>
+                    <td>@task.State</td>
+                    <td>
+                        @if (task.IsRecurring)
+                        {
+                            <span class="badge bg-info">@task.RecurrenceType (@task.RecurrenceInterval)</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">No</span>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-light btn-sm me-2"
+                                @onclick="() => OpenEdit(task)">
+                            Edit
+                        </button>
+
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => OpenDelete(task.TaskId)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<CreateTaskModal IsOpen="@IsCreateOpen"
+                 OnClose="HandleCreateClosed" />
+
+<EditTaskModal IsOpen="@IsEditOpen"
+               Task="@SelectedTask"
+               OnClose="HandleEditClosed" />
+
+<DeleteTaskModal IsOpen="@IsDeleteOpen"
+                 TaskId="@SelectedTaskId"
+                 OnClose="HandleDeleteClosed" />
+
+@code {
+    private List<TaskResponseDto>? Tasks;
+
+    private TaskResponseDto? SelectedTask;
+    private Guid? SelectedTaskId;
+
+    private bool IsCreateOpen;
+    private bool IsEditOpen;
+    private bool IsDeleteOpen;
+
+    // lookup maps
+    private readonly Dictionary<Guid, string> _customerNames = new();
+    private readonly Dictionary<string, string> _userNames = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 1) load tasks
+            Tasks = await TaskService.GetAllAsync();
+
+            // 2) load customers
+            var customers = await CustomerService.GetAllAsync();
+            if (customers != null)
+            {
+                foreach (var c in customers)
+                {
+                    // using CustomerResponseDto.CustomerId + FullName we created earlier
+                    _customerNames[c.CustomerId] = c.FullName;
+                }
+            }
+
+            // 3) load users
+            var users = await UserService.GetAllUsersAsync();
+            if (users != null)
+            {
+                foreach (var u in users)
+                {
+                    // Adjust these properties if your UserResponseDto uses different names
+                    var display = string.IsNullOrWhiteSpace(u.FullName)
+                        ? u.Email
+                        : $"{u.FullName} ({u.Email})";
+
+                    _userNames[u.Id] = display;
+                }
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private string GetCustomerName(Guid customerId)
+    {
+        if (_customerNames.TryGetValue(customerId, out var name))
+            return name;
+
+        // fallback to id if not found
+        return customerId.ToString();
+    }
+
+    private string GetUserName(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return "-";
+
+        if (_userNames.TryGetValue(userId, out var name))
+            return name;
+
+        // fallback to id if not found
+        return userId;
+    }
+
+    private void OpenCreate()
+    {
+        IsCreateOpen = true;
+    }
+
+    private void OpenEdit(TaskResponseDto task)
+    {
+        SelectedTask = task;
+        IsEditOpen = true;
+    }
+
+    private void OpenDelete(Guid taskId)
+    {
+        SelectedTaskId = taskId;
+        IsDeleteOpen = true;
+    }
+
+    private async Task HandleCreateClosed(bool refresh)
+    {
+        IsCreateOpen = false;
+
+        if (refresh)
+        {
+            Tasks = await TaskService.GetAllAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleEditClosed(bool refresh)
+    {
+        IsEditOpen = false;
+        SelectedTask = null;
+
+        if (refresh)
+        {
+            Tasks = await TaskService.GetAllAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleDeleteClosed(bool refresh)
+    {
+        IsDeleteOpen = false;
+        SelectedTaskId = null;
+
+        if (refresh)
+        {
+            Tasks = await TaskService.GetAllAsync();
+            StateHasChanged();
+        }
+    }
+}

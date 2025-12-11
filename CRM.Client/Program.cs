@@ -4,8 +4,10 @@ using CRM.Client.Config;
 using CRM.Client.Security;
 using CRM.Client.Services.Audit;
 using CRM.Client.Services.Auth;
+using CRM.Client.Services.Customers;
 using CRM.Client.Services.Http;
 using CRM.Client.Services.Roles;
+using CRM.Client.Services.Tasks;
 using CRM.Client.Services.Users;
 using CRM.Client.State;
 using Microsoft.AspNetCore.Authorization;
@@ -50,6 +52,9 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<CustomerService>();
+
 
 // 6. Razor Components
 builder.Services.AddRazorComponents()

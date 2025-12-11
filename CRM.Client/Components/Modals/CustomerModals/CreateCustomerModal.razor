@@ -1,0 +1,181 @@
+﻿@using CRM.Client.DTOs.Customers
+@using CRM.Client.DTOs.Users
+@using CRM.Client.Services.Customers
+@using CRM.Client.Services.Users
+
+@inject CustomerService CustomerService
+@inject UserService UserService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block customer-modal-backdrop" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered customer-modal-dialog">
+            <div class="modal-content customer-modal-content">
+                <div class="modal-header customer-modal-header">
+                    <h5 class="modal-title customer-modal-title">
+                        🧑‍💼 Create Customer
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            @onclick="() => Close(false)"></button>
+                </div>
+
+                <div class="modal-body customer-modal-body">
+                    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="customer-section mb-3">
+                            <div class="customer-section-title">Name</div>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">First Name</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Model.FirstName" />
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label">Middle Name</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Model.MiddleName" />
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label">Surname</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Model.SurName" />
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="form-label">Preferred Name</label>
+                                <InputText class="form-control"
+                                           @bind-Value="Model.PreferredName" />
+                            </div>
+                        </div>
+
+                        <div class="customer-section mb-3">
+                            <div class="customer-section-title">Contact</div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Email</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Model.Email" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Phone</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Model.Phone" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="customer-section mb-3">
+                            <div class="customer-section-title">Address</div>
+                            <div>
+                                <label class="form-label">Address</label>
+                                <InputTextArea class="form-control"
+                                               rows="3"
+                                               @bind-Value="Model.Address" />
+                            </div>
+                        </div>
+
+                        <div class="customer-section mb-1">
+                            <div class="customer-section-title">Meta</div>
+
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label">Created By User</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="SelectedUserId">
+                                        <option value="">-- Select user --</option>
+                                        @if (Users is not null)
+                                        {
+                                            @foreach (var user in Users)
+                                            {
+                                                var display = string.IsNullOrWhiteSpace(user.FullName)
+                                                ? user.Email
+                                                : $"{user.FullName} ({user.Email})";
+
+                                                <option value="@user.Id">@display</option>
+                                            }
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="customer-meta-note">
+                                        Later we can auto-fill this with the logged-in user.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+
+                <div class="modal-footer customer-modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="() => Close(false)">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="btn btn-success"
+                            @onclick="Submit">
+                        Save Customer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private CustomerCreateDto Model { get; set; } = new();
+
+    private List<UserResponseDto>? Users;
+    private string? SelectedUserId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && Users == null)
+        {
+            // Load users list once when modal is first opened
+            Users = await UserService.GetAllUsersAsync();
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // Need a user selected and convertible to Guid
+        if (string.IsNullOrWhiteSpace(SelectedUserId) ||
+            !Guid.TryParse(SelectedUserId, out var createdById))
+        {
+            // You can add a validation message later
+            return;
+        }
+
+        Model.CreatedByUserId = createdById;
+
+        await CustomerService.CreateAsync(Model);
+
+        await Close(true);
+    }
+
+    private async Task Submit()
+    {
+        await HandleValidSubmit();
+    }
+
+    private async Task Close(bool refresh)
+    {
+        // reset form for next open
+        Model = new CustomerCreateDto();
+        SelectedUserId = null;
+
+        await OnClose.InvokeAsync(refresh);
+    }
+}

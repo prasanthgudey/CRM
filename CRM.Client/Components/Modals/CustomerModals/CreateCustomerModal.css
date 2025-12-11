@@ -1,0 +1,105 @@
+﻿.customer-modal-backdrop {
+    background-color: rgba(15, 23, 42, 0.55);
+    z-index: 1050;
+}
+
+.customer-modal-dialog {
+    max-width: 780px;
+}
+
+.customer-modal-content {
+    border-radius: 1rem;
+    border: none;
+    overflow: hidden;
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.45);
+}
+
+.customer-modal-header {
+    background: linear-gradient(135deg, #198754, #0d6efd);
+    color: #ffffff;
+    border-bottom: none;
+    padding: 0.9rem 1.5rem;
+}
+
+.customer-modal-title {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.customer-modal-body {
+    background-color: #f8fafc;
+    padding: 1.5rem 1.75rem;
+}
+
+.customer-modal-footer {
+    border-top: none;
+    padding: 0.9rem 1.75rem 1.3rem;
+    background-color: #f8fafc;
+}
+
+.customer-section {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem 0.9rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+    .customer-section + .customer-section {
+        margin-top: 1rem;
+    }
+
+.customer-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    margin-bottom: 0.6rem;
+}
+
+.customer-modal-body .form-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #475569;
+    margin-bottom: 0.25rem;
+}
+
+.customer-modal-body .form-control,
+.customer-modal-body .form-select {
+    border-radius: 0.55rem;
+    border-color: #cbd5e1;
+    font-size: 0.9rem;
+}
+
+    .customer-modal-body .form-control:focus,
+    .customer-modal-body .form-select:focus {
+        border-color: #198754;
+        box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.18);
+    }
+
+.customer-modal-body textarea.form-control {
+    min-height: 90px;
+    resize: vertical;
+}
+
+.customer-modal-footer .btn-success {
+    padding-inline: 1.4rem;
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+.customer-modal-footer .btn-outline-secondary {
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+.customer-meta-note {
+    font-size: 0.8rem;
+    color: #6b7280;
+    background-color: #eef2ff;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px dashed #a5b4fc;
+}

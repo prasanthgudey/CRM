@@ -13,8 +13,12 @@ namespace CRM.Server.Services.Interfaces
             string? search);
 
         Task<CustomerResponseDto?> GetByIdAsync(Guid id);
-        Task<CustomerResponseDto> CreateAsync(CustomerCreateDto dto);
-        Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto);
-        Task<bool> DeleteAsync(Guid id);
+
+        // Updated to accept performer id for auditing
+        Task<CustomerResponseDto> CreateAsync(CustomerCreateDto dto, string performedByUserId);
+
+        Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto, string performedByUserId);
+
+        Task<bool> DeleteAsync(Guid id, string performedByUserId);
     }
 }

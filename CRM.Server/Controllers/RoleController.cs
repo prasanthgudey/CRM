@@ -2,17 +2,17 @@
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize(Roles = "Admin")] // ✅ Admin only
+    [Authorize(Roles = "Admin")] // ✅ Enforced as per spec
     public class RoleController : ControllerBase
     {
         private readonly IRoleService _roleService;
 
-        // ✅ Custom service
         public RoleController(IRoleService roleService)
         {
             _roleService = roleService;
@@ -39,7 +39,10 @@ namespace CRM.Server.Controllers
 
             try
             {
-                await _roleService.CreateRoleAsync(dto.RoleName);
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                await _roleService.CreateRoleAsync(dto.RoleName, performedBy!);
+
                 return Ok("Role created successfully");
             }
             catch (Exception ex)
@@ -53,9 +56,11 @@ namespace CRM.Server.Controllers
         [HttpPost("assign")]
         public async Task<IActionResult> AssignRole(AssignRoleDto dto)
         {
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
             try
             {
-                await _roleService.AssignRoleAsync(dto.UserId, dto.RoleName);
+                await _roleService.AssignRoleAsync(dto.UserId, dto.RoleName, performedBy!);
                 return Ok("Role assigned successfully");
             }
             catch (Exception ex)
@@ -63,6 +68,7 @@ namespace CRM.Server.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -126,8 +132,11 @@ namespace CRM.Server.Controllers
 
             try
             {
-                await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName);
-                return NoContent();
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName, performedBy!);
+
+                return Ok("Role updated successfully");
             }
             catch (Exception ex)
             {
@@ -140,9 +149,11 @@ namespace CRM.Server.Controllers
         [HttpDelete("{name}")]
         public async Task<IActionResult> Delete(string name)
         {
-            await _roleService.DeleteRoleAsync(name);
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            await _roleService.DeleteRoleAsync(name, performedBy!);
+
             return Ok("Role deleted successfully");
         }
-
     }
 }

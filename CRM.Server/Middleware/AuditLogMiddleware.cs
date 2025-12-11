@@ -15,24 +15,34 @@ namespace CRM.Server.Middleware
 
         public async Task InvokeAsync(
             HttpContext context,
-            IAuditLogService auditLogService) // ✅ Built-in DI into middleware
+            IAuditLogService auditLogService) // ✅ Injected correctly
         {
+
+            Console.WriteLine("✅ AUDIT MIDDLEWARE HIT");
+
             await _next(context);
 
             // ✅ Only log authenticated users
             if (context.User?.Identity?.IsAuthenticated == true)
             {
-                var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var performedByUserId =
+                    context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
                 var path = context.Request.Path.Value;
                 var ip = context.Connection.RemoteIpAddress?.ToString();
 
-                if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(path))
+                if (!string.IsNullOrWhiteSpace(performedByUserId) &&
+                    !string.IsNullOrWhiteSpace(path))
                 {
                     await auditLogService.LogAsync(
-                        userId,
+                        performedByUserId,     // ✅ Who triggered
+                        null,                  // ✅ No target user for middleware logs
                         $"API Accessed: {path}",
-                        ip,
-                        null
+                        "API",
+                        true,                  // ✅ Success assumed here
+                        ip,                    // ✅ IP Address
+                        null,                  // ✅ OldValue
+                        null                   // ✅ NewValue
                     );
                 }
             }
