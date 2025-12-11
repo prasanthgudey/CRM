@@ -1,9 +1,8 @@
 ﻿using CRM.Server.DTOs;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using CRM.Server.Data;
 using Microsoft.AspNetCore.Authorization;
-
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
@@ -42,7 +41,12 @@ namespace CRM.Server.Controllers
         [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Create(CustomerCreateDto dto)
         {
-            var result = await _service.CreateAsync(dto);
+            // Set performedByUserId from authenticated user if available
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            // If dto has CreatedByUserId property, prefer server side set
+            dto.CreatedByUserId = performedBy;
+
+            var result = await _service.CreateAsync(dto, performedBy!);
             return Ok(result);
         }
 
@@ -50,7 +54,8 @@ namespace CRM.Server.Controllers
         [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Update(Guid id, CustomerUpdateDto dto)
         {
-            var updated = await _service.UpdateAsync(id, dto);
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var updated = await _service.UpdateAsync(id, dto, performedBy!);
             return updated ? NoContent() : NotFound();
         }
 
@@ -58,7 +63,8 @@ namespace CRM.Server.Controllers
         [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var deleted = await _service.DeleteAsync(id);
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var deleted = await _service.DeleteAsync(id, performedBy!);
             return deleted ? NoContent() : NotFound();
         }
     }

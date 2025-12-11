@@ -1,19 +1,23 @@
 ﻿using CRM.Server.Dtos;
 using CRM.Server.Models.Tasks;
 using CRM.Server.Repositories;
+using CRM.Server.Services.Interfaces;
+using System.Text.Json;
 
 namespace CRM.Server.Services
 {
     public class TaskService : ITaskService
     {
         private readonly ITaskRepository _repo;
+        private readonly IAuditLogService _auditLogService;
 
-        public TaskService(ITaskRepository repo)
+        public TaskService(ITaskRepository repo, IAuditLogService auditLogService)
         {
             _repo = repo;
+            _auditLogService = auditLogService;
         }
 
-        public IEnumerable<TaskResponseDto> GetAll(TaskFilterDto? filter = null)
+        public async Task<IEnumerable<TaskResponseDto>> GetAllAsync(TaskFilterDto? filter = null)
         {
             var query = _repo.GetAll().AsQueryable();
 
@@ -36,37 +40,21 @@ namespace CRM.Server.Services
 
                 if (filter.DueTo.HasValue)
                     query = query.Where(t => t.DueDate <= filter.DueTo.Value);
-
-                var sortBy = filter.SortBy?.ToLower();
-                var direction = (filter.SortDirection ?? "asc").ToLower();
-
-                query = (sortBy, direction) switch
-                {
-                    ("priority", "desc") => query.OrderByDescending(t => t.Priority),
-                    ("priority", _) => query.OrderBy(t => t.Priority),
-
-                    ("status", "desc") => query.OrderByDescending(t => t.State),
-                    ("status", _) => query.OrderBy(t => t.State),
-
-                    ("date", "desc") => query.OrderByDescending(t => t.DueDate),
-                    ("date", _) => query.OrderBy(t => t.DueDate),
-
-                    _ => query.OrderBy(t => t.TaskId)
-                };
             }
 
-            return query
-                .Select(t => ToResponseDto(t))
-                .ToList();
+            return query.Select(ToResponseDto).ToList();
         }
 
-        public TaskResponseDto? GetById(Guid id)
+        public async Task<TaskResponseDto?> GetByIdAsync(Guid id)
         {
             var task = _repo.GetById(id);
             return task is null ? null : ToResponseDto(task);
         }
 
-        public TaskResponseDto Create(CreateTaskDto dto)
+        // ============================================================
+        // ✅ CREATE TASK + AUDIT
+        // ============================================================
+        public async Task<TaskResponseDto> CreateAsync(CreateTaskDto dto, string performedByUserId)
         {
             var task = new TaskItem
             {
@@ -89,13 +77,29 @@ namespace CRM.Server.Services
                 task.CompletedAt = DateTime.UtcNow;
 
             var saved = _repo.Add(task);
+
+            await SafeAudit(
+                performedByUserId,
+                saved.TaskId.ToString(),
+                "Task Created",
+                "Task",
+                null,
+                JsonSerializer.Serialize(saved)
+            );
+
             return ToResponseDto(saved);
         }
 
-        public TaskResponseDto Update(Guid id, UpdateTaskDto dto)
+        // ============================================================
+        // ✅ UPDATE TASK + STATUS CHANGE AUDIT
+        // ============================================================
+        public async Task<TaskResponseDto> UpdateAsync(Guid id, UpdateTaskDto dto, string performedByUserId)
         {
             var existing = _repo.GetById(id)
                 ?? throw new Exception("Task not found");
+
+            var oldValue = JsonSerializer.Serialize(existing);
+            var oldState = existing.State;
 
             if (!string.IsNullOrWhiteSpace(dto.Title))
                 existing.Title = dto.Title;
@@ -117,6 +121,9 @@ namespace CRM.Server.Services
             if (dto.State.HasValue)
                 existing.State = dto.State.Value;
 
+            if (existing.State == TaskState.Completed)
+                existing.CompletedAt = DateTime.UtcNow;
+
             if (dto.IsRecurring.HasValue)
                 existing.IsRecurring = dto.IsRecurring.Value;
 
@@ -130,12 +137,56 @@ namespace CRM.Server.Services
                 existing.RecurrenceEndDate = dto.RecurrenceEndDate;
 
             var updated = _repo.Update(existing);
+
+            var newValue = JsonSerializer.Serialize(updated);
+
+            // ✅ Status Change separate audit
+            if (dto.State.HasValue && oldState != updated.State)
+            {
+                await SafeAudit(
+                    performedByUserId,
+                    updated.TaskId.ToString(),
+                    "Task Status Changed",
+                    "Task",
+                    JsonSerializer.Serialize(new { oldState }),
+                    JsonSerializer.Serialize(new { updated.State })
+                );
+            }
+            else
+            {
+                await SafeAudit(
+                    performedByUserId,
+                    updated.TaskId.ToString(),
+                    "Task Updated",
+                    "Task",
+                    oldValue,
+                    newValue
+                );
+            }
+
             return ToResponseDto(updated);
         }
 
-        public void Delete(Guid id)
+        // ============================================================
+        // ✅ DELETE TASK + AUDIT
+        // ============================================================
+        public async Task DeleteAsync(Guid id, string performedByUserId)
         {
+            var task = _repo.GetById(id)
+                ?? throw new Exception("Task not found");
+
+            var oldValue = JsonSerializer.Serialize(task);
+
             _repo.Delete(id);
+
+            await SafeAudit(
+                performedByUserId,
+                id.ToString(),
+                "Task Deleted",
+                "Task",
+                oldValue,
+                null
+            );
         }
 
         private static TaskResponseDto ToResponseDto(TaskItem t) =>
@@ -156,5 +207,35 @@ namespace CRM.Server.Services
                 RecurrenceInterval = t.RecurrenceInterval,
                 RecurrenceEndDate = t.RecurrenceEndDate
             };
+
+        // ============================================================
+        // ✅ SAFE AUDIT WRAPPER
+        // ============================================================
+        private async Task SafeAudit(
+            string performedByUserId,
+            string targetId,
+            string action,
+            string entityName,
+            string? oldValue,
+            string? newValue)
+        {
+            try
+            {
+                await _auditLogService.LogAsync(
+                    performedByUserId,
+                    targetId,
+                    action,
+                    entityName,
+                    true,
+                    null,
+                    oldValue,
+                    newValue
+                );
+            }
+            catch
+            {
+                // ✅ Never break core task functionality
+            }
+        }
     }
 }

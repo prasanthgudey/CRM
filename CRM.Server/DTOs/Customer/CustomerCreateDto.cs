@@ -31,7 +31,7 @@ namespace CRM.Server.DTOs
         public string Address { get; set; }= string.Empty;
 
         [Required(ErrorMessage = "Creator Id is required")]
-        public Guid CreatedByUserId { get; set; }
+        public string CreatedByUserId { get; set; }
 
     }
 }

@@ -2,11 +2,14 @@
 using CRM.Server.Dtos;
 using CRM.Server.Models.Tasks;
 using CRM.Server.Services;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // ✅ All task actions require login
     public class TasksController : ControllerBase
     {
         private readonly ITaskService _service;
@@ -16,72 +19,62 @@ namespace CRM.Server.Controllers
             _service = service;
         }
 
-       
-
-
         [HttpGet("all")]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            var tasks =  _service.GetAll();
+            var tasks = await _service.GetAllAsync();
             return Ok(tasks);
         }
 
-        // =============================
-        // GET: /api/tasks/{id}
-        // =============================
         [HttpGet("{id:guid}")]
-        public IActionResult GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id)
         {
-            var task = _service.GetById(id);
+            var task = await _service.GetByIdAsync(id);
             if (task == null)
                 return NotFound("Task not found");
 
             return Ok(task);
         }
 
-
-        // =============================
-        // GET: /api/tasks/customer/{customerId}
-        // =============================
         [HttpGet("customer/{customerId:Guid}")]
-        public IActionResult GetByCustomerId(Guid customerId)
+        public async Task<IActionResult> GetByCustomerId(Guid customerId)
         {
-            var result = _service.GetAll(new TaskFilterDto { CustomerId = customerId });
+            var result = await _service.GetAllAsync(new TaskFilterDto { CustomerId = customerId });
             return Ok(result);
         }
-        // =============================
-        // GET: /api/tasks/user/{userId}
-        // =============================
+
         [HttpGet("user/{userId}")]
-        public IActionResult GetByUserId(string userId)
+        public async Task<IActionResult> GetByUserId(string userId)
         {
-            var result = _service.GetAll(new TaskFilterDto { UserId = userId });
+            var result = await _service.GetAllAsync(new TaskFilterDto { UserId = userId });
             return Ok(result);
         }
 
-
         // =============================
-        // POST: /api/tasks
+        // ✅ CREATE TASK (AUDITED)
         // =============================
         [HttpPost]
-        public IActionResult Create([FromBody] CreateTaskDto dto)
+        public async Task<IActionResult> Create([FromBody] CreateTaskDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var task = _service.Create(dto);
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var task = await _service.CreateAsync(dto, performedBy!);
             return CreatedAtAction(nameof(GetById), new { id = task.TaskId }, task);
         }
 
         // =============================
-        // PUT: /api/tasks/{id}
+        // ✅ UPDATE TASK (AUDITED)
         // =============================
         [HttpPut("{id:Guid}")]
-        public IActionResult Update(Guid id, [FromBody] UpdateTaskDto dto)
+        public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTaskDto dto)
         {
             try
             {
-                var task = _service.Update(id, dto);
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var task = await _service.UpdateAsync(id, dto, performedBy!);
                 return Ok(task);
             }
             catch (Exception ex)
@@ -91,14 +84,15 @@ namespace CRM.Server.Controllers
         }
 
         // =============================
-        // DELETE: /api/tasks/{id}
+        // ✅ DELETE TASK (AUDITED)
         // =============================
         [HttpDelete("{id:Guid}")]
-        public IActionResult Delete(Guid id)
+        public async Task<IActionResult> Delete(Guid id)
         {
             try
             {
-                _service.Delete(id);
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                await _service.DeleteAsync(id, performedBy!);
                 return NoContent();
             }
             catch (Exception ex)

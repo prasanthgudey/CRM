@@ -5,8 +5,8 @@ using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using CRM.Server.DTOs.Auth;
-//using Microsoft.AspNetCore.Identity;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 
 namespace CRM.Server.Services
 {
@@ -16,25 +16,26 @@ namespace CRM.Server.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _config;
+        private readonly IAuditLogService _auditLogService;
 
-        // ✅ Built-in: UserManager, IConfiguration
-        // ✅ Custom: IUserRepository, IEmailService
         public UserService(
             IUserRepository userRepository,
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
-            IConfiguration config)
+            IConfiguration config,
+            IAuditLogService auditLogService)
         {
             _userRepository = userRepository;
             _userManager = userManager;
             _emailService = emailService;
             _config = config;
+            _auditLogService = auditLogService;
         }
 
         // ============================================================
-        // ✅ 1️⃣ MANUAL ADMIN USER CREATION (TEMP PASSWORD)
+        // ✅ 1️⃣ MANUAL ADMIN USER CREATION (WITH AUDIT)
         // ============================================================
-        public async Task CreateUserAsync(CreateUserDto dto)
+        public async Task CreateUserAsync(CreateUserDto dto, string performedByUserId)
         {
             var existing = await _userManager.FindByEmailAsync(dto.Email);
             if (existing != null)
@@ -49,28 +50,32 @@ namespace CRM.Server.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            // ✅ Strong temporary password
             string tempPassword = Guid.NewGuid().ToString("N")[..8] + "@A1";
 
             var result = await _userManager.CreateAsync(user, tempPassword);
             if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
 
-            // ✅ Assign role
-            var roleResult = await _userManager.AddToRoleAsync(user, dto.Role);
-            if (!roleResult.Succeeded)
-                throw new Exception("Role assignment failed");
+            await _userManager.AddToRoleAsync(user, dto.Role);
 
-            // ✅ Optional: Send temp password via email
             await _emailService.SendAsync(
                 user.Email!,
                 "Your CRM Account Credentials",
                 $"Your temporary password is: {tempPassword}"
             );
+
+            await SafeAudit(
+                performedByUserId,
+                user.Id,
+                "User Created",
+                "User",
+                null,
+                JsonSerializer.Serialize(user)
+            );
         }
 
         // ============================================================
-        // ✅ 2️⃣ GET ALL USERS (ADMIN VIEW)
+        // ✅ 2️⃣ GET ALL USERS (NO AUDIT REQUIRED)
         // ============================================================
         public async Task<List<UserResponseDto>> GetAllUsersAsync()
         {
@@ -96,9 +101,9 @@ namespace CRM.Server.Services
         }
 
         // ============================================================
-        // ✅ 3️⃣ EMAIL INVITE USER (REGISTRATION LINK FLOW)
+        // ✅ 3️⃣ EMAIL INVITE USER (WITH AUDIT)
         // ============================================================
-        public async Task InviteUserAsync(InviteUserDto dto)
+        public async Task InviteUserAsync(InviteUserDto dto, string performedByUserId)
         {
             var existing = await _userManager.FindByEmailAsync(dto.Email);
             if (existing != null)
@@ -121,66 +126,95 @@ namespace CRM.Server.Services
 
             await _userManager.AddToRoleAsync(user, dto.Role);
 
-            // ✅ Generate secure registration token
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
             var inviteLink =
                 $"{_config["Client:Url"]}/register?token={Uri.EscapeDataString(token)}&email={user.Email}";
 
-            //var inviteLink =
-            //$"https://localhost:7194/api/auth/complete-registration?token={Uri.EscapeDataString(token)}&email={user.Email}";
-
-
-
-            // ✅ Send registration email
             await _emailService.SendAsync(
                 user.Email!,
                 "CRM Registration Invite",
                 $"Click the link to complete your registration:\n\n{inviteLink}"
             );
+
+            await SafeAudit(
+                performedByUserId,
+                user.Id,
+                "User Invited",
+                "User",
+                null,
+                JsonSerializer.Serialize(new { user.Email, Role = dto.Role })
+            );
         }
 
         // ============================================================
-        // ✅ 4️⃣ DEACTIVATE USER (ADMIN CONTROL)
+        // ✅ 4️⃣ DEACTIVATE USER (WITH AUDIT)
         // ============================================================
-        public async Task DeactivateUserAsync(string userId)
+        public async Task DeactivateUserAsync(string userId, string performedByUserId)
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
                 throw new Exception("User not found");
 
+            var oldValue = JsonSerializer.Serialize(new { user.IsActive });
+
             user.IsActive = false;
             await _userManager.UpdateAsync(user);
+
+            var newValue = JsonSerializer.Serialize(new { user.IsActive });
+
+            await SafeAudit(
+                performedByUserId,
+                userId,
+                "User Deactivated",
+                "User",
+                oldValue,
+                newValue
+            );
         }
 
-
-        public async Task ActivateUserAsync(string userId)
+        // ============================================================
+        // ✅ 5️⃣ ACTIVATE USER (WITH AUDIT)
+        // ============================================================
+        public async Task ActivateUserAsync(string userId, string performedByUserId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-
             if (user == null)
                 throw new Exception("User not found");
+
+            var oldValue = JsonSerializer.Serialize(new { user.IsActive });
 
             user.IsActive = true;
-
             await _userRepository.UpdateAsync(user);
+
+            var newValue = JsonSerializer.Serialize(new { user.IsActive });
+
+            await SafeAudit(
+                performedByUserId,
+                userId,
+                "User Activated",
+                "User",
+                oldValue,
+                newValue
+            );
         }
 
-
-
-        public async Task UpdateUserAsync(string userId, UpdateUserDto dto)
+        // ============================================================
+        // ✅ 6️⃣ UPDATE USER (WITH AUDIT)
+        // ============================================================
+        public async Task UpdateUserAsync(string userId, UpdateUserDto dto, string performedByUserId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-
             if (user == null)
                 throw new Exception("User not found");
+
+            var oldValue = JsonSerializer.Serialize(user);
 
             user.FullName = dto.FullName;
             user.Email = dto.Email;
 
             if (!string.IsNullOrWhiteSpace(dto.Role))
             {
-                // Using roleManager or your RoleService logic
                 var currentRoles = await _userManager.GetRolesAsync(user);
                 if (currentRoles.Any())
                     await _userManager.RemoveFromRolesAsync(user, currentRoles);
@@ -192,28 +226,48 @@ namespace CRM.Server.Services
                 user.IsActive = dto.IsActive.Value;
 
             await _userRepository.UpdateAsync(user);
+
+            var newValue = JsonSerializer.Serialize(user);
+
+            await SafeAudit(
+                performedByUserId,
+                userId,
+                "User Updated",
+                "User",
+                oldValue,
+                newValue
+            );
         }
 
-        public async Task DeleteUserAsync(string userId)
+        // ============================================================
+        // ✅ 7️⃣ DELETE USER (WITH AUDIT)
+        // ============================================================
+        public async Task DeleteUserAsync(string userId, string performedByUserId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-
             if (user == null)
                 throw new Exception("User not found");
 
+            var oldValue = JsonSerializer.Serialize(user);
+
             await _userRepository.DeleteAsync(user);
+
+            await SafeAudit(
+                performedByUserId,
+                userId,
+                "User Deleted",
+                "User",
+                oldValue,
+                null
+            );
         }
 
-
-
         // ============================================================
-        // ✅ FORGOT PASSWORD
+        // ✅ 8️⃣ FORGOT PASSWORD (NO AUDIT HERE - DONE IN AUTH)
         // ============================================================
         public async Task ForgotPasswordAsync(string email)
         {
             var user = await _userManager.FindByEmailAsync(email);
-
-            // ✅ Security: Do not reveal if user exists
             if (user == null)
                 return;
 
@@ -230,7 +284,7 @@ namespace CRM.Server.Services
         }
 
         // ============================================================
-        // ✅ RESET PASSWORD
+        // ✅ 9️⃣ RESET PASSWORD (NO AUDIT HERE - DONE IN AUTH)
         // ============================================================
         public async Task ResetPasswordAsync(string email, string token, string newPassword)
         {
@@ -242,12 +296,12 @@ namespace CRM.Server.Services
 
             var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
 
-             if (!result.Succeeded)
+            if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
         }
 
         // ============================================================
-        // ✅ CHANGE PASSWORD (LOGGED-IN USER)
+        // ✅ 🔟 CHANGE PASSWORD (NO AUDIT HERE - DONE IN AUTH)
         // ============================================================
         public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
         {
@@ -262,14 +316,12 @@ namespace CRM.Server.Services
                 throw new Exception(result.Errors.First().Description);
         }
 
-
         // ============================================================
-        // ✅ GET USER BY ID (PROFILE)
+        // ✅ GET USER BY ID
         // ============================================================
         public async Task<UserResponseDto> GetUserByIdAsync(string userId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-
             if (user == null)
                 throw new Exception("User not found");
 
@@ -287,7 +339,7 @@ namespace CRM.Server.Services
         }
 
         // ============================================================
-        // ✅ 5️⃣ FILTER USERS (BY ROLE & ACTIVE STATUS)
+        // ✅ FILTER USERS
         // ============================================================
         public async Task<List<UserResponseDto>> FilterUsersAsync(string? role, bool? isActive)
         {
@@ -319,13 +371,16 @@ namespace CRM.Server.Services
 
             return result;
         }
+
+        // ============================================================
+        // ✅ MFA METHODS (NO AUDIT HERE - DONE IN AUTH)
+        // ============================================================
         public async Task<EnableMfaResponseDto> EnableMfaAsync(string userId)
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
                 throw new Exception("User not found");
 
-            // ✅ RESET any existing key
             await _userManager.ResetAuthenticatorKeyAsync(user);
 
             var key = await _userManager.GetAuthenticatorKeyAsync(user);
@@ -333,7 +388,6 @@ namespace CRM.Server.Services
             var email = user.Email!;
             var issuer = "CRM";
 
-            // ✅ STANDARD TOTP URI FORMAT
             var qrCodeUri =
                 $"otpauth://totp/{UrlEncoder.Default.Encode(issuer)}:" +
                 $"{UrlEncoder.Default.Encode(email)}" +
@@ -370,7 +424,6 @@ namespace CRM.Server.Services
             if (user == null)
                 throw new Exception("User not found");
 
-            // ✅ OTP MUST BE VERIFIED BEFORE DISABLING
             var isValid = await _userManager.VerifyTwoFactorTokenAsync(
                 user,
                 TokenOptions.DefaultAuthenticatorProvider,
@@ -382,10 +435,37 @@ namespace CRM.Server.Services
             user.TwoFactorEnabled = false;
             await _userManager.UpdateAsync(user);
 
-            // ✅ REMOVE SECRET
             await _userManager.ResetAuthenticatorKeyAsync(user);
         }
 
-
+        // ============================================================
+        // ✅ SAFE AUDIT HELPER
+        // ============================================================
+        private async Task SafeAudit(
+            string performedByUserId,
+            string targetUserId,
+            string action,
+            string entityName,
+            string? oldValue,
+            string? newValue)
+        {
+            try
+            {
+                await _auditLogService.LogAsync(
+                    performedByUserId,
+                    targetUserId,
+                    action,
+                    entityName,
+                    true,
+                    null,
+                    oldValue,
+                    newValue
+                );
+            }
+            catch
+            {
+                // ✅ Never break business logic
+            }
+        }
     }
 }
