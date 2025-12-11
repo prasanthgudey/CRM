@@ -186,16 +186,16 @@ namespace CRM.Server.Controllers
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteUser(string userId)
         {
-            try
-            {
-                await _userService.DeleteUserAsync(userId);
-                return Ok(new { message = "User deleted successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await _userService.DeleteUserAsync(userId, performedBy!);
+            return Ok(new { message = "User deleted successfully" });
         }
+
+        //[HttpGet]
+        //public async Task<IActionResult> GetAllUsers()
+        //{
+        //    return Ok(await _userService.GetAllUsersAsync());
+        //}
 
 
         // =====================================================

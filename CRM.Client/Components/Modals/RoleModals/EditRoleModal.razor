@@ -7,10 +7,10 @@
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
         <div class="modal-card shadow"
              style="
-                width: 540px;
-                border-radius: 14px;
-                padding: 32px 36px;
-                background: white;">
+                    width: 540px;
+                    border-radius: 14px;
+                    padding: 32px 36px;
+                    background: white;">
 
             <h5 class="mb-3 text-center">Edit Role</h5>
 
@@ -20,6 +20,7 @@
             }
 
             <EditForm Model="Model" OnValidSubmit="UpdateRole">
+            <EditForm Model="Model" OnValidSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
 
                 <!-- Role Name Input -->
@@ -59,17 +60,55 @@
 
     private UpdateRoleDto Model { get; set; } = new();
     private bool IsLoading;
-    private string? Message;
+    private string? Message { get; set; }
+    private bool _wasOpen = false;
 
+    // ---------------------------
+    // Corrected + merged logic
+    // ---------------------------
     protected override void OnParametersSet()
     {
+        if (IsOpen && !_wasOpen)
+        {
+            var name = OldRoleName ?? string.Empty;
+
+            Model = new UpdateRoleDto
+            {
+                OldName = name,
+                NewName = name
+            };
+        }
+
         if (!string.IsNullOrWhiteSpace(OldRoleName))
         {
             Model.OldName = OldRoleName;
             Model.NewName = OldRoleName;
         }
+
+        _wasOpen = IsOpen;
     }
 
+    // ---------------------------
+    // Form Submit
+    // ---------------------------
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.NewName))
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Validation",
+                "Role name is required.",
+                "warning");
+
+            return;
+        }
+
+        await UpdateRole();
+    }
+
+    // ---------------------------
+    // Update Role Logic
+    // ---------------------------
     private async Task UpdateRole()
     {
         IsLoading = true;
@@ -80,12 +119,61 @@
             await RoleService.UpdateRoleAsync(Model);
             Message = "Role updated successfully.";
 
-            await Task.Delay(700);
-            await OnClose.InvokeAsync(false);
+            // Duplicate Role Check
+            if (!result.IsSuccess && result.ErrorMessage != null)
+            {
+                if (
+                    result.ErrorMessage.Contains("exists", StringComparison.OrdinalIgnoreCase) ||
+                    result.ErrorMessage.Contains("already", StringComparison.OrdinalIgnoreCase) ||
+                    result.ErrorMessage.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
+                    result.StatusCode == 409
+                   )
+                {
+                    await JSRuntime.InvokeVoidAsync("Swal.fire",
+                        "Duplicate Role",
+                        "A role with this name already exists.",
+                        "error");
+
+                    return;
+                }
+            }
+
+            if (result.IsSuccess)
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Success",
+                    "Role updated successfully ✔",
+                    "success");
+
+                await Task.Delay(900);
+                await Close(true);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Failed",
+                    result.ErrorMessage ?? "Could not update role.",
+                    "error");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            Message = "Failed to update role.";
+            if (ex.Message.Contains("exists", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("already", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Duplicate Role",
+                    "A role with this name already exists.",
+                    "error");
+
+                return;
+            }
+
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                ex.Message,
+                "error");
         }
         finally
         {
@@ -93,7 +181,7 @@
         }
     }
 
-    private async Task Close()
+    private async Task Close(bool success)
     {
         Message = null;
         await OnClose.InvokeAsync(false);

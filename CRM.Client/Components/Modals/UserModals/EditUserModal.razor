@@ -118,6 +118,51 @@
         SelectedRole = role;
         EditModel.Role = role;
         IsDropdownOpen = false;
+            Message = null;
+        }
+    
+
+    // Safe wrapper for crmAlerts calls
+    private async Task ShowAlertAsync(string kind, string text)
+    {
+        if (!_isInteractive)
+        {
+            // fallback to inline message until JS is ready
+            Message = text;
+            return;
+        }
+
+        try
+        {
+            if (kind.Equals("success", StringComparison.OrdinalIgnoreCase))
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", text);
+            else if (kind.Equals("error", StringComparison.OrdinalIgnoreCase))
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", text);
+            else if (kind.Equals("warning", StringComparison.OrdinalIgnoreCase))
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showWarning", text);
+            else
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showInfo", text);
+        }
+        catch
+        {
+            // if JS fails for any reason, show inline message
+            Message = text;
+        }
+    }
+
+    // Simple email validator
+    private bool IsValidEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private async Task Save()
