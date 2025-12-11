@@ -172,6 +172,7 @@ namespace CRM.Server.Controllers
             var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
 
             var user = await _userService.GetUserByIdAsync(userId!);
+            //commnt by eswar
 
             return Ok(user);
         }
