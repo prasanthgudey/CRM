@@ -242,6 +242,42 @@ namespace CRM.Server.Services
                 .ToList();
         }
 
+        // -------------------------
+        // NEW: Dashboard helper methods
+        // -------------------------
+
+        /// <summary>
+        /// NEW: Returns total number of customers (server-side)
+        /// </summary>
+        public async Task<int> GetTotalCountAsync()
+        {
+            var list = await _repo.GetAllAsync();
+            return list?.Count ?? 0;
+        }
+
+        /// <summary>
+        /// NEW: Returns number of customers created in the last `days` (server-side)
+        /// </summary>
+        public async Task<int> GetNewCustomersCountAsync(int days = 7)
+        {
+            var list = await _repo.GetAllAsync();
+            if (list == null || !list.Any()) return 0;
+
+            var cutoff = DateTime.UtcNow.AddDays(-days);
+
+            var count = list.Count(c =>
+            {
+                if (string.IsNullOrWhiteSpace(c.CreatedAt)) return false;
+                if (DateTime.TryParse(c.CreatedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var created))
+                {
+                    return created >= cutoff;
+                }
+                return false;
+            });
+
+            return count;
+        }
+
         // SAFE AUDIT helper
         private async Task SafeAudit(
             string? performedByUserId,

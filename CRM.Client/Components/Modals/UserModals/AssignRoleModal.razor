@@ -1,39 +1,55 @@
 ﻿@using CRM.Client.DTOs.Roles
 @using CRM.Client.Services.Roles
 @inject RoleService RoleService
-@inject IJSRuntime JSRuntime    
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
-        <div class="modal-card shadow"
-             style="width: 360px; border-radius: 12px; padding: 20px; background: white;">
 
-            <h5 class="mb-3 text-center">Assign Role</h5>
+        <div class="modal-card shadow"
+             style="width: 500px; padding: 28px 32px; border-radius: 14px; background:white;">
+
+            <h5 class="text-center mb-3">Assign Role</h5>
 
             @if (!string.IsNullOrWhiteSpace(Message))
             {
-                <div class="alert alert-info py-2">
-                    @Message
-                </div>
+                <div class="alert alert-info py-2">@Message</div>
             }
 
-            <EditForm Model="AssignModel" OnValidSubmit="AssignRole">
-                <DataAnnotationsValidator />
+        <EditForm Model="AssignModel" OnValidSubmit="AssignRole">
+            <DataAnnotationsValidator />
 
-                <!-- ✅ ROLE SELECTION -->
-                <div class="form-group mt-3">
-                    <label class="small text-muted">Select Role</label>
-                    <select class="form-control"
-                            @bind="AssignModel.RoleName">
-                        <option value="">-- Choose a role --</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Manager">Manager</option>
-                        <option value="User">User</option>
-                    </select>
+            <!-- ROLE WITH CUSTOM SCROLLABLE DROPDOWN -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">Select Role</label>
+
+                <div class="role-dropdown-container">
+
+                    <!-- Selected Role -->
+                    <div class="role-selected" @onclick="ToggleDropdown">
+                        @(string.IsNullOrWhiteSpace(AssignModel.RoleName)
+                                                ? "-- Select a role --"
+                                                : AssignModel.RoleName)
+                    </div>
+
+                        <!-- Scrollable dropdown list -->
+                    @if (ShowDropdown && Roles != null)
+                        {
+                            <div class="role-dropdown-list">
+                                @foreach (var role in Roles)
+                                {
+                                    <div class="role-item"
+                                         @onclick="() => SelectRole(role.Name)">
+                                        @role.Name
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
 
-                <!-- ✅ ACTION BUTTONS -->
+                <!-- ACTION BUTTONS -->
                 <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary"
@@ -46,6 +62,7 @@
                         @(IsLoading ? "Assigning..." : "Assign Role")
                     </button>
                 </div>
+
             </EditForm>
 
         </div>
@@ -55,54 +72,59 @@
 @code {
 
     [Parameter] public bool IsOpen { get; set; }
-
     [Parameter] public string? UserId { get; set; }
-
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private AssignRoleDto AssignModel { get; set; } = new AssignRoleDto();
+    private AssignRoleDto AssignModel { get; set; } = new();
+    private List<RoleResponseDto>? Roles { get; set; }
 
     private bool IsLoading { get; set; }
-
     private string? Message { get; set; }
+    private bool ShowDropdown = false;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         AssignModel = new AssignRoleDto
         {
             UserId = UserId ?? string.Empty
         };
+
+        if (IsOpen)
+            Roles = await RoleService.GetAllRolesAsync();
+    }
+
+    private void ToggleDropdown()
+    {
+        ShowDropdown = !ShowDropdown;
+    }
+
+    private void SelectRole(string role)
+    {
+        AssignModel.RoleName = role;
+        ShowDropdown = false;
     }
 
     private async Task AssignRole()
     {
         if (string.IsNullOrWhiteSpace(AssignModel.RoleName))
         {
-            Message = "Please select a role.";
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Please select a role.");
             return;
         }
 
         IsLoading = true;
-        Message = null;
 
         try
         {
             await RoleService.AssignRoleAsync(AssignModel);
 
-            // ⭐ NEW – SweetAlert success popup
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role assigned successfully.");
-
-            // (optional) no need to show message inside modal now, SweetAlert already shows it
-            // Message = "Role assigned successfully.";
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role assigned successfully!");
 
             await Task.Delay(500);
             await OnClose.InvokeAsync(false);
         }
         catch
         {
-            Message = "Failed to assign role.";
-
-            // ⭐ NEW – SweetAlert error popup
             await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to assign role.");
         }
         finally
@@ -111,10 +133,9 @@
         }
     }
 
-
     private async Task Close()
     {
-        Message = null;
+        ShowDropdown = false;
         await OnClose.InvokeAsync(false);
     }
 }

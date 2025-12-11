@@ -1,12 +1,17 @@
 ﻿@using CRM.Client.DTOs.Users
+@using CRM.Client.DTOs.Roles
 @using CRM.Client.Services.Users
+@using CRM.Client.Services.Roles
 @inject UserService UserService
+@inject RoleService RoleService
 @inject IJSRuntime JSRuntime
 
 @if (IsOpen && User != null)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
-        <div class="modal-card shadow" style="width: 420px; border-radius: 12px; padding: 18px; background: white;">
+        <div class="modal-card shadow"
+             style="width: 450px; border-radius: 12px; padding: 22px; background: white;">
+
             <h5 class="mb-3 text-center">Edit User</h5>
 
             @if (!string.IsNullOrWhiteSpace(Message))
@@ -17,43 +22,77 @@
             <EditForm Model="EditModel" OnValidSubmit="Save">
                 <DataAnnotationsValidator />
 
+                <!-- Full Name -->
                 <div class="form-group">
                     <label class="small text-muted">Full Name</label>
-                    <InputText class="form-control" placeholder="Enter full name" @bind-Value="EditModel.FullName" />
+                    <InputText class="form-control"
+                               placeholder="Enter full name"
+                               @bind-Value="EditModel.FullName" />
                 </div>
 
+                <!-- Email -->
                 <div class="form-group mt-2">
                     <label class="small text-muted">Email</label>
-                    <InputText class="form-control" placeholder="Enter email address" @bind-Value="EditModel.Email" />
+                    <InputText class="form-control"
+                               placeholder="Enter email"
+                               @bind-Value="EditModel.Email" />
                 </div>
 
-                <div class="form-group mt-2">
-                    <label class="small text-muted">Role</label>
-                    <InputSelect class="form-control" @bind-Value="EditModel.Role">
-                        <option value="">-- Select a role --</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Manager">Manager</option>
-                        <option value="User">User</option>
-                    </InputSelect>
+                <!-- Role (Dynamic + Scrollable) -->
+                <div class="form-group mt-3">
+                    <label class="small text-muted">Select Role</label>
+
+                    <div class="role-dropdown-container">
+                        <div class="role-selected" @onclick="ToggleDropdown">
+                            @(SelectedRole ?? "-- Select a role --")
+                        </div>
+
+                        @if (IsDropdownOpen)
+                        {
+                            <div class="role-dropdown-list">
+                                @foreach (var r in Roles)
+                                {
+                                    <div class="role-item" @onclick="() => SelectRole(r.Name)">
+                                        @r.Name
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
 
+                <!-- Buttons -->
                 <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
-                    <button class="btn btn-primary" disabled="@IsLoading">@((IsLoading) ? "Saving..." : "Save")</button>
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="Cancel">
+                        Cancel
+                    </button>
+
+                    <button class="btn btn-primary" disabled="@IsLoading">
+                        @(IsLoading ? "Saving..." : "Save")
+                    </button>
                 </div>
+
             </EditForm>
         </div>
     </div>
 }
 
 @code {
+
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public UserResponseDto? User { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private UpdateUserDto EditModel { get; set; } = new UpdateUserDto();
-    private bool IsLoading { get; set; }
-    private string? Message { get; set; }
+    private UpdateUserDto EditModel { get; set; } = new();
+    private List<RoleResponseDto> Roles = new();
+
+    private bool IsLoading;
+    private string? Message;
+    private bool IsDropdownOpen = false;
+
+    private string? SelectedRole;
 
     // JS interop guard
     private bool _isInteractive = false;
@@ -67,7 +106,7 @@
         return base.OnAfterRenderAsync(firstRender);
     }
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         if (User != null)
         {
@@ -77,8 +116,23 @@
                 Email = User.Email,
                 Role = User.Role
             };
-            Message = null;
+
+            SelectedRole = User.Role;
+
+            Roles = await RoleService.GetAllRolesAsync();
+    Message = null;
         }
+    }
+
+    private void ToggleDropdown() => IsDropdownOpen = !IsDropdownOpen;
+
+    private void SelectRole(string role)
+    {
+        SelectedRole = role;
+        EditModel.Role = role;
+        IsDropdownOpen = false;
+            Message = null;
+        
     }
 
     // Safe wrapper for crmAlerts calls
@@ -203,7 +257,6 @@
 
     private async Task Cancel()
     {
-        Message = null;
-        await OnClose.InvokeAsync(false);   // cancel -> no alert
+        await OnClose.InvokeAsync(false);
     }
 }

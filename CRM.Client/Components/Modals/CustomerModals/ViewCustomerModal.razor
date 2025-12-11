@@ -1,0 +1,170 @@
+﻿@using CRM.Client.DTOs.Customers
+@inject IJSRuntime JSRuntime
+
+@if (IsOpen && Model != null)
+{
+    <div class="modal fade show d-block customer-modal-backdrop" tabindex="-1" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered customer-modal-dialog" role="document">
+            <div class="modal-content customer-modal-content">
+                <div class="modal-header customer-modal-header">
+                    <h5 class="modal-title customer-modal-title">Customer — View</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Close" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body customer-modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="small text-muted">First name</label>
+                            <div class="form-control-plaintext">@Model.FirstName</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="small text-muted">Middle name</label>
+                            <div class="form-control-plaintext">@ShortOrDash(Model.MiddleName)</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="small text-muted">Surname</label>
+                            <div class="form-control-plaintext">@Model.SurName</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted">Preferred name</label>
+                            <div class="form-control-plaintext">@ShortOrDash(Model.PreferredName)</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted">Full name</label>
+                            <div class="form-control-plaintext">@Model.FullName</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted">Email</label>
+                            <div class="form-control-plaintext">@Model.Email</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted">Phone</label>
+                            <div class="form-control-plaintext">@Model.Phone</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="small text-muted">Address</label>
+                            <div class="form-control-plaintext">@ShortOrDash(Model.Address)</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted">Created By (UserId)</label>
+                            <div class="form-control-plaintext">@Model.CreatedByUserId</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted">Created At</label>
+                            <div class="form-control-plaintext">@FormatCreatedAt(Model.CreatedAt)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer customer-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    // USER-DEFINED model (set from parent)
+    [Parameter] public CustomerResponseDto? Model { get; set; }
+
+    private async Task Close()
+    {
+        // reset model reference (optional) and notify parent
+        await OnClose.InvokeAsync(false);
+    }
+
+    // Helper: show dash for empty strings
+    private static string ShortOrDash(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value!;
+
+    // Helper: parse CreatedAt (string) and format; fallback to raw or "-"
+    private static string FormatCreatedAt(string? createdAt)
+    {
+        if (string.IsNullOrWhiteSpace(createdAt))
+            return "-";
+
+        // Try parse as ISO or other common formats
+        if (DateTimeOffset.TryParse(createdAt, out var dto))
+        {
+            // convert to local time and format
+            return dto.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+        }
+
+        // Try parse as DateTime
+        if (DateTime.TryParse(createdAt, out var dt))
+        {
+            return dt.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+        }
+
+        // If parsing fails, return the raw string (trimmed)
+        return createdAt.Length > 0 ? createdAt : "-";
+    }
+}
+
+<style>
+    .customer-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 1050;
+    }
+
+    .customer-modal-dialog {
+        max-width: 820px;
+    }
+
+    .customer-modal-content {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .customer-modal-header {
+        background: #0d6efd;
+        color: white;
+        padding: 12px 16px;
+    }
+
+    .customer-modal-title {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .customer-modal-body {
+        padding: 16px;
+        background: #ffffff;
+    }
+
+    .customer-modal-footer {
+        padding: 10px 16px;
+        background: #f8f9fa;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    /* plain text look for read-only fields */
+    .form-control-plaintext {
+        padding: .275rem .5rem;
+        margin-bottom: .5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+
+    .btn-close-white {
+        filter: invert(1) brightness(2);
+        opacity: 0.9;
+    }
+</style>

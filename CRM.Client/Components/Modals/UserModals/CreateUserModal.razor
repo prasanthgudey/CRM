@@ -1,55 +1,78 @@
 ﻿@using CRM.Client.DTOs.Users
+@using CRM.Client.DTOs.Roles
 @using CRM.Client.Services.Users
+@using CRM.Client.Services.Roles
 @inject UserService UserService
+@inject RoleService RoleService
 @inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
+
         <div class="modal-card shadow"
-             style="width: 400px; border-radius: 12px; padding: 20px; background: white;">
+             style="
+            width: 540px;
+            border-radius: 14px;
+            padding: 32px 36px;
+            background: white;">
+
 
             <h5 class="mb-3 text-center">Create New User</h5>
 
             @if (!string.IsNullOrWhiteSpace(Message))
             {
-                <div class="alert alert-info py-2">
-                    @Message
-                </div>
+                <div class="alert alert-info py-2">@Message</div>
             }
 
-            <EditForm Model="CreateModel" OnValidSubmit="CreateUser">
-                <DataAnnotationsValidator />
+        <EditForm Model="CreateModel" OnValidSubmit="CreateUser">
+            <DataAnnotationsValidator />
 
-                <!-- ✅ FULL NAME -->
-                <div class="form-group mt-3">
-                    <label class="small text-muted">Full Name</label>
-                    <InputText class="form-control"
-                               placeholder="Enter full name"
-                               @bind-Value="CreateModel.FullName" />
+            <!-- Full Name -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">Full Name</label>
+                <InputText class="form-control"
+                           placeholder="Enter full name"
+                           @bind-Value="CreateModel.FullName" />
+            </div>
+
+            <!-- Email -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">Email Address</label>
+                <InputText class="form-control"
+                           placeholder="Enter email address"
+                           @bind-Value="CreateModel.Email" />
+            </div>
+
+            <!-- CUSTOM SCROLLABLE ROLE DROPDOWN -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">Select Role</label>
+
+                <div class="role-dropdown-container position-relative">
+
+                    <!-- Selected field -->
+                    <div class="role-selected" @onclick="ToggleDropdown">
+                        @(string.IsNullOrWhiteSpace(CreateModel.Role)
+                                                ? "-- Select a role --"
+                                                : CreateModel.Role)
+                    </div>
+
+                        <!-- Dropdown list -->
+                    @if (ShowDropdown)
+                        {
+                            <div class="role-dropdown-list shadow-sm">
+                                @foreach (var r in Roles ?? new List<RoleResponseDto>())
+                                {
+                                    <div class="role-item" @onclick="() => SelectRole(r.Name)">
+                                        @r.Name
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
 
-                <!-- ✅ EMAIL -->
-                <div class="form-group mt-3">
-                    <label class="small text-muted">Email Address</label>
-                    <InputText class="form-control"
-                               placeholder="Enter email address"
-                               @bind-Value="CreateModel.Email" />
-                </div>
-
-                <!-- ✅ ROLE -->
-                <div class="form-group mt-3">
-                    <label class="small text-muted">Select Role</label>
-                    <InputSelect class="form-control"
-                                 @bind-Value="CreateModel.Role">
-                        <option value="">-- Select a role --</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Manager">Manager</option>
-                        <option value="User">User</option>
-                    </InputSelect>
-                </div>
-
-                <!-- ✅ ACTION BUTTONS -->
+                <!-- Buttons -->
                 <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary"
@@ -57,50 +80,46 @@
                         Cancel
                     </button>
 
-                    <button class="btn btn-success"
-                            disabled="@IsLoading">
+                    <button class="btn btn-success" disabled="@IsLoading">
                         @(IsLoading ? "Creating..." : "Create User")
                     </button>
                 </div>
-            </EditForm>
 
+            </EditForm>
         </div>
     </div>
 }
 
 @code {
-
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private CreateUserDto CreateModel { get; set; } = new CreateUserDto();
+    private CreateUserDto CreateModel { get; set; } = new();
+    private List<RoleResponseDto>? Roles { get; set; }
     private bool IsLoading { get; set; }
     private string? Message { get; set; }
 
-    // private async Task CreateUser()
-    // {
-    //     IsLoading = true;
-    //     Message = null;
+    private bool ShowDropdown = false;
 
-    //     try
-    //     {
-    //         await UserService.CreateUserAsync(CreateModel);
-    //         Message = "User created successfully.";
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen)
+        {
+            Roles = await RoleService.GetAllRolesAsync();
+        }
+    }
 
-    //         CreateModel = new CreateUserDto();
+    private void ToggleDropdown()
+    {
+        ShowDropdown = !ShowDropdown;
+    }
 
-    //         await Task.Delay(1200);
-    //         await OnClose.InvokeAsync(false);
-    //     }
-    //     catch
-    //     {
-    //         Message = "Failed to create user.";
-    //     }
-    //     finally
-    //     {
-    //         IsLoading = false;
-    //     }
-    // }
+    private void SelectRole(string roleName)
+    {
+        CreateModel.Role = roleName;
+        ShowDropdown = false;
+    }
+
     private async Task CreateUser()
     {
         IsLoading = true;
@@ -108,24 +127,23 @@
 
         try
         {
-            var result = await UserService.CreateUserAsync(CreateModel);   /* ⭐ NEW */
+            var result = await UserService.CreateUserAsync(CreateModel);
 
-            if (result != null && result.Success)
+            if (result?.Success == true)
             {
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", result.Message);  /* ⭐ NEW SUCCESS ALERT */
-                CreateModel = new CreateUserDto();   /* reset form */
-
-                await Task.Delay(800);
-                await OnClose.InvokeAsync(false); /* close modal */
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", result.Message);
+                CreateModel = new();
+                await Task.Delay(600);
+                await OnClose.InvokeAsync(false);
             }
             else if (result != null)
             {
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message);    /* ⭐ NEW ERROR ALERT */
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message);
             }
         }
         catch
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Something went wrong"); /* ⭐ fallback */
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Something went wrong");
         }
         finally
         {
@@ -135,7 +153,7 @@
 
     private async Task Close()
     {
-        CreateModel = new CreateUserDto();
+        CreateModel = new();
         Message = null;
         await OnClose.InvokeAsync(false);
     }

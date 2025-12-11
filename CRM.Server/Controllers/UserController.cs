@@ -1,4 +1,5 @@
-﻿using CRM.Server.DTOs.Users;
+﻿using CRM.Server.DTOs.Roles;
+using CRM.Server.DTOs.Users;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -150,6 +151,24 @@ namespace CRM.Server.Controllers
             return Ok(user);
         }
 
+
+
+
+        [HttpPost("assign")]
+        public async Task<IActionResult> AssignRole(AssignRoleDto dto)
+        {
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            try
+            {
+                await _userService.AssignRoleAsync(dto.UserId, dto.RoleName, performedBy!);
+                return Ok("Role assigned successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
         [HttpGet("filter")]
         public async Task<IActionResult> Filter([FromQuery] string? role, [FromQuery] bool? isActive)
         {

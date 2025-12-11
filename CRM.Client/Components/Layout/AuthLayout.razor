@@ -1,28 +1,18 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="auth-shell">
-    <!-- Left brand / marketing panel -->
-    <section class="auth-panel auth-panel-brand">
-        <div class="auth-brand-inner">
-            <div class="auth-logo-circle">
-                CRM
-            </div>
+<div class="auth-layout-container">
 
-            <h1 class="auth-brand-title">CRM Platform</h1>
-            <p class="auth-brand-subtitle">Secure Access Portal</p>
+    <!-- TOP TITLE SECTION (Centered) -->
+    <div class="auth-top-title">
+        <img src="images/crm.png" alt="Logo" class="auth-logo" />
 
-            <ul class="auth-brand-points">
-                <li>Manage customers and tasks in one place</li>
-                <li>Role-based secure access for your team</li>
-                <li>Fast insights with audit and activity logs</li>
-            </ul>
-        </div>
-    </section>
+        <h1 class="auth-title-main">CRM Platform</h1>
+        <p class="auth-title-sub">Secure Access Portal</p>
+    </div>
 
-    <!-- Right login / auth content -->
-    <section class="auth-panel auth-panel-form">
-        <div class="auth-form-inner">
-            @Body
-        </div>
-    </section>
+    <!-- LOGIN CONTENT GOES HERE (Centered) -->
+    <div class="auth-body">
+        @Body
+    </div>
+
 </div>

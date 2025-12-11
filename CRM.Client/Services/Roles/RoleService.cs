@@ -101,7 +101,7 @@ namespace CRM.Client.Services.Roles
         // ASSIGN ROLE TO USER
         public async Task AssignRoleAsync(AssignRoleDto dto)
         {
-            await _api.PostAsync("api/role/assign", dto);
+            await _api.PostAsync("api/user/assign", dto);
         }
     }
 }
