@@ -23,7 +23,10 @@ namespace CRM.Server.Services.Interfaces
         Task<List<UserResponseDto>> FilterUsersAsync(string? role, bool? isActive);
 
         Task<EnableMfaResponseDto> EnableMfaAsync(string userId);
+
         Task VerifyMfaAsync(string userId, string code);
         Task DisableMfaAsync(string userId, string code);
+
+        Task AssignRoleAsync(string userId, string roleName, string performedByUserId);
     }
 }

@@ -86,7 +86,7 @@ namespace CRM.Server.Controllers
 
             //var task = _service.Create(dto);
 
-            _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
+            //_logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
 
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 

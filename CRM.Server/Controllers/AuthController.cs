@@ -77,7 +77,7 @@ namespace CRM.Server.Controllers
             var token = _jwtTokenService.GenerateToken(user, roles);
 
             await SafeAudit(user.Id, "Login Success", "Authentication", true, ip,
-                null, user.Email);
+                null, null);
 
             return Ok(new AuthResponseDto
             {
