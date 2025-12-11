@@ -7,5 +7,7 @@
         public bool RequireLowercase { get; set; }
         public bool RequireDigit { get; set; }
         public bool RequireNonAlphanumeric { get; set; }
+
+        public int PasswordExpiryMinutes { get; set; } = 2;
     }
 }

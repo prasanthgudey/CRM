@@ -4,6 +4,6 @@ namespace CRM.Server.Services.Interfaces
 {
     public interface IJwtTokenService
     {
-        string GenerateToken(ApplicationUser user, IList<string> roles);
+        string GenerateToken(ApplicationUser user, IList<string> roles, string? sessionId);
     }
 }

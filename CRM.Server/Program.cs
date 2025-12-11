@@ -140,6 +140,16 @@ builder.Services.Configure<PasswordPolicySettings>(
 builder.Services.Configure<MfaSettings>(
     builder.Configuration.GetSection("MfaSettings"));
 
+// Program.cs (before building the app)
+builder.Services.Configure<PasswordPolicySettings>(
+    builder.Configuration.GetSection("PasswordPolicySettings"));
+
+builder.Services.Configure<RefreshTokenSettings>(
+    builder.Configuration.GetSection("RefreshTokenSettings"));
+
+// ... earlier in Program.cs where you configure options:
+builder.Services.Configure<SessionSettings>(
+    builder.Configuration.GetSection("SessionSettings"));
 
 
 // =========================
@@ -169,7 +179,10 @@ builder.Services.AddAuthentication(options =>
 
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(jwtSettings["Key"]!)
-        )
+        ),
+
+        // IMPORTANT: reduce/disable default clock skew for strict expiry (use TimeSpan.Zero for testing)
+        ClockSkew = TimeSpan.Zero
     };
 });
 
@@ -202,6 +215,8 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 
 // =========================
 // ✅ BUILD APPLICATION
@@ -247,7 +262,10 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // ✅ JWT Authentication & Authorization (ORDER MATTERS)
 app.UseAuthentication();
+
+app.UseMiddleware<SessionActivityMiddleware>();
 app.UseAuthorization();
+
 
 app.MapControllers();
 
