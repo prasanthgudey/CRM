@@ -1,4 +1,5 @@
-﻿using CRM.Server.Data;              // ✅ DbContext is in Data namespace
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.Data;              // ✅ DbContext is in Data namespace
 using CRM.Server.Models;
 using CRM.Server.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -13,5 +14,8 @@ namespace CRM.Server.Repositories.Interfaces
         Task UpdateAsync(Customer customer);
         Task DeleteAsync(Customer customer);
         Task<bool> ExistsAsync(Guid id);
+
+        Task<PagedResult<Customer>> GetPagedAsync(PageParams parms);
+
     }
 }

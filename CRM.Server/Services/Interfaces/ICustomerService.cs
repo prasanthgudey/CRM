@@ -1,5 +1,6 @@
-﻿using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
 using CRM.Server.Data;
+using CRM.Server.DTOs;
 
 namespace CRM.Server.Services.Interfaces
 {
@@ -20,5 +21,8 @@ namespace CRM.Server.Services.Interfaces
         Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto, string performedByUserId);
 
         Task<bool> DeleteAsync(Guid id, string performedByUserId);
+
+        Task<PagedResult<CustomerResponseDto>> GetPagedAsync(PageParams parms);
+
     }
 }

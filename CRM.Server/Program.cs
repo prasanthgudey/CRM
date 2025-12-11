@@ -3,6 +3,7 @@ using CRM.Server.Middleware;
 using CRM.Server.Models;
 using CRM.Server.Repositories;
 using CRM.Server.Repositories.Interfaces;
+using CRM.Server.Repositories.Tasks;
 using CRM.Server.Security;
 using CRM.Server.Services;
 using CRM.Server.Services.Interfaces;

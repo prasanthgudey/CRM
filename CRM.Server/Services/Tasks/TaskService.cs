@@ -1,4 +1,5 @@
-﻿using CRM.Server.Dtos;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.Dtos;
 using CRM.Server.Models.Tasks;
 using CRM.Server.Repositories;
 using CRM.Server.Services.Interfaces;
@@ -273,6 +274,28 @@ namespace CRM.Server.Services
             {
                 // ✅ Never break core task functionality
             }
+        }
+
+        public async Task<PagedResult<TaskResponseDto>> GetPagedAsync(PageParams parms)
+        {
+            var paged = await _repo.GetPagedAsync(parms);
+            return new PagedResult<TaskResponseDto>
+            {
+                Items = paged.Items.Select(t => new TaskResponseDto
+                {
+                    TaskId = t.TaskId,
+                    Title = t.Title,
+                    Description = t.Description,
+                    DueDate = t.DueDate,
+                    Priority = t.Priority,
+                    State = t.State,
+                    CreatedAt = t.CreatedAt
+                    // map other fields you need
+                }).ToList(),
+                Page = paged.Page,
+                PageSize = paged.PageSize,
+                TotalCount = paged.TotalCount
+            };
         }
     }
 }

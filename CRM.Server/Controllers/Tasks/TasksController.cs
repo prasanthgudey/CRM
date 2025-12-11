@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using CRM.Server.Common.Paging;
 using CRM.Server.Dtos;
 using CRM.Server.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace CRM.Server.Controllers
@@ -18,6 +19,14 @@ namespace CRM.Server.Controllers
         {
             _service = service;
             _logger = logger;
+        }
+
+        // GET api/tasks?page=1&pageSize=20&search=foo
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAll([FromQuery] PageParams parms)
+        {
+            var result = await _service.GetPagedAsync(parms);
+            return Ok(result);
         }
 
         [HttpGet("all")]
@@ -86,7 +95,7 @@ namespace CRM.Server.Controllers
 
             //var task = _service.Create(dto);
 
-            _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
+            //_logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
 
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
