@@ -1,0 +1,240 @@
+﻿@using CRM.Client.DTOs.Shared
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Web
+@inject CRM.Client.Services.SearchService SearchService
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div style="position: relative; display:inline-block;">
+    <input class="form-control"
+           placeholder="Search customers & tasks..."
+           @oninput="OnInput"
+           @onkeydown="OnKeyDown"
+           value="@Query"
+           autocomplete="off" />
+
+    @if (IsLoading)
+    {
+        <div class="search-loading small text-muted">Searching...</div>
+    }
+
+    @if (ShowResults && Results?.Any() == true)
+    {
+        <ul class="list-group search-results" style="position:absolute; top:44px; right:0; width:420px; z-index:99999; background:white; border:1px solid #ddd;">
+            @for (int i = 0; i < Results.Count; i++)
+            {
+                var r = Results[i];
+                <li class="list-group-item list-group-item-action" @onclick="() => NavigateTo(r)">
+                    <div>@(Highlight(r.Title, Query))</div>
+                    <div class="text-muted small">@r.EntityType@if(!string.IsNullOrEmpty(r.Subtitle)){
+                    <text> - @r.Subtitle</text>
+                }
+    </div>
+                @if (!string.IsNullOrEmpty(r.Snippet))
+                {
+                    <div class="small text-truncate">@((MarkupString)Highlight(r.Snippet, Query))</div>
+                }
+            </li>
+        }
+    </ul>
+        }
+
+    <!-- Debug panel (visible while debugging) -->
+@*     <div style="position: fixed; bottom: 12px; right: 12px; width: 520px; max-height: 320px; overflow:auto; background:#fff; border:1px solid #666; padding:.5rem; z-index:200000;">
+        <div style="font-weight:600">GlobalSearch DEBUG</div>
+        <div><strong>Query:</strong> @Query</div>
+        <div><strong>IsLoading:</strong> @IsLoading</div>
+        <div><strong>ShowResults:</strong> @ShowResults</div>
+        <div><strong>Results.Count:</strong> @(Results?.Count ?? 0)</div>
+        <div style="margin-top:.5rem;"><strong>Last Service Call:</strong> @LastServiceLog</div>
+        <div style="margin-top:.5rem;"><strong>Last Raw HTTP:</strong> Status=@LastHttpStatus</div>
+        <pre style="white-space:pre-wrap; font-size:11px; max-height:180px; overflow:auto;">@LastRawResponse</pre>
+        <div style="margin-top:.5rem;">
+            <button class="btn btn-sm btn-secondary" @onclick="ClearDebug">Clear</button>
+        </div>
+    
+</div> *@
+</div>
+
+@code {
+    private string Query { get; set; } = string.Empty;
+    private List<SearchResultDto> Results { get; set; } = new();
+    private bool IsLoading { get; set; } = false;
+    private bool ShowResults { get; set; } = false;
+
+    private CancellationTokenSource _cts;
+    private int _selectedIndex = -1;
+
+    // debug fields
+    private string LastServiceLog { get; set; } = "(none)";
+    private string LastRawResponse { get; set; } = "(none)";
+    private int LastHttpStatus { get; set; } = 0;
+
+    private void ClearDebug()
+    {
+        LastServiceLog = "(none)";
+        LastRawResponse = "(none)";
+        LastHttpStatus = 0;
+        StateHasChanged();
+    }
+
+    // Called on every keystroke
+    private void OnInput(ChangeEventArgs e)
+    {
+        Query = e?.Value?.ToString() ?? string.Empty;
+        _selectedIndex = -1; // reset selection on new typing
+        Console.WriteLine($"[GlobalSearch] OnInput fired. Query='{Query}'");
+        _ = DebouncedSearchAsync(Query);
+    }
+
+    private async Task DebouncedSearchAsync(string q)
+    {
+        try { _cts?.Cancel(); } catch { }
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            Console.WriteLine("[GlobalSearch] Query empty -> clearing results");
+            Results.Clear();
+            ShowResults = false;
+            IsLoading = false;
+            LastServiceLog = "Query empty";
+            LastRawResponse = "(none)";
+            LastHttpStatus = 0;
+            StateHasChanged();
+            return;
+        }
+
+        IsLoading = true;
+        ShowResults = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(300, token);
+
+            Console.WriteLine($"[GlobalSearch] Calling SearchService.SearchAsync(q='{q}')");
+            var res = await SearchService.SearchAsync(q, 25);
+            Console.WriteLine($"[GlobalSearch] SearchService returned {res?.Count ?? 0} items");
+            LastServiceLog = $"Service returned {res?.Count ?? 0} items";
+
+            if (token.IsCancellationRequested) return;
+
+            // assign results from the service
+            Results = res ?? new List<SearchResultDto>();
+
+            // If Results empty, perform a direct HttpClient GET to inspect raw response
+            if (!Results.Any())
+            {
+                try
+                {
+                    var url = $"/api/search?q={Uri.EscapeDataString(q)}&limit=25";
+                    Console.WriteLine($"[GlobalSearch] Service returned 0 -> performing direct HttpClient GET {url}");
+                    var httpResponse = await Http.GetAsync(url, token);
+                    LastHttpStatus = (int)httpResponse.StatusCode;
+                    LastRawResponse = await httpResponse.Content.ReadAsStringAsync(token);
+                    Console.WriteLine($"[GlobalSearch] Direct HTTP status: {LastHttpStatus}; body length: {LastRawResponse?.Length ?? 0}");
+                    // try to deserialize to show parsed count as well
+                    try
+                    {
+                        var parsed = System.Text.Json.JsonSerializer.Deserialize<List<SearchResultDto>>(LastRawResponse ?? "[]", new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        Console.WriteLine($"[GlobalSearch] Direct HTTP parsed {parsed?.Count ?? 0} items");
+                        LastServiceLog += $" | Direct HTTP parsed {parsed?.Count ?? 0}";
+                        if (parsed?.Any() == true)
+                        {
+                            // populate Results from raw if service failed to return them
+                            Results = parsed;
+                        }
+                    }
+                    catch (Exception dex)
+                    {
+                        Console.Error.WriteLine($"[GlobalSearch] parse error: {dex.Message}");
+                    }
+                }
+                catch (Exception hex)
+                {
+                    LastRawResponse = $"HTTP error: {hex.Message}";
+                    Console.Error.WriteLine($"[GlobalSearch] Direct HTTP error: {hex.Message}");
+                }
+            }
+
+            _selectedIndex = Results.Any() ? 0 : -1;
+        }
+        catch (TaskCanceledException)
+        {
+            Console.WriteLine("[GlobalSearch] Debounced task canceled");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[GlobalSearch] error: {ex.Message}");
+            LastServiceLog = "Exception: " + ex.Message;
+            Results = new List<SearchResultDto>();
+            _selectedIndex = -1;
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void NavigateTo(SearchResultDto r)
+    {
+        ShowResults = false;
+        if (!string.IsNullOrEmpty(r.Route))
+            Nav.NavigateTo(r.Route);
+    }
+
+    private MarkupString Highlight(string? text, string? query)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query))
+            return (MarkupString)(text ?? string.Empty);
+
+        try
+        {
+            var escapedQuery = System.Text.RegularExpressions.Regex.Escape(query);
+            var result = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                escapedQuery,
+                match => $"<mark>{match.Value}</mark>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            return (MarkupString)result;
+        }
+        catch
+        {
+            return (MarkupString)text;
+        }
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowDown")
+        {
+            if (!Results.Any()) return;
+            _selectedIndex = Math.Min(_selectedIndex + 1, Results.Count - 1);
+        }
+        else if (e.Key == "ArrowUp")
+        {
+            if (!Results.Any()) return;
+            _selectedIndex = Math.Max(_selectedIndex - 1, 0);
+        }
+        else if (e.Key == "Enter")
+        {
+            if (_selectedIndex >= 0 && _selectedIndex < Results.Count)
+            {
+                NavigateTo(Results[_selectedIndex]);
+            }
+            else if (Results.Any())
+            {
+                NavigateTo(Results.First());
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            ShowResults = false;
+        }
+    }
+}

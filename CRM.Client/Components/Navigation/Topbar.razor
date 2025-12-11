@@ -35,7 +35,16 @@
                     @_roleDisplay
                 </div>
             </div>
-        </div>
+            <!-- example insertion -->
+@* <div class="topbar-search">
+    <GlobalSearch />
+</div> *@
+            <!-- temporary test inside Topbar.razor -->
+            @* <input placeholder="search test" class="form-control" /> *@
+ 
+            </div>
+        <div class="topbar-search"> <CRM.Client.Components.Shared.GlobalSearch /></div>
+
 
         <button class="topbar-logout-btn" @onclick="Logout">
             Logout
