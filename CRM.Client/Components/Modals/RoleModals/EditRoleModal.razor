@@ -5,30 +5,34 @@
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
-        <div class="modal-card">
+        <div class="modal-card shadow"
+             style="
+                width: 540px;
+                border-radius: 14px;
+                padding: 32px 36px;
+                background: white;">
 
             <h5 class="mb-3 text-center">Edit Role</h5>
 
             @if (!string.IsNullOrWhiteSpace(Message))
             {
-                <div class="alert alert-info py-2">
-                    @Message
-                </div>
+                <div class="alert alert-info py-2">@Message</div>
             }
 
             <EditForm Model="Model" OnValidSubmit="UpdateRole">
                 <DataAnnotationsValidator />
 
-                <!-- ✅ NEW ROLE NAME -->
+                <!-- Role Name Input -->
                 <div class="form-group mt-3">
                     <label class="small text-muted">New Role Name</label>
                     <InputText class="form-control"
-                               placeholder="Enter new role name (e.g. Manager, Supervisor)"
+                               placeholder="Enter new role name"
                                @bind-Value="Model.NewName" />
                 </div>
 
-                <!-- ✅ ACTION BUTTONS -->
+                <!-- Action Buttons -->
                 <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+
                     <button type="button"
                             class="btn btn-outline-secondary"
                             @onclick="Close">
@@ -37,8 +41,9 @@
 
                     <button class="btn btn-warning"
                             disabled="@IsLoading">
-                        @(IsLoading ? "Updating..." : "Update")
+                        @(IsLoading ? "Updating..." : "Update Role")
                     </button>
+
                 </div>
             </EditForm>
 
@@ -52,9 +57,18 @@
     [Parameter] public string? OldRoleName { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private UpdateRoleDto Model { get; set; } = new UpdateRoleDto();
+    private UpdateRoleDto Model { get; set; } = new();
     private bool IsLoading;
     private string? Message;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(OldRoleName))
+        {
+            Model.OldName = OldRoleName;
+            Model.NewName = OldRoleName;
+        }
+    }
 
     private async Task UpdateRole()
     {
@@ -63,11 +77,10 @@
 
         try
         {
-            Model.OldName = OldRoleName!;
             await RoleService.UpdateRoleAsync(Model);
             Message = "Role updated successfully.";
 
-            await Task.Delay(1000);
+            await Task.Delay(700);
             await OnClose.InvokeAsync(false);
         }
         catch

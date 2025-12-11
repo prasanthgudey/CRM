@@ -51,6 +51,11 @@ else if (Response != null)
                    @bind="Code" />
         </div>
 
+        @if (!string.IsNullOrWhiteSpace(InlineError))
+        {
+            <div class="alert alert-danger py-2">@InlineError</div>
+        }
+
         <div class="d-flex justify-content-end gap-2">
             <button class="btn btn-secondary"
                     @onclick="Cancel">
@@ -81,7 +86,10 @@ else if (Response != null)
 
     private string? ErrorMessage;
 
-    // ✅ On page load → Enable MFA and get QR
+    private string? InlineError;   // ⭐ New inline error (for empty or invalid code)
+
+
+    // Load MFA setup data
     protected override async Task OnInitializedAsync()
     {
         try
@@ -94,7 +102,7 @@ else if (Response != null)
                 return;
             }
 
-            // ✅ Convert otpauth:// URI to real QR Image URL
+            // Convert QR code string to real QR image URL
             QrImageUrl =
                 "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data="
                 + System.Net.WebUtility.UrlEncode(Response.QrCodeImageUrl);
@@ -109,27 +117,55 @@ else if (Response != null)
         }
     }
 
-    // ✅ Verify OTP
+
+    // Verify user-entered OTP code
     private async Task Verify()
     {
+        InlineError = null;
         ErrorMessage = null;
+
+        // ⭐ NEW VALIDATIONS BEFORE CALLING API
+
+        // Empty check
+        if (string.IsNullOrWhiteSpace(Code))
+        {
+            InlineError = "Please enter the 6-digit code.";
+            return;
+        }
+
+        // Length check
+        if (Code.Trim().Length != 6)
+        {
+            InlineError = "The MFA code must be exactly 6 digits.";
+            return;
+        }
+        if (!Code.All(char.IsDigit))
+        {
+            InlineError = "The MFA code must contain only numbers.";
+            return;
+        }
+
+        // Optional digit-only check (enable if needed)
+        // if (!Code.All(char.IsDigit))
+        // {
+        //     InlineError = "The MFA code must contain only numbers.";
+        //     return;
+        // }
+
         IsVerifying = true;
 
         try
         {
-            var dto = new VerifyMfaDto
-            {
-                Code = Code.Trim()
-            };
+            var dto = new VerifyMfaDto { Code = Code.Trim() };
 
             await AuthService.VerifyMfaAsync(dto);
 
-            // ✅ SUCCESS → Back to profile
+            // SUCCESS → return to user profile
             Navigation.NavigateTo("/profile", true);
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
+            InlineError = ex.Message;  // backend failure
         }
         finally
         {
@@ -141,4 +177,5 @@ else if (Response != null)
     {
         Navigation.NavigateTo("/profile");
     }
+
 }
