@@ -1,67 +1,49 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace CRM.Server.Migrations
 {
-    /// <inheritdoc />
-    public partial class auditchange : Migration
+    public partial class CreateAuditLogsFresh : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.RenameColumn(
-                name: "UserId",
-                table: "AuditLogs",
-                newName: "TargetUserId");
+            migrationBuilder.CreateTable(
+                name: "AuditLogs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
 
-            migrationBuilder.AlterColumn<string>(
-                name: "EntityName",
-                table: "AuditLogs",
-                type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "",
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)",
-                oldNullable: true);
+                    PerformedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
 
-            migrationBuilder.AddColumn<bool>(
-                name: "IsSuccess",
-                table: "AuditLogs",
-                type: "bit",
-                nullable: false,
-                defaultValue: false);
+                    TargetUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
 
-            migrationBuilder.AddColumn<string>(
-                name: "PerformedByUserId",
-                table: "AuditLogs",
-                type: "nvarchar(max)",
-                nullable: true);
+                    Action = table.Column<string>(type: "nvarchar(max)", nullable: false),
+
+                    EntityName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+
+                    OldValue = table.Column<string>(type: "nvarchar(max)", nullable: true),
+
+                    NewValue = table.Column<string>(type: "nvarchar(max)", nullable: true),
+
+                    IpAddress = table.Column<string>(type: "nvarchar(max)", nullable: true),
+
+                    IsSuccess = table.Column<bool>(nullable: false, defaultValue: false),
+
+                    CreatedAt = table.Column<DateTime>(nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AuditLogs", x => x.Id);
+                });
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "IsSuccess",
-                table: "AuditLogs");
-
-            migrationBuilder.DropColumn(
-                name: "PerformedByUserId",
-                table: "AuditLogs");
-
-            migrationBuilder.RenameColumn(
-                name: "TargetUserId",
-                table: "AuditLogs",
-                newName: "UserId");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "EntityName",
-                table: "AuditLogs",
-                type: "nvarchar(max)",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
+            migrationBuilder.DropTable(
+                name: "AuditLogs");
         }
     }
 }

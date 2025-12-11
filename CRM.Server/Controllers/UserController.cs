@@ -114,11 +114,11 @@ namespace CRM.Server.Controllers
             return Ok(new { message = "User deleted successfully" });
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllUsers()
-        {
-            return Ok(await _userService.GetAllUsersAsync());
-        }
+        //[HttpGet]
+        //public async Task<IActionResult> GetAllUsers()
+        //{
+        //    return Ok(await _userService.GetAllUsersAsync());
+        //}
 
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetUserById(string userId)

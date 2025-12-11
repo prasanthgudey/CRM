@@ -20,48 +20,142 @@ namespace CRM.Server.Controllers
             _logger = logger;
         }
 
+        // -----------------------
+        // Read / Query endpoints
+        // -----------------------
+
         [HttpGet("all")]
         public async Task<IActionResult> GetAll()
         {
             _logger.LogInformation("GET api/tasks/all called");
-
-            //var tasks = _service.GetAll();
-            var tasks = await _service.GetAllAsync();
-            return Ok(tasks);
+            try
+            {
+                var tasks = await _service.GetAllAsync();
+                return Ok(tasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to GET api/tasks/all");
+                return StatusCode(500, "Failed to get tasks");
+            }
         }
 
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             _logger.LogInformation("GET api/tasks/{Id} called", id);
-
-            //var task = _service.GetById(id);
-            var task = await _service.GetByIdAsync(id);
-            if (task == null)
+            try
             {
-                _logger.LogWarning("Task with Id {Id} not found", id);
-                return NotFound("Task not found");
-            }
+                var task = await _service.GetByIdAsync(id);
+                if (task == null)
+                {
+                    _logger.LogWarning("Task with Id {Id} not found", id);
+                    return NotFound("Task not found");
+                }
 
-            return Ok(task);
+                return Ok(task);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to GET api/tasks/{Id}", id);
+                return StatusCode(500, "Failed to get task");
+            }
         }
 
         [HttpGet("customer/{customerId:Guid}")]
         public async Task<IActionResult> GetByCustomerId(Guid customerId)
         {
             _logger.LogInformation("GET api/tasks/customer/{CustomerId} called", customerId);
-
-            //var result = _service.GetAll(new TaskFilterDto { CustomerId = customerId });
-            var result = await _service.GetAllAsync(new TaskFilterDto { CustomerId = customerId });
-            return Ok(result);
+            try
+            {
+                var result = await _service.GetAllAsync(new TaskFilterDto { CustomerId = customerId });
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to GET api/tasks/customer/{CustomerId}", customerId);
+                return StatusCode(500, "Failed to get tasks for customer");
+            }
         }
 
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetByUserId(string userId)
         {
             _logger.LogInformation("GET api/tasks/user/{UserId} called", userId);
-            var result = await _service.GetAllAsync(new TaskFilterDto { UserId = userId });
-            return Ok(result);
+            try
+            {
+                var result = await _service.GetAllAsync(new TaskFilterDto { UserId = userId });
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to GET api/tasks/user/{UserId}", userId);
+                return StatusCode(500, "Failed to get tasks for user");
+            }
+        }
+
+        // -----------------------
+        // Dashboard-friendly endpoints (added)
+        // -----------------------
+
+        /// <summary>
+        /// GET: /api/tasks/count
+        /// Returns the total number of tasks.
+        /// </summary>
+        [HttpGet("count")]
+        public async Task<IActionResult> GetTotalCount()
+        {
+            _logger.LogInformation("GET api/tasks/count called");
+            try
+            {
+                var count = await _service.GetTotalCountAsync();
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get total tasks count");
+                return StatusCode(500, "Failed to get tasks count");
+            }
+        }
+
+        /// <summary>
+        /// GET: /api/tasks/open/count
+        /// Returns the number of open tasks (not completed).
+        /// </summary>
+        [HttpGet("open/count")]
+        public async Task<IActionResult> GetOpenCount()
+        {
+            _logger.LogInformation("GET api/tasks/open/count called");
+            try
+            {
+                var count = await _service.GetOpenCountAsync();
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get open tasks count");
+                return StatusCode(500, "Failed to get open tasks count");
+            }
+        }
+
+        /// <summary>
+        /// GET: /api/tasks/recent?take=50
+        /// Returns recent tasks (paged by take).
+        /// </summary>
+        [HttpGet("recent")]
+        public async Task<IActionResult> GetRecent([FromQuery] int take = 50)
+        {
+            _logger.LogInformation("GET api/tasks/recent called (take={Take})", take);
+            try
+            {
+                var tasks = await _service.GetRecentTasksAsync(take);
+                return Ok(tasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get recent tasks");
+                return StatusCode(500, "Failed to get recent tasks");
+            }
         }
 
         // =============================
@@ -84,15 +178,19 @@ namespace CRM.Server.Controllers
                 return BadRequest(ModelState);
             }
 
-            //var task = _service.Create(dto);
+            try
+            {
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
-
-            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            var task = await _service.CreateAsync(dto, performedBy!);
-            _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
-            return CreatedAtAction(nameof(GetById), new { id = task.TaskId }, task);
+                var task = await _service.CreateAsync(dto, performedBy!);
+                _logger.LogInformation("Task created with Id {TaskId}", task.TaskId);
+                return CreatedAtAction(nameof(GetById), new { id = task.TaskId }, task);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create task");
+                return StatusCode(500, "Failed to create task");
+            }
         }
 
         // =============================
@@ -109,11 +207,6 @@ namespace CRM.Server.Controllers
                     return BadRequest(ModelState);
                 }
 
-                // Any exception thrown here will be handled by GlobalExceptionMiddleware
-                //var task = _service.Update(id, dto);
-
-                
-
                 var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 var task = await _service.UpdateAsync(id, dto, performedBy!);
                 _logger.LogInformation("Task updated with Id {Id}", id);
@@ -121,6 +214,7 @@ namespace CRM.Server.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update task with Id {Id}", id);
                 return BadRequest(ex.Message);
             }
         }
@@ -141,6 +235,7 @@ namespace CRM.Server.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to delete task with Id {Id}", id);
                 return BadRequest(ex.Message);
             }
         }

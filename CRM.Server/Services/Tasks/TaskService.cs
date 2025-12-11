@@ -3,6 +3,7 @@ using CRM.Server.Models.Tasks;
 using CRM.Server.Repositories;
 using CRM.Server.Services.Interfaces;
 using System.Text.Json;
+using System.Linq;
 
 namespace CRM.Server.Services
 {
@@ -61,15 +62,15 @@ namespace CRM.Server.Services
                 };
             }
 
-            return query
+            return await Task.FromResult(query
                 .Select(t => ToResponseDto(t))
-                .ToList();
+                .ToList());
         }
 
         public async Task<TaskResponseDto?> GetByIdAsync(Guid id)
         {
             var task = _repo.GetById(id);
-            return task is null ? null : ToResponseDto(task);
+            return await Task.FromResult(task is null ? null : ToResponseDto(task));
         }
 
         // ============================================================
@@ -108,10 +109,9 @@ namespace CRM.Server.Services
                 JsonSerializer.Serialize(saved)
             );
 
-
             _logger.LogInformation("Task created with Id {TaskId}", saved.TaskId);
 
-            return ToResponseDto(saved);
+            return await Task.FromResult(ToResponseDto(saved));
         }
 
         // ============================================================
@@ -194,10 +194,9 @@ namespace CRM.Server.Services
                 );
             }
 
-
             _logger.LogInformation("Task {Id} updated successfully", id);
 
-            return ToResponseDto(updated);
+            return await Task.FromResult(ToResponseDto(updated));
         }
 
         // ============================================================
@@ -224,6 +223,41 @@ namespace CRM.Server.Services
             );
 
             _logger.LogInformation("Task {Id} deleted successfully", id);
+        }
+
+        // -------------------------
+        // New dashboard helper methods
+        // -------------------------
+
+        public async Task<int> GetTotalCountAsync()
+        {
+            // uses same repository pattern already in the service
+            var query = _repo.GetAll().AsQueryable();
+            var count = query.Count();
+            return await Task.FromResult(count);
+        }
+
+        public async Task<int> GetOpenCountAsync()
+        {
+            var query = _repo.GetAll().AsQueryable();
+            // consider your TaskState enum / values; Completed is assumed to be TaskState.Completed
+            var count = query.Count(t => t.State != TaskState.Completed);
+            return await Task.FromResult(count);
+        }
+
+        public async Task<List<TaskResponseDto>> GetRecentTasksAsync(int take = 50)
+        {
+            var query = _repo.GetAll().AsQueryable();
+
+            // Order by DueDate (nulls last) then CreatedAt if available; adapt if your entity differs
+            var ordered = query
+                .OrderByDescending(t => t.DueDate)
+                .ThenByDescending(t => t.CreatedAt)
+                .Take(take)
+                .Select(t => ToResponseDto(t))
+                .ToList();
+
+            return await Task.FromResult(ordered);
         }
 
         private static TaskResponseDto ToResponseDto(TaskItem t) =>

@@ -67,5 +67,46 @@ namespace CRM.Server.Controllers
             var deleted = await _service.DeleteAsync(id, performedBy!);
             return deleted ? NoContent() : NotFound();
         }
+
+        // -------------------------
+        // NEW: Dashboard endpoints
+        // -------------------------
+
+        /// <summary>
+        /// NEW: GET /api/customers/count
+        /// Returns the total number of customers.
+        /// </summary>
+        [HttpGet("count")]
+        public async Task<IActionResult> GetTotalCount()
+        {
+            try
+            {
+                var count = await _service.GetTotalCountAsync();
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                // You can add logger if desired; keeping same style as other methods
+                return StatusCode(500, "Failed to get customer count");
+            }
+        }
+
+        /// <summary>
+        /// NEW: GET /api/customers/new?days=7
+        /// Returns number of customers created within the last `days`.
+        /// </summary>
+        [HttpGet("new")]
+        public async Task<IActionResult> GetNewCustomers([FromQuery] int days = 7)
+        {
+            try
+            {
+                var count = await _service.GetNewCustomersCountAsync(days);
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Failed to get new customers count");
+            }
+        }
     }
 }

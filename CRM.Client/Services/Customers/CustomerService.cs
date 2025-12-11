@@ -1,4 +1,5 @@
-﻿using System;
+﻿// File: CRM.Client/Services/Customers/CustomerService.cs
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using CRM.Client.DTOs.Customers;
@@ -23,7 +24,6 @@ namespace CRM.Client.Services.Customers
             string? address = null,
             string? search = null)
         {
-            // Build query string with only non-null params
             var queryParams = new List<string>();
 
             if (!string.IsNullOrWhiteSpace(name))
@@ -42,7 +42,6 @@ namespace CRM.Client.Services.Customers
                 queryParams.Add($"search={Uri.EscapeDataString(search)}");
 
             var url = "api/customers";
-
             if (queryParams.Count > 0)
                 url += "?" + string.Join("&", queryParams);
 
@@ -51,26 +50,43 @@ namespace CRM.Client.Services.Customers
 
         // GET: api/customers/{id}
         public async Task<CustomerResponseDto?> GetByIdAsync(Guid id)
-        {
-            return await _api.GetAsync<CustomerResponseDto>($"api/customers/{id}");
-        }
+            => await _api.GetAsync<CustomerResponseDto>($"api/customers/{id}");
 
         // POST: api/customers
         public async Task<CustomerResponseDto?> CreateAsync(CustomerCreateDto dto)
-        {
-            return await _api.PostAsync<CustomerCreateDto, CustomerResponseDto>("api/customers", dto);
-        }
+            => await _api.PostAsync<CustomerCreateDto, CustomerResponseDto>("api/customers", dto);
 
         // PUT: api/customers/{id}
         public async Task UpdateAsync(Guid id, CustomerUpdateDto dto)
-        {
-            await _api.PutAsync<CustomerUpdateDto, object?>($"api/customers/{id}", dto);
-        }
+            => await _api.PutAsync<CustomerUpdateDto, object?>($"api/customers/{id}", dto);
 
         // DELETE: api/customers/{id}
         public async Task DeleteAsync(Guid id)
+            => await _api.DeleteAsync($"api/customers/{id}");
+
+        // -------------------------
+        // NEW: Dashboard-friendly helpers
+        // -------------------------
+
+        /// <summary>
+        /// NEW: Returns total number of customers.
+        /// Calls GET /api/customers/count
+        /// </summary>
+        public async Task<int> GetTotalCountAsync()
         {
-            await _api.DeleteAsync($"api/customers/{id}");
+            var result = await _api.GetAsync<int?>("api/customers/count");
+            return result ?? 0;
+        }
+
+        /// <summary>
+        /// NEW: Returns number of customers created in the last `days`.
+        /// Calls GET /api/customers/new?days={days}
+        /// This exact name matches the call in your dashboard: GetNewCountAsync
+        /// </summary>
+        public async Task<int> GetNewCountAsync(int days = 7)   // <-- NOTE: name matches dashboard
+        {
+            var result = await _api.GetAsync<int?>($"api/customers/new?days={days}");
+            return result ?? 0;
         }
     }
 }
