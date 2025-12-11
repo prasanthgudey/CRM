@@ -75,7 +75,31 @@ namespace CRM.Server.Controllers
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetUserById(string userId)
         {
-            return Ok(await _userService.GetUserByIdAsync(userId));
+            try
+            {
+                var user = await _userService.GetUserByIdAsync(userId);
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        // =====================================================
+        // ✅ GET MY PROFILE (LOGGED-IN USER)
+        // =====================================================
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+            var user = await _userService.GetUserByIdAsync(userId!);
+            //commnt by eswar
+
+            return Ok(user);
         }
 
         [HttpGet("filter")]

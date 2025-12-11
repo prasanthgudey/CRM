@@ -138,7 +138,7 @@ namespace CRM.Server.Controllers
         }
 
         // =====================================================
-        // ✅ LOGOUT + AUDIT (NEW)
+        // ✅ FORGOT PASSWORD  
         // =====================================================
         [HttpPost("logout")]
         [Authorize]
