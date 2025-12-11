@@ -112,11 +112,11 @@ namespace CRM.Client.Services.Tasks
 
 
         // DELETE: /api/tasks/{id}
-        public async Task DeleteAsync(Guid id)
-        {
-            await _api.DeleteAsync($"api/tasks/{id}");
+        //public async Task DeleteAsync(Guid id)
+        //{
+        //    await _api.DeleteAsync($"api/tasks/{id}");
 
-        }
+        //}
 
     }
 }
