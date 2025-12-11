@@ -11,5 +11,10 @@
             string? ipAddress = null,
             string? oldValue = null,
             string? newValue = null);
+        // NEW: Dashboard total audit logs count
+        Task<int> GetTotalCountAsync();
+
     }
+
+
 }

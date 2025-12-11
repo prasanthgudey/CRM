@@ -1,13 +1,22 @@
 ﻿@using CRM.Client.DTOs.Users
+@using CRM.Client.DTOs.Roles
 @using CRM.Client.Services.Users
+@using CRM.Client.Services.Roles
 @inject UserService UserService
-@inject IJSRuntime JSRuntime   
+@inject RoleService RoleService
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
+
         <div class="modal-card shadow"
-             style="width: 380px; padding: 20px; border-radius: 12px; background:white;">
+             style="
+            width: 540px;
+            border-radius: 14px;
+            padding: 32px 36px;
+            background: white;">
+
 
             <h5 class="text-center mb-3">Invite New User</h5>
 
@@ -16,34 +25,54 @@
                 <div class="alert alert-info py-2">@Message</div>
             }
 
-            <EditForm Model="InviteModel" OnValidSubmit="SendInvite">
-                <DataAnnotationsValidator />
+        <EditForm Model="InviteModel" OnValidSubmit="SendInvite">
 
-                <div class="form-group">
-                    <label class="small text-muted">Full Name</label>
-                    <InputText class="form-control"
-                               placeholder="Enter user's full name"
-                               @bind-Value="InviteModel.FullName" />
+            <DataAnnotationsValidator />
+
+            <!-- Full Name -->
+            <div class="form-group">
+                <label class="small text-muted">Full Name</label>
+                <InputText class="form-control"
+                           placeholder="Enter user's full name"
+                           @bind-Value="InviteModel.FullName" />
+            </div>
+
+            <!-- Email -->
+            <div class="form-group mt-2">
+                <label class="small text-muted">Email Address</label>
+                <InputText class="form-control"
+                           placeholder="Enter user's email address"
+                           @bind-Value="InviteModel.Email" />
+            </div>
+
+            <!-- CUSTOM SCROLLABLE DROPDOWN -->
+            <div class="form-group mt-2">
+                <label class="small text-muted">Select Role</label>
+
+                <div class="role-dropdown-container position-relative">
+
+                    <!-- Selected Item -->
+                    <div class="role-selected" @onclick="ToggleDropdown">
+                        @(string.IsNullOrWhiteSpace(InviteModel.Role)
+                                                ? "-- Select a role --"
+                                                : InviteModel.Role)
+                    </div>
+
+                    @if (ShowDropdown)
+                        {
+                            <div class="role-dropdown-list shadow-sm">
+                                @foreach (var r in Roles ?? new List<RoleResponseDto>())
+                                {
+                                    <div class="role-item" @onclick="() => SelectRole(r.Name)">
+                                        @r.Name
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
 
-                <div class="form-group mt-2">
-                    <label class="small text-muted">Email Address</label>
-                    <InputText class="form-control"
-                               placeholder="Enter user's email address"
-                               @bind-Value="InviteModel.Email" />
-                </div>
-
-                <div class="form-group mt-2">
-                    <label class="small text-muted">Select Role</label>
-                    <InputSelect class="form-control"
-                                 @bind-Value="InviteModel.Role">
-                        <option value="">-- Select a role --</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Manager">Manager</option>
-                        <option value="User">User</option>
-                    </InputSelect>
-                </div>
-
+                <!-- Buttons -->
                 <div class="modal-actions mt-3 d-flex justify-content-end gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary"
@@ -56,7 +85,9 @@
                         @(IsLoading ? "Sending..." : "Send Invite")
                     </button>
                 </div>
+
             </EditForm>
+
         </div>
     </div>
 }
@@ -66,8 +97,30 @@
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private InviteUserDto InviteModel { get; set; } = new();
+    private List<RoleResponseDto>? Roles { get; set; }
+
+    private bool ShowDropdown = false;
     private bool IsLoading;
     private string? Message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen)
+        {
+            Roles = await RoleService.GetAllRolesAsync();   // Load roles from DB
+        }
+    }
+
+    private void ToggleDropdown()
+    {
+        ShowDropdown = !ShowDropdown;
+    }
+
+    private void SelectRole(string role)
+    {
+        InviteModel.Role = role;
+        ShowDropdown = false;
+    }
 
     private async Task SendInvite()
     {
@@ -76,29 +129,24 @@
 
         try
         {
-            // ⭐ NEW — Call service and receive result (must return success, message)
             var result = await UserService.InviteUserAsync(InviteModel);
 
-            // ⭐ NEW — If backend says user already exists
-            if (result != null && result.Success == false)
+            if (result != null && !result.Success)
             {
                 await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message ?? "User already exists");
                 IsLoading = false;
-                return;  // modal should NOT close
+                return;
             }
 
-            // ⭐ Success alert
             await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Invitation sent successfully!");
 
-            // Optional — Reset form
-            InviteModel = new InviteUserDto();
+            InviteModel = new InviteUserDto(); // reset form
 
             await Task.Delay(400);
-            await OnClose.InvokeAsync(true);  // close only on success
+            await OnClose.InvokeAsync(true);
         }
         catch
         {
-            // ⭐ NEW - show error alert if something fails
             await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to send invite");
         }
         finally
@@ -110,6 +158,6 @@
     private async Task Cancel()
     {
         Message = null;
-        await OnClose.InvokeAsync(false);   // ❗ no alert here (cancel should do nothing visually)
+        await OnClose.InvokeAsync(false);
     }
 }

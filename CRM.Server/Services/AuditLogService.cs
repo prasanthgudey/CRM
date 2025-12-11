@@ -1,4 +1,5 @@
 ﻿using CRM.Server.Models;
+using CRM.Server.Repositories;
 using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
 
@@ -38,5 +39,11 @@ namespace CRM.Server.Services
 
             await _auditRepository.AddAsync(log);
         }
+        public async Task<int> GetTotalCountAsync()
+        {
+            var all = await _auditRepository.GetAllAsync();
+            return all?.Count ?? 0;
+        }
     }
 }
+// NEW: Number of failed (IsSuccess = false) logs in last X days

@@ -6,7 +6,12 @@
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
-        <div class="modal-card shadow">
+        <div class="modal-card shadow"
+             style="
+            width: 540px;
+            border-radius: 14px;
+            padding: 32px 36px;
+            background: white;">
 
             <h5 class="mb-3 text-center">Create New Role</h5>
 
@@ -18,13 +23,15 @@
             <EditForm Model="RoleModel" OnValidSubmit="CreateRole">
                 <DataAnnotationsValidator />
 
+                <!-- Role Name -->
                 <div class="form-group mt-3">
                     <label class="small text-muted">Role Name</label>
                     <InputText class="form-control"
-                               placeholder="Enter role name"
+                               placeholder="Enter role name (e.g. Admin)"
                                @bind-Value="RoleModel.RoleName" />
                 </div>
 
+                <!-- Buttons -->
                 <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary"
@@ -42,6 +49,7 @@
         </div>
     </div>
 }
+
 
 @code {
 

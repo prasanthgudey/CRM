@@ -17,5 +17,12 @@ namespace CRM.Client.Services.Audit
         {
             return await _api.GetAsync<List<AuditLogResponseDto>>("api/audit");
         }
+        // NEW: client-side helper to fetch total audit count
+        public async Task<int> GetTotalCountAsync()
+        {
+            var result = await _api.GetAsync<int?>("api/audit/count");
+            return result ?? 0;
+        }
+
     }
 }

@@ -1,10 +1,10 @@
-﻿using CRM.Server.DTOs.Users;
+﻿using CRM.Server.DTOs.Auth;
+using CRM.Server.DTOs.Users;
 using CRM.Server.Models;
 using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
-using CRM.Server.DTOs.Auth;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
@@ -12,34 +12,96 @@ namespace CRM.Server.Services
 {
     public class UserService : IUserService
     {
+        // ---------- Dependencies ----------
+        // _userRepository         => USER-DEFINED repository abstraction
+        // UserManager<TUser>      => FRAMEWORK: Microsoft.AspNetCore.Identity UserManager
+        // IEmailService           => USER-DEFINED service abstraction
+        // IConfiguration          => FRAMEWORK configuration
+        // IAuditLogService        => USER-DEFINED auditing service
+        // IRoleRepository         => USER-DEFINED repository abstraction
         private readonly IUserRepository _userRepository;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _config;
         private readonly IAuditLogService _auditLogService;
+        private readonly IRoleRepository _roleRepository;
 
         public UserService(
             IUserRepository userRepository,
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IConfiguration config,
-            IAuditLogService auditLogService)
+            IAuditLogService auditLogService,
+            IRoleRepository roleRepository
+        )
         {
             _userRepository = userRepository;
             _userManager = userManager;
             _emailService = emailService;
             _config = config;
             _auditLogService = auditLogService;
+            _roleRepository = roleRepository;
+        }
+
+        // Helper DTO builder (uses FRAMEWORK UserManager to get roles)
+        private async Task<UserResponseDto> MapToUserDto(ApplicationUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                FullName = user.FullName ?? "",
+                Email = user.Email ?? "",
+                Role = roles.FirstOrDefault() ?? "",
+                IsActive = user.IsActive,
+                TwoFactorEnabled = user.TwoFactorEnabled
+            };
         }
 
         // ============================================================
-        // ✅ 1️⃣ MANUAL ADMIN USER CREATION (WITH AUDIT)
+        // Assign Role (Audit DTO Before + After)
+        // ============================================================
+        public async Task AssignRoleAsync(string userId, string roleName, string performedByUserId)
+        {
+            if (string.IsNullOrWhiteSpace(roleName))
+                throw new Exception("Role name cannot be empty.");
+
+            var user = await _userManager.FindByIdAsync(userId)
+                       ?? throw new Exception("User not found");
+
+            var role = await _roleRepository.GetByNameAsync(roleName)
+                       ?? throw new Exception("Role does not exist.");
+
+            // Old value (refactored to avoid nested await in expressions)
+            var oldDto = await MapToUserDto(user);
+            var oldValue = JsonSerializer.Serialize(oldDto);
+
+            var currentRoles = (await _userManager.GetRolesAsync(user)).ToList();
+
+            if (!currentRoles.Contains(roleName))
+            {
+                if (currentRoles.Any())
+                    await _userManager.RemoveFromRolesAsync(user, currentRoles);
+
+                await _userManager.AddToRoleAsync(user, roleName);
+            }
+
+            // New value
+            var updatedUser = await _userManager.FindByIdAsync(userId);
+            var newDto = await MapToUserDto(updatedUser);
+            var newValue = JsonSerializer.Serialize(newDto);
+
+            await SafeAudit(performedByUserId, userId, "Role Assigned", "User", oldValue, newValue);
+        }
+
+        // ============================================================
+        // Create User (Admin)
         // ============================================================
         public async Task CreateUserAsync(CreateUserDto dto, string performedByUserId)
         {
             var existing = await _userManager.FindByEmailAsync(dto.Email);
-            if (existing != null)
-                throw new Exception("Email already exists");
+            if (existing != null) throw new Exception("Email already exists");
 
             var user = new ApplicationUser
             {
@@ -64,18 +126,14 @@ namespace CRM.Server.Services
                 $"Your temporary password is: {tempPassword}"
             );
 
-            await SafeAudit(
-                performedByUserId,
-                user.Id,
-                "User Created",
-                "User",
-                null,
-                JsonSerializer.Serialize(user)
-            );
+            var newDto = await MapToUserDto(user);
+            var newValue = JsonSerializer.Serialize(newDto);
+
+            await SafeAudit(performedByUserId, user.Id, "User Created", "User", null, newValue);
         }
 
         // ============================================================
-        // ✅ 2️⃣ GET ALL USERS (NO AUDIT REQUIRED)
+        // Get All Users
         // ============================================================
         public async Task<List<UserResponseDto>> GetAllUsersAsync()
         {
@@ -83,31 +141,18 @@ namespace CRM.Server.Services
             var result = new List<UserResponseDto>();
 
             foreach (var user in users)
-            {
-                var roles = await _userManager.GetRolesAsync(user);
-
-                result.Add(new UserResponseDto
-                {
-                    Id = user.Id,
-                    FullName = user.FullName ?? "",
-                    Email = user.Email ?? "",
-                    IsActive = user.IsActive,
-                    Role = roles.FirstOrDefault() ?? "",
-                    TwoFactorEnabled = user.TwoFactorEnabled
-                });
-            }
+                result.Add(await MapToUserDto(user));
 
             return result;
         }
 
         // ============================================================
-        // ✅ 3️⃣ EMAIL INVITE USER (WITH AUDIT)
+        // Invite User
         // ============================================================
         public async Task InviteUserAsync(InviteUserDto dto, string performedByUserId)
         {
             var existing = await _userManager.FindByEmailAsync(dto.Email);
-            if (existing != null)
-                throw new Exception("Email already exists");
+            if (existing != null) throw new Exception("Email already exists");
 
             var user = new ApplicationUser
             {
@@ -120,9 +165,9 @@ namespace CRM.Server.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await _userManager.CreateAsync(user);
-            if (!result.Succeeded)
-                throw new Exception(result.Errors.First().Description);
+            var creation = await _userManager.CreateAsync(user);
+            if (!creation.Succeeded)
+                throw new Exception(creation.Errors.First().Description);
 
             await _userManager.AddToRoleAsync(user, dto.Role);
 
@@ -134,81 +179,66 @@ namespace CRM.Server.Services
             await _emailService.SendAsync(
                 user.Email!,
                 "CRM Registration Invite",
-                $"Click the link to complete your registration:\n\n{inviteLink}"
+                $"Click the link to complete registration:\n\n{inviteLink}"
             );
 
-            await SafeAudit(
-                performedByUserId,
-                user.Id,
-                "User Invited",
-                "User",
-                null,
-                JsonSerializer.Serialize(new { user.Email, Role = dto.Role })
-            );
+            var newDto = await MapToUserDto(user);
+            var newValue = JsonSerializer.Serialize(newDto);
+
+            await SafeAudit(performedByUserId, user.Id, "User Invited", "User", null, newValue);
         }
 
         // ============================================================
-        // ✅ 4️⃣ DEACTIVATE USER (WITH AUDIT)
+        // Deactivate User
         // ============================================================
         public async Task DeactivateUserAsync(string userId, string performedByUserId)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            var user = await _userManager.FindByIdAsync(userId)
+                       ?? throw new Exception("User not found");
 
-            var oldValue = JsonSerializer.Serialize(new { user.IsActive });
+            var oldDto = await MapToUserDto(user);
+            var oldValue = JsonSerializer.Serialize(oldDto);
 
             user.IsActive = false;
             await _userManager.UpdateAsync(user);
 
-            var newValue = JsonSerializer.Serialize(new { user.IsActive });
+            var newDto = await MapToUserDto(user);
+            var newValue = JsonSerializer.Serialize(newDto);
 
-            await SafeAudit(
-                performedByUserId,
-                userId,
-                "User Deactivated",
-                "User",
-                oldValue,
-                newValue
-            );
+            await SafeAudit(performedByUserId, userId, "User Deactivated", "User", oldValue, newValue);
         }
 
         // ============================================================
-        // ✅ 5️⃣ ACTIVATE USER (WITH AUDIT)
+        // Activate User
         // ============================================================
         public async Task ActivateUserAsync(string userId, string performedByUserId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            var user = await _userRepository.GetByIdAsync(userId)
+                       ?? throw new Exception("User not found");
 
-            var oldValue = JsonSerializer.Serialize(new { user.IsActive });
+            var oldDto = await MapToUserDto(user);
+            var oldValue = JsonSerializer.Serialize(oldDto);
 
             user.IsActive = true;
             await _userRepository.UpdateAsync(user);
 
-            var newValue = JsonSerializer.Serialize(new { user.IsActive });
+            var updated = await _userManager.FindByIdAsync(userId);
+            var newDto = await MapToUserDto(updated);
+            var newValue = JsonSerializer.Serialize(newDto);
 
-            await SafeAudit(
-                performedByUserId,
-                userId,
-                "User Activated",
-                "User",
-                oldValue,
-                newValue
-            );
+            await SafeAudit(performedByUserId, userId, "User Activated", "User", oldValue, newValue);
         }
 
         // ============================================================
-        // ✅ 6️⃣ UPDATE USER (WITH AUDIT)
+        // Update User
         // ============================================================
         public async Task UpdateUserAsync(string userId, UpdateUserDto dto, string performedByUserId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            var user = await _userRepository.GetByIdAsync(userId)
+                       ?? throw new Exception("User not found");
 
-            var oldValue = JsonSerializer.Serialize(user);
+            var oldDto = await MapToUserDto(user);
+            var oldValue = JsonSerializer.Serialize(oldDto);
 
             user.FullName = dto.FullName;
             user.Email = dto.Email;
@@ -227,145 +257,55 @@ namespace CRM.Server.Services
 
             await _userRepository.UpdateAsync(user);
 
-            var newValue = JsonSerializer.Serialize(user);
+            var newDto = await MapToUserDto(user);
+            var newValue = JsonSerializer.Serialize(newDto);
 
-            await SafeAudit(
-                performedByUserId,
-                userId,
-                "User Updated",
-                "User",
-                oldValue,
-                newValue
-            );
+            await SafeAudit(performedByUserId, userId, "User Updated", "User", oldValue, newValue);
         }
 
         // ============================================================
-        // ✅ 7️⃣ DELETE USER (WITH AUDIT)
+        // Delete User
         // ============================================================
         public async Task DeleteUserAsync(string userId, string performedByUserId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            var user = await _userRepository.GetByIdAsync(userId)
+                       ?? throw new Exception("User not found");
 
-            var oldValue = JsonSerializer.Serialize(user);
+            var oldDto = await MapToUserDto(user);
+            var oldValue = JsonSerializer.Serialize(oldDto);
 
             await _userRepository.DeleteAsync(user);
 
-            await SafeAudit(
-                performedByUserId,
-                userId,
-                "User Deleted",
-                "User",
-                oldValue,
-                null
-            );
+            await SafeAudit(performedByUserId, userId, "User Deleted", "User", oldValue, null);
         }
 
         // ============================================================
-        // ✅ 8️⃣ FORGOT PASSWORD (NO AUDIT HERE - DONE IN AUTH)
-        // ============================================================
-        public async Task ForgotPasswordAsync(string email)
-        {
-            var user = await _userManager.FindByEmailAsync(email);
-            if (user == null)
-                return;
-
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-
-            var resetLink =
-                $"{_config["Client:Url"]}/reset-password?token={Uri.EscapeDataString(token)}&email={user.Email}";
-
-            await _emailService.SendAsync(
-                user.Email!,
-                "CRM Password Reset",
-                $"Click the link below to reset your password:\n\n{resetLink}"
-            );
-        }
-
-        // ============================================================
-        // ✅ 9️⃣ RESET PASSWORD (NO AUDIT HERE - DONE IN AUTH)
-        // ============================================================
-        public async Task ResetPasswordAsync(string email, string token, string newPassword)
-        {
-            var user = await _userManager.FindByEmailAsync(email);
-            if (user == null)
-                throw new Exception("Invalid reset request");
-
-            var decodedToken = Uri.UnescapeDataString(token);
-
-            var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
-
-            if (!result.Succeeded)
-                throw new Exception(result.Errors.First().Description);
-        }
-
-        // ============================================================
-        // ✅ 🔟 CHANGE PASSWORD (NO AUDIT HERE - DONE IN AUTH)
-        // ============================================================
-        public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
-
-            var result = await _userManager.ChangePasswordAsync(
-                user, currentPassword, newPassword);
-
-            if (!result.Succeeded)
-                throw new Exception(result.Errors.First().Description);
-        }
-
-        // ============================================================
-        // ✅ GET USER BY ID
+        // Get by ID
         // ============================================================
         public async Task<UserResponseDto> GetUserByIdAsync(string userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            var user = await _userRepository.GetByIdAsync(userId)
+                       ?? throw new Exception("User not found");
 
-            var roles = await _userManager.GetRolesAsync(user);
-
-            return new UserResponseDto
-            {
-                Id = user.Id,
-                FullName = user.FullName ?? "",
-                Email = user.Email ?? "",
-                IsActive = user.IsActive,
-                Role = roles.FirstOrDefault() ?? "",
-                TwoFactorEnabled = user.TwoFactorEnabled
-            };
+            return await MapToUserDto(user);
         }
 
         // ============================================================
-        // ✅ FILTER USERS
+        // Filter users
         // ============================================================
         public async Task<List<UserResponseDto>> FilterUsersAsync(string? role, bool? isActive)
         {
-            var users = _userManager.Users.AsQueryable();
-
-            if (isActive.HasValue)
-                users = users.Where(x => x.IsActive == isActive.Value);
-
-            var userList = users.ToList();
+            var users = _userManager.Users.ToList();
             var result = new List<UserResponseDto>();
 
-            foreach (var user in userList)
+            foreach (var user in users)
             {
                 var roles = await _userManager.GetRolesAsync(user);
 
-                if (string.IsNullOrEmpty(role) || roles.Contains(role))
+                if ((string.IsNullOrEmpty(role) || roles.Contains(role)) &&
+                    (!isActive.HasValue || user.IsActive == isActive.Value))
                 {
-                    result.Add(new UserResponseDto
-                    {
-                        Id = user.Id,
-                        FullName = user.FullName ?? "",
-                        Email = user.Email ?? "",
-                        IsActive = user.IsActive,
-                        Role = roles.FirstOrDefault() ?? "",
-                        TwoFactorEnabled = user.TwoFactorEnabled
-                    });
+                    result.Add(await MapToUserDto(user));
                 }
             }
 
@@ -373,13 +313,12 @@ namespace CRM.Server.Services
         }
 
         // ============================================================
-        // ✅ MFA METHODS (NO AUDIT HERE - DONE IN AUTH)
+        // MFA (no audit)
         // ============================================================
         public async Task<EnableMfaResponseDto> EnableMfaAsync(string userId)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-                throw new Exception("User not found");
+            var user = await _userManager.FindByIdAsync(userId)
+                       ?? throw new Exception("User not found");
 
             await _userManager.ResetAuthenticatorKeyAsync(user);
 
@@ -438,8 +377,59 @@ namespace CRM.Server.Services
             await _userManager.ResetAuthenticatorKeyAsync(user);
         }
 
+        public async Task ForgotPasswordAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                return;
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            var resetLink =
+                $"{_config["Client:Url"]}/reset-password?token={Uri.EscapeDataString(token)}&email={user.Email}";
+
+            await _emailService.SendAsync(
+                user.Email!,
+                "CRM Password Reset",
+                $"Click the link below to reset your password:\n\n{resetLink}"
+            );
+        }
+
         // ============================================================
-        // ✅ SAFE AUDIT HELPER
+        // 9) Reset Password (no audit here - handled in auth)
+        // ============================================================
+        public async Task ResetPasswordAsync(string email, string token, string newPassword)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                throw new Exception("Invalid reset request");
+
+            var decodedToken = Uri.UnescapeDataString(token);
+
+            var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
+
+            if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+        }
+
+        // ============================================================
+        // 10) Change Password (no audit here - handled in auth)
+        // ============================================================
+        public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            var result = await _userManager.ChangePasswordAsync(
+                user, currentPassword, newPassword);
+
+            if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+        }
+
+        // ============================================================
+        // SAFE AUDIT
         // ============================================================
         private async Task SafeAudit(
             string performedByUserId,
@@ -464,8 +454,10 @@ namespace CRM.Server.Services
             }
             catch
             {
-                // ✅ Never break business logic
+                // DO NOT BREAK BUSINESS LOGIC
             }
         }
     }
 }
+
+
