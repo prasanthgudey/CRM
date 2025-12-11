@@ -1,0 +1,226 @@
+﻿@using CRM.Client.DTOs.Tasks
+@using CRM.Client.DTOs.Customers
+@using CRM.Client.DTOs.Users
+@using CRM.Client.Services.Tasks
+@using CRM.Client.Services.Customers
+@using CRM.Client.Services.Users
+
+@inject TaskService TaskService
+@inject CustomerService CustomerService
+@inject UserService UserService
+
+@if (IsOpen && Task != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Task - @Task.Title</h5>
+                    <button type="button" class="btn-close" @onclick="() => Close(false)"></button>
+                </div>
+
+                <div class="modal-body">
+                    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Customer</label>
+                                <InputSelect class="form-select"
+                                             @bind-Value="SelectedCustomerIdString">
+                                    <option value="">-- Select customer --</option>
+                                    @if (Customers is not null)
+                                    {
+                                        @foreach (var customer in Customers)
+                                        {
+                                            <option value="@customer.CustomerId.ToString()">
+                                                @customer.FullName (@customer.Email)
+                                            </option>
+                                        }
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">User</label>
+                                <InputSelect class="form-select"
+                                             @bind-Value="SelectedUserId">
+                                    <option value="">-- Assign to user --</option>
+                                    @if (Users is not null)
+                                    {
+                                        @foreach (var user in Users)
+                                        {
+                                            var display = string.IsNullOrWhiteSpace(user.FullName)
+                                            ? user.Email
+                                            : $"{user.FullName} ({user.Email})";
+
+                                            <option value="@user.Id">@display</option>
+                                        }
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Title</label>
+                            <InputText class="form-control"
+                                       @bind-Value="Model.Title" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea class="form-control"
+                                           @bind-Value="Model.Description" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Due Date</label>
+                            <InputDate class="form-control"
+                                       @bind-Value="Model.DueDate" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Priority</label>
+                            <InputSelect class="form-select"
+                                         @bind-Value="Model.Priority">
+                                @foreach (var value in Enum.GetValues<TaskPriority>())
+                                {
+                                    <option value="@value">@value</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">State</label>
+                            <InputSelect class="form-select"
+                                         @bind-Value="Model.State">
+                                @foreach (var value in Enum.GetValues<TaskState>())
+                                {
+                                    <option value="@value">@value</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <InputCheckbox class="form-check-input"
+                                           @bind-Value="Model.IsRecurring" />
+                            <label class="form-check-label">
+                                Is Recurring
+                            </label>
+                        </div>
+
+                        @if (Model.IsRecurring)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Recurrence Type</label>
+                                <InputSelect class="form-select"
+                                             @bind-Value="Model.RecurrenceType">
+                                    @foreach (var value in Enum.GetValues<RecurrenceType>())
+                                    {
+                                        <option value="@value">@value</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Recurrence Interval</label>
+                                <InputNumber class="form-control"
+                                             @bind-Value="Model.RecurrenceInterval" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Recurrence End Date</label>
+                                <InputDate class="form-control"
+                                           @bind-Value="Model.RecurrenceEndDate" />
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="() => Close(false)">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="Submit">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public TaskResponseDto? Task { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private UpdateTaskDto Model { get; set; } = new();
+
+    private List<CustomerResponseDto>? Customers;
+    private List<UserResponseDto>? Users;
+
+    private string? SelectedCustomerIdString;
+    private string? SelectedUserId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && Task != null)
+        {
+            // Load lookups once
+            if (Customers == null)
+            {
+                Customers = await CustomerService.GetAllAsync();
+            }
+
+            if (Users == null)
+            {
+                Users = await UserService.GetAllUsersAsync();
+            }
+
+            // Map Task → Model
+            Model = new UpdateTaskDto
+            {
+                Title = Task.Title,
+                Description = Task.Description,
+                DueDate = Task.DueDate,
+                Priority = Task.Priority,
+                State = Task.State,
+                IsRecurring = Task.IsRecurring,
+                RecurrenceType = Task.RecurrenceType,
+                RecurrenceInterval = Task.RecurrenceInterval,
+                RecurrenceEndDate = Task.RecurrenceEndDate
+            };
+
+            SelectedCustomerIdString = Task.CustomerId.ToString();
+            SelectedUserId = Task.UserId;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (Task == null) return;
+
+        // Note: backend UpdateTaskDto currently does NOT take CustomerId/UserId,
+        // so changing the dropdowns here is mainly for display.
+        // If later you add those fields to UpdateTaskDto and backend, you can map them here.
+
+        await TaskService.UpdateAsync(Task.TaskId, Model);
+        await Close(true);
+    }
+
+    private async Task Submit()
+    {
+        await HandleValidSubmit();
+    }
+
+    private async Task Close(bool refresh)
+    {
+        await OnClose.InvokeAsync(refresh);
+    }
+}
