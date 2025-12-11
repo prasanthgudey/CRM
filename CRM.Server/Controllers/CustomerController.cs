@@ -38,7 +38,7 @@ namespace CRM.Server.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin,Manager")]
+        //[Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Create(CustomerCreateDto dto)
         {
             // Set performedByUserId from authenticated user if available
@@ -51,7 +51,7 @@ namespace CRM.Server.Controllers
         }
 
         [HttpPut("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        //[Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Update(Guid id, CustomerUpdateDto dto)
         {
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -60,7 +60,7 @@ namespace CRM.Server.Controllers
         }
 
         [HttpDelete("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        //[Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);

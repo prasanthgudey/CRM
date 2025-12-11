@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -171,7 +172,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// 🔹 1. Configure Serilog FIRST
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)   // reads "Serilog" from appsettings.json
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
+// 🔹 2. Tell ASP.NET Core to use Serilog
+builder.Host.UseSerilog();
 
 // =========================
 // ✅ DEPENDENCY INJECTION
