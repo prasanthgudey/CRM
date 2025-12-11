@@ -1,6 +1,8 @@
 ﻿@using CRM.Client.DTOs.Roles
 @using CRM.Client.Services.Roles
+@using CRM.Client.Services
 @inject RoleService RoleService
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
@@ -9,33 +11,26 @@
 
             <h5 class="mb-3 text-center">Edit Role</h5>
 
-            @if (!string.IsNullOrWhiteSpace(Message))
-            {
-                <div class="alert alert-info py-2">
-                    @Message
-                </div>
-            }
-
-            <EditForm Model="Model" OnValidSubmit="UpdateRole">
+            <EditForm Model="Model" OnValidSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
+                <ValidationSummary />
 
-                <!-- ✅ NEW ROLE NAME -->
                 <div class="form-group mt-3">
-                    <label class="small text-muted">New Role Name</label>
+                    <label class="small text-muted">Role Name</label>
                     <InputText class="form-control"
-                               placeholder="Enter new role name (e.g. Manager, Supervisor)"
-                               @bind-Value="Model.NewName" />
+                               @bind-Value="Model.NewName"
+                               placeholder="Enter role name" />
                 </div>
 
-                <!-- ✅ ACTION BUTTONS -->
                 <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary"
-                            @onclick="Close">
+                            @onclick="() => Close(false)">
                         Cancel
                     </button>
 
-                    <button class="btn btn-warning"
+                    <button type="submit"
+                            class="btn btn-warning"
                             disabled="@IsLoading">
                         @(IsLoading ? "Updating..." : "Update")
                     </button>
@@ -47,32 +42,102 @@
 }
 
 @code {
-
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public string? OldRoleName { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private UpdateRoleDto Model { get; set; } = new UpdateRoleDto();
+    private UpdateRoleDto Model { get; set; } = new();
     private bool IsLoading;
-    private string? Message;
+    private bool _wasOpen = false;
 
-    private async Task UpdateRole()
+    protected override void OnParametersSet()
     {
+        if (IsOpen && !_wasOpen)
+        {
+            var name = OldRoleName ?? string.Empty;
+
+            Model = new UpdateRoleDto
+            {
+                OldName = name,
+                NewName = name
+            };
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.NewName))
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Validation",
+                "Role name is required.",
+                "warning");
+
+            return;
+        }
+
         IsLoading = true;
-        Message = null;
 
         try
         {
-            Model.OldName = OldRoleName!;
-            await RoleService.UpdateRoleAsync(Model);
-            Message = "Role updated successfully.";
+            var result = await RoleService.UpdateRoleAsync(Model);
 
-            await Task.Delay(1000);
-            await OnClose.InvokeAsync(false);
+            // ---- CHECK IF ROLE ALREADY EXISTS ----
+            if (!result.IsSuccess && result.ErrorMessage != null)
+            {
+                if (result.ErrorMessage.Contains("exists", StringComparison.OrdinalIgnoreCase) ||
+                    result.ErrorMessage.Contains("already", StringComparison.OrdinalIgnoreCase) ||
+                    result.ErrorMessage.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
+                    result.StatusCode == 409)
+                {
+                    await JSRuntime.InvokeVoidAsync("Swal.fire",
+                        "Duplicate Role",
+                        "A role with this name already exists.",
+                        "error");
+
+                    return;
+                }
+            }
+
+            if (result.IsSuccess)
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Success",
+                    "Role updated successfully ✔",
+                    "success");
+
+                await Task.Delay(900);
+                await Close(true);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Failed",
+                    result.ErrorMessage ?? "Could not update role.",
+                    "error");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            Message = "Failed to update role.";
+            // Check exception message for duplicate case
+            if (ex.Message.Contains("exists", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("already", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Duplicate Role",
+                    "A role with this name already exists.",
+                    "error");
+
+                return;
+            }
+
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                ex.Message,
+                "error");
         }
         finally
         {
@@ -80,9 +145,10 @@
         }
     }
 
-    private async Task Close()
+
+    private async Task Close(bool success)
     {
-        Message = null;
-        await OnClose.InvokeAsync(false);
+        _wasOpen = false;
+        await OnClose.InvokeAsync(success);
     }
 }

@@ -67,6 +67,7 @@ else
 <CreateRoleModal IsOpen="@IsCreateOpen"
                  OnClose="CloseCreateRoleModal" />
 
+
 <!-- ✅ EDIT ROLE MODAL -->
 <EditRoleModal IsOpen="@IsEditOpen"
                OldRoleName="@SelectedRole"
@@ -81,7 +82,8 @@ else
 
     private List<RoleResponseDto>? Roles;
 
-    private string? Message;
+    private string Message = string.Empty;
+
 
     private bool IsCreateOpen;
     private bool IsEditOpen;
@@ -89,10 +91,25 @@ else
 
     private string? SelectedRole;
 
+
     // ✅ Load roles
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         {
             Roles = await RoleService.GetAllRolesAsync();
             StateHasChanged();

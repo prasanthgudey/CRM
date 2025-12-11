@@ -1,7 +1,7 @@
 ﻿@using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Users
 @inject UserService UserService
-@inject IJSRuntime JSRuntime     
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen && User != null)
 {
@@ -55,6 +55,18 @@
     private bool IsLoading { get; set; }
     private string? Message { get; set; }
 
+    // JS interop guard
+    private bool _isInteractive = false;
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isInteractive = true;
+        }
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
     protected override void OnParametersSet()
     {
         if (User != null)
@@ -65,6 +77,50 @@
                 Email = User.Email,
                 Role = User.Role
             };
+            Message = null;
+        }
+    }
+
+    // Safe wrapper for crmAlerts calls
+    private async Task ShowAlertAsync(string kind, string text)
+    {
+        if (!_isInteractive)
+        {
+            // fallback to inline message until JS is ready
+            Message = text;
+            return;
+        }
+
+        try
+        {
+            if (kind.Equals("success", StringComparison.OrdinalIgnoreCase))
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", text);
+            else if (kind.Equals("error", StringComparison.OrdinalIgnoreCase))
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", text);
+            else if (kind.Equals("warning", StringComparison.OrdinalIgnoreCase))
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showWarning", text);
+            else
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showInfo", text);
+        }
+        catch
+        {
+            // if JS fails for any reason, show inline message
+            Message = text;
+        }
+    }
+
+    // Simple email validator
+    private bool IsValidEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -72,31 +128,72 @@
     {
         if (User == null) return;
 
+        // Client-side validation
+        if (string.IsNullOrWhiteSpace(EditModel.FullName))
+        {
+            await ShowAlertAsync("warning", "Please enter full name.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(EditModel.Email) || !IsValidEmail(EditModel.Email))
+        {
+            await ShowAlertAsync("warning", "Please enter a valid email address.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(EditModel.Role))
+        {
+            await ShowAlertAsync("warning", "Please select a role.");
+            return;
+        }
+
         IsLoading = true;
         Message = null;
 
         try
         {
+            // If your UserService.UpdateUserAsync throws on error, we handle exceptions below.
             await UserService.UpdateUserAsync(User.Id, EditModel);
 
-            Message = "User updated successfully.";                    // your original message
+            Message = "User updated successfully.";
 
-            await JSRuntime.InvokeVoidAsync(                            // new code - SweetAlert success
-                "crmAlerts.showSuccess",
-                "User updated successfully."
-            );
+            await ShowAlertAsync("success", "User updated successfully.");
 
-            await Task.Delay(900);
+            await Task.Delay(700);
             await OnClose.InvokeAsync(false);
         }
-        catch
+        catch (Exception ex)
         {
-            Message = "Failed to update user.";
+            // Get a normalized message to inspect
+            var msg = ex.Message ?? string.Empty;
+            var lower = msg.ToLowerInvariant();
 
-            await JSRuntime.InvokeVoidAsync(                            // new code - SweetAlert error
-                "crmAlerts.showError",
-                "Failed to update user."
-            );
+            // Duplicate detection: prefer explicit keywords
+            if (lower.Contains("exists") || lower.Contains("already") || lower.Contains("duplicate"))
+            {
+                // Distinguish role vs user messages (if server mentions role/email)
+                if (lower.Contains("role"))
+                {
+                    Message = "Role already exists.";
+                    await ShowAlertAsync("error", "Role already exists.");
+                }
+                else if (lower.Contains("email"))
+                {
+                    Message = "Email already in use.";
+                    await ShowAlertAsync("error", "Email already in use.");
+                }
+                else
+                {
+                    Message = "User already exists.";
+                    await ShowAlertAsync("error", "User already exists.");
+                }
+            }
+            else
+            {
+                // Generic failure
+                Message = "Failed to update user.";
+                await ShowAlertAsync("error", "Failed to update user.");
+            }
         }
         finally
         {

@@ -5,6 +5,9 @@ using CRM.Client.Config;
 using CRM.Client.State;
 using CRM.Client.Services.Auth;
 using CRM.Client.Security;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 
 namespace CRM.Client.Services.Http
@@ -147,7 +150,7 @@ namespace CRM.Client.Services.Http
         }
 
         // ✅ =========================
-        // ✅ GENERIC PUT (SAFE)
+        // ✅ GENERIC PUT (SAFE, EXPECTS BODY)
         // ✅ =========================
         public async Task<TResponse?> PutAsync<TRequest, TResponse>(string endpoint, TRequest data)
         {
@@ -177,6 +180,51 @@ namespace CRM.Client.Services.Http
             return JsonSerializer.Deserialize<TResponse>(responseJson, JsonOptions());
         }
 
+        // ✅ ===============================
+        // ✅ PUT (NO RESPONSE EXPECTED)
+        // ✅ ===============================
+        public async Task PutAsync<TRequest>(string endpoint, TRequest data)   // <-- NEW
+        {
+            await AttachTokenAsync();
+
+            var json = JsonSerializer.Serialize(data, JsonOptions());
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[PUT] {endpoint}");
+            Console.WriteLine($"[PUT BODY] {json}");
+
+            var response = await _httpClient.PutAsync(endpoint, content);
+
+            Console.WriteLine($"[PUT STATUS] {(int)response.StatusCode} {response.StatusCode}");
+
+            response.EnsureSuccessStatusCode(); // throws if 4xx/5xx
+        }
+
+        // *** NEW CODE START ***
+        // RAW PUT (RETURNS HttpResponseMessage for manual inspection)
+        public async Task<HttpResponseMessage> PutRawAsync<TRequest>(string endpoint, TRequest data)
+        {
+            await AttachTokenAsync();
+
+            var json = JsonSerializer.Serialize(data, JsonOptions());
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[PUT RAW] {endpoint}");
+            Console.WriteLine($"[PUT RAW BODY] {json}");
+
+            var response = await _httpClient.PutAsync(endpoint, content);
+
+            Console.WriteLine($"[PUT RAW STATUS] {(int)response.StatusCode} {response.StatusCode}");
+
+            // VERY IMPORTANT:
+            // Do NOT call EnsureSuccessStatusCode() here because the caller must inspect 
+            // 409 Conflict or any other error codes for logic such as "Role already exists".
+            return response;
+        }
+        // *** NEW CODE END ***
+
+
+
         // ✅ =========================
         // ✅ GENERIC DELETE (NO DATA)
         // ✅ =========================
@@ -199,7 +247,9 @@ namespace CRM.Client.Services.Http
             return new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
-            };
+            }
+            
+            ;
         }
     }
 }

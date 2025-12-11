@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using CRM.Server.Models;
 
 namespace CRM.Server.Services.Interfaces
 {
