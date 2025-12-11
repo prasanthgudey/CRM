@@ -1,4 +1,5 @@
-﻿using CRM.Server.Dtos;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.Dtos;
 
 namespace CRM.Server.Services
 {
@@ -14,5 +15,8 @@ namespace CRM.Server.Services
         Task<TaskResponseDto> UpdateAsync(Guid id, UpdateTaskDto dto, string performedByUserId);
 
         Task DeleteAsync(Guid id, string performedByUserId);
+
+        //paginig
+        Task<PagedResult<TaskResponseDto>> GetPagedAsync(PageParams parms);
     }
 }

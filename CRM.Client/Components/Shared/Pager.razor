@@ -1,0 +1,60 @@
+﻿@using System
+@using System.Linq
+
+<nav aria-label="Page navigation">
+    <ul class="pagination">
+        <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+            <button class="page-link" @onclick="() => GoToPage(1)">«</button>
+        </li>
+        <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+            <button class="page-link" @onclick="() => GoToPage(CurrentPage - 1)">‹</button>
+        </li>
+
+        @foreach (var p in VisiblePages)
+        {
+            <li class="page-item @(p == CurrentPage ? "active" : "")">
+                <button class="page-link" @onclick="() => GoToPage(p)">@p</button>
+            </li>
+        }
+
+        <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+            <button class="page-link" @onclick="() => GoToPage(CurrentPage + 1)">›</button>
+        </li>
+        <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+            <button class="page-link" @onclick="() => GoToPage(TotalPages)">»</button>
+        </li>
+    </ul>
+</nav>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public long TotalCount { get; set; } = 0;
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public int MaxVisiblePages { get; set; } = 7;
+
+    private int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling((double)TotalCount / PageSize);
+
+    private IEnumerable<int> VisiblePages
+    {
+        get
+        {
+            var total = TotalPages;
+            if (total == 0) return Array.Empty<int>();
+            var half = MaxVisiblePages / 2;
+            var start = Math.Max(1, CurrentPage - half);
+            var end = Math.Min(total, start + MaxVisiblePages - 1);
+            if (end - start + 1 < MaxVisiblePages) start = Math.Max(1, end - MaxVisiblePages + 1);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+
+    private async Task GoToPage(int p)
+    {
+        if (p < 1) p = 1;
+        if (p > TotalPages) p = TotalPages;
+        if (p == CurrentPage) return;
+        CurrentPage = p;
+        await OnPageChanged.InvokeAsync(p);
+    }
+}

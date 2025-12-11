@@ -1,9 +1,10 @@
-﻿using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.DTOs;
 using CRM.Server.Models;
 using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
-using System.Text.Json;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace CRM.Server.Services
 {
@@ -267,6 +268,32 @@ namespace CRM.Server.Services
             {
                 // swallow - auditing must not break main flow
             }
+        }
+
+        public async Task<PagedResult<CustomerResponseDto>> GetPagedAsync(PageParams parms)
+        {
+            var paged = await _repo.GetPagedAsync(parms);
+
+            return new PagedResult<CustomerResponseDto>
+            {
+                Items = paged.Items.Select(c => new CustomerResponseDto
+                {
+                    CustomerId = c.CustomerId,
+                    FirstName = c.FirstName,
+                    SurName = c.SurName,
+                    MiddleName = c.MiddleName,
+                    PreferredName = c.PreferredName,
+                    Email = c.Email,
+                    Phone = c.Phone,
+                    Address = c.Address,
+                    CreatedByUserId = c.CreatedByUserId,
+                    CreatedAt = c.CreatedAt
+                }).ToList(),
+
+                Page = paged.Page,
+                PageSize = paged.PageSize,
+                TotalCount = paged.TotalCount
+            };
         }
     }
 }

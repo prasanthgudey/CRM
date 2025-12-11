@@ -1,16 +1,18 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CRM.Server.Common.Paging;
 using CRM.Server.Data;
-using CRM.Server.Models.Tasks;
 using CRM.Server.Dtos;
+using CRM.Server.Models.Tasks;
+using Microsoft.EntityFrameworkCore;
 
-namespace CRM.Server.Repositories
+namespace CRM.Server.Repositories.Tasks
+
 {
-    public class TaskRepository : ITaskRepository
+    public class TaskRepository : BaseRepository<TaskItem>, ITaskRepository
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<TaskRepository> _logger;
 
-        public TaskRepository(ApplicationDbContext context, ILogger<TaskRepository> logger)
+        public TaskRepository(ApplicationDbContext context, ILogger<TaskRepository> logger):base(context)
         {
             _context = context;
             _logger = logger;
@@ -84,6 +86,35 @@ namespace CRM.Server.Repositories
 
                 throw;
             }
+        }
+        // Paged implementation uses BaseRepository's GetPagedAsync by passing a customize function
+        public async Task<PagedResult<TaskItem>> GetPagedAsync(PageParams parms)
+        {
+            return await base.GetPagedAsync(parms, q =>
+            {
+                if (!string.IsNullOrWhiteSpace(parms.Search))
+                {
+                    var s = parms.Search!.Trim();
+                    q = q.Where(t =>
+                        EF.Functions.Like(t.Title ?? "", $"%{s}%") ||
+                        EF.Functions.Like(t.Description ?? "", $"%{s}%") ||
+                        EF.Functions.Like(t.Priority.ToString(), $"%{s}%"));
+                }
+
+                // whitelist sorting (safe)
+                if (!string.IsNullOrWhiteSpace(parms.SortBy) && parms.SortBy!.Equals("dueDate", StringComparison.OrdinalIgnoreCase))
+                {
+                    q = parms.SortDir?.Equals("desc", StringComparison.OrdinalIgnoreCase) == true
+                        ? q.OrderByDescending(t => t.DueDate)
+                        : q.OrderBy(t => t.DueDate);
+                }
+                else
+                {
+                    q = q.OrderByDescending(t => t.CreatedAt);
+                }
+
+                return q;
+            });
         }
     }
 }

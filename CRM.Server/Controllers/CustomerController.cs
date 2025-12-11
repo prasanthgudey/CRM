@@ -1,7 +1,8 @@
-﻿using CRM.Server.DTOs;
+﻿using CRM.Server.Common.Paging;
+using CRM.Server.DTOs;
 using CRM.Server.Services.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace CRM.Server.Controllers
@@ -67,5 +68,13 @@ namespace CRM.Server.Controllers
             var deleted = await _service.DeleteAsync(id, performedBy!);
             return deleted ? NoContent() : NotFound();
         }
+
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] PageParams parms)
+        {
+            var result = await _service.GetPagedAsync(parms);
+            return Ok(result);
+        }
+
     }
 }
