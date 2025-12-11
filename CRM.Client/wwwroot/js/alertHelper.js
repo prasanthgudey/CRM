@@ -1,48 +1,49 @@
-﻿// wwwroot/js/alertHelper.js
-
-window.crmAlerts = {
+﻿window.crmAlerts = {
     showSuccess: function (message) {
         Swal.fire({
-            icon: "success",
-            title: message,
-            width: 320,
-            padding: "10px 0 16px",
-            customClass: {
-                popup: "crm-alert-popup",
-                title: "crm-alert-title"
-            }
+            icon: 'success',
+            title: 'Success',
+            text: message,
+            width: '340px',
+            padding: '1rem',
+            allowOutsideClick: false,
+            confirmButtonColor: '#6c63ff',
         });
     },
 
     showError: function (message) {
         Swal.fire({
-            icon: "error",
-            title: message,
-            width: 320,
-            padding: "10px 0 16px",
-            customClass: {
-                popup: "crm-alert-popup",
-                title: "crm-alert-title"
-            }
+            icon: 'error',
+            title: 'Error',
+            text: message,
+            width: '340px',
+            padding: '1rem',
+            allowOutsideClick: false,
+            confirmButtonColor: '#6c63ff',
         });
     },
 
-    confirmDelete: async function (message) {
-        const result = await Swal.fire({
-            title: "Confirm delete",
-            text: message || "Are you sure?",
-            icon: "warning",
-            width: 340,
-            padding: "10px 0 16px",
-            customClass: {
-                popup: "crm-alert-popup",
-                title: "crm-alert-title"
-            },
-            showCancelButton: true,
-            confirmButtonText: "Yes",
-            cancelButtonText: "Cancel"
+    showWarning: function (message) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Warning',
+            text: message,
+            width: '340px',
+            padding: '1rem',
+            allowOutsideClick: false,
+            confirmButtonColor: '#6c63ff',
         });
+    },
 
-        return result.isConfirmed;
+    showInfo: function (message) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Info',
+            text: message,
+            width: '340px',
+            padding: '1rem',
+            allowOutsideClick: false,
+            confirmButtonColor: '#6c63ff',
+        });
     }
 };

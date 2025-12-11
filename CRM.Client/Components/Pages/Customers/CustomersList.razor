@@ -1,0 +1,177 @@
+﻿@page "/customers"
+@layout MainLayout
+
+@using CRM.Client.Components.Layout
+@using CRM.Client.DTOs.Customers
+@using CRM.Client.Services.Customers
+@using CRM.Client.Components.Modals.CustomerModals
+
+@inject CustomerService CustomerService
+
+<h3>Customers</h3>
+
+<div class="mb-3 d-flex gap-2">
+    <button type="button"
+            class="btn btn-primary"
+            @onclick="OpenCreate">
+        + New Customer
+    </button>
+</div>
+
+<!-- LIVE SEARCH -->
+<input class="form-control mb-3"
+       placeholder="Search by name, email, phone, address..."
+       value="@SearchText"
+       @oninput="OnSearchChanged" />
+
+@if (Customers == null)
+{
+    <p>Loading customers...</p>
+}
+else if (!Customers.Any())
+{
+    <p>No customers found.</p>
+}
+else
+{
+    <table class="table table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Name</th>
+                <th>Preferred Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Created At</th>
+                <th style="width:220px">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var customer in Customers)
+            {
+                <tr>
+                    <td>@customer.FullName</td>
+                    <td>@(string.IsNullOrWhiteSpace(customer.PreferredName) ? "-" : customer.PreferredName)</td>
+                    <td>@customer.Email</td>
+                    <td>@customer.Phone</td>
+                    <td>@customer.Address</td>
+                    <td>@FormatDate(customer.CreatedAt)</td>
+
+                    <td>
+                        <button class="btn btn-light btn-sm me-2"
+                                @onclick="() => OpenEdit(customer)">
+                            Edit
+                        </button>
+
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => OpenDelete(customer.CustomerId)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<CreateCustomerModal IsOpen="@IsCreateOpen"
+                     OnClose="HandleCreateClosed" />
+
+<EditCustomerModal IsOpen="@IsEditOpen"
+                   Customer="@SelectedCustomer"
+                   OnClose="HandleEditClosed" />
+
+<DeleteCustomerModal IsOpen="@IsDeleteOpen"
+                     CustomerId="@SelectedCustomerId"
+                     OnClose="HandleDeleteClosed" />
+
+@code {
+    private List<CustomerResponseDto>? Customers;
+
+    private CustomerResponseDto? SelectedCustomer;
+    private Guid? SelectedCustomerId;
+
+    private bool IsCreateOpen;
+    private bool IsEditOpen;
+    private bool IsDeleteOpen;
+
+    private string? SearchText;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Customers = await CustomerService.GetAllAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString();
+        Customers = await CustomerService.GetAllAsync(search: SearchText);
+        StateHasChanged();
+    }
+
+    private void OpenCreate()
+    {
+        IsCreateOpen = true;
+    }
+
+    private void OpenEdit(CustomerResponseDto customer)
+    {
+        SelectedCustomer = customer;
+        IsEditOpen = true;
+    }
+
+    private void OpenDelete(Guid customerId)
+    {
+        SelectedCustomerId = customerId;
+        IsDeleteOpen = true;
+    }
+
+    private async Task HandleCreateClosed(bool refresh)
+    {
+        IsCreateOpen = false;
+
+        if (refresh)
+        {
+            Customers = await CustomerService.GetAllAsync(search: SearchText);
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleEditClosed(bool refresh)
+    {
+        IsEditOpen = false;
+        SelectedCustomer = null;
+
+        if (refresh)
+        {
+            Customers = await CustomerService.GetAllAsync(search: SearchText);
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleDeleteClosed(bool refresh)
+    {
+        IsDeleteOpen = false;
+        SelectedCustomerId = null;
+
+        if (refresh)
+        {
+            Customers = await CustomerService.GetAllAsync(search: SearchText);
+            StateHasChanged();
+        }
+    }
+
+    private string FormatDate(string created)
+    {
+        if (DateTime.TryParse(created, out var dt))
+        {
+            return dt.ToLocalTime().ToString("MMM dd yyyy hh:mm tt");
+        }
+
+        return created;
+    }
+}

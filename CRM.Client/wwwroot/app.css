@@ -242,25 +242,71 @@
     .topbar-logout-btn:hover {
         background-color: #dc2626;
     }
+
+
+/* ========== Profile layout ========== */
+
+.profile-title {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-bottom: 1.6rem;
+    color: #111827;
+}
+
+.profile-page {
+    display: flex;
+    justify-content: center;
+    padding-top: 1rem;
 /* Inner spacing fixes */
 .login-inner-card {
     padding: 34px 36px; /* increased spacing */
 }
 
+/* Card */
+.profile-card {
+    width: 100%;
+    max-width: 600px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 .login-title {
     margin-bottom: 0.6rem;
 }
 
+/* Rows */
+.profile-row {
+    margin-bottom: 1.1rem;
+}
 .login-subtitle {
     margin-top: -4px;
     margin-bottom: 1.8rem; /* space before email field */
 }
 
+/* Split rows: two equal columns (for Role/Status and buttons) */
+.profile-row--split {
+    display: flex;
+    gap: 1rem;
+}
 /* Every field gets clean spacing */
 .login-inner-card .form-group {
     margin-bottom: 1.4rem;
 }
 
+    .profile-row--split .profile-col,
+    .profile-row--actions .profile-btn {
+        flex: 1;
+    }
+
+/* Labels + values */
+.profile-label {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 0.3rem;
+}
 /* Forgot password alignment */
 .password-row {
     display: flex;
@@ -269,6 +315,14 @@
     margin-bottom: 6px;
 }
 
+.profile-value {
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.92rem;
+    color: #111827;
+}
     /* Forgot password link */
     .password-row .forgot-link {
         font-size: 0.85rem;
@@ -276,10 +330,97 @@
         padding-top: 2px;
     }
 
+/* Badges */
+.profile-badge {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
         .password-row .forgot-link:hover {
             text-decoration: underline;
         }
 
+.profile-badge--primary {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.profile-badge--success {
+    background-color: #16a34a;
+    color: #ffffff;
+}
+
+.profile-badge--secondary {
+    background-color: #9ca3af;
+    color: #ffffff;
+}
+
+/* Buttons */
+.profile-row--actions {
+    margin-top: 1.6rem;
+}
+
+.profile-btn {
+    border-radius: 4px;
+    border: 1px solid transparent;
+    padding: 0.65rem 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+/* Change Password */
+.profile-btn--warning {
+    background-color: #ffc107;
+    border-color: #ffca2c;
+    color: #1f2933;
+}
+
+    .profile-btn--warning:hover {
+        background-color: #ffcd39;
+        transform: translateY(-1px);
+    }
+
+/* Enable MFA */
+.profile-btn--primary-outline {
+    background-color: #ffffff;
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+    .profile-btn--primary-outline:hover {
+        background-color: #2563eb;
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+/* Disable MFA */
+.profile-btn--danger-outline {
+    background-color: #ffffff;
+    border-color: #dc2626;
+    color: #dc2626;
+}
+
+    .profile-btn--danger-outline:hover {
+        background-color: #dc2626;
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+/* Small-screen: stack split rows */
+@media (max-width: 640px) {
+    .profile-row--split {
+        flex-direction: column;
+    }
+}
+
+
+/* Page heading (optional) */
+.page-title,
+h3 {
 /* login button spacing */
 .login-btn {
     margin-top: 10px;

@@ -2,6 +2,14 @@
 {
     public interface IAuditLogService
     {
-        Task LogAsync(string userId, string action, string? oldValue = null, string? newValue = null);
+        Task LogAsync(
+            string? performedByUserId,
+            string? targetUserId,
+            string action,
+            string entityName,
+            bool isSuccess,
+            string? ipAddress = null,
+            string? oldValue = null,
+            string? newValue = null);
     }
 }

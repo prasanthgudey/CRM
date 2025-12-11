@@ -1,5 +1,6 @@
 ﻿@using CRM.Client.Services.Roles
 @inject RoleService RoleService
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
@@ -53,17 +54,35 @@
 
     private async Task DeleteRole()
     {
+        if (string.IsNullOrWhiteSpace(RoleName))
+            return;
+
         IsLoading = true;
 
-        await RoleService.DeleteRoleAsync(RoleName!);
-        await Task.Delay(800);
+        try
+        {
+            await RoleService.DeleteRoleAsync(RoleName!);
 
-        await OnClose.InvokeAsync(false);
-        IsLoading = false;
+            // ⭐ NEW – SweetAlert success
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role deleted successfully");
+
+            await Task.Delay(400);
+            await OnClose.InvokeAsync(false);   // your existing pattern
+        }
+        catch
+        {
+            // ⭐ NEW – SweetAlert error
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to delete role");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task Close()
     {
+        // ❗ No alerts here – user clicked Cancel
         await OnClose.InvokeAsync(false);
     }
 }

@@ -2,21 +2,26 @@
 using CRM.Server.Models;
 using CRM.Server.Repositories.Interfaces;
 using CRM.Server.Services.Interfaces;
-using CRM.Server.Data;
-
+using System.Text.Json;
+using System.Security.Claims;
 
 namespace CRM.Server.Services
 {
     public class CustomerService : ICustomerService
     {
         private readonly ICustomerRepository _repo;
-        public CustomerService(ICustomerRepository repo) => _repo = repo;
+        private readonly IAuditLogService _auditLogService;
+
+        public CustomerService(ICustomerRepository repo, IAuditLogService auditLogService)
+        {
+            _repo = repo;
+            _auditLogService = auditLogService;
+        }
 
         public async Task<List<CustomerResponseDto>> GetAllAsync()
             => (await _repo.GetAllAsync()).Select(c => new CustomerResponseDto
             {
                 CustomerId = c.CustomerId,
-                //FullName = c.FullName,
                 FirstName = c.FirstName,
                 SurName = c.SurName,
                 MiddleName = c.MiddleName,
@@ -35,7 +40,6 @@ namespace CRM.Server.Services
             return new CustomerResponseDto
             {
                 CustomerId = c.CustomerId,
-                //FullName = c.FullName,
                 FirstName = c.FirstName,
                 SurName = c.SurName,
                 MiddleName = c.MiddleName,
@@ -48,12 +52,12 @@ namespace CRM.Server.Services
             };
         }
 
-        public async Task<CustomerResponseDto> CreateAsync(CustomerCreateDto dto)
+        // CREATE with audit
+        public async Task<CustomerResponseDto> CreateAsync(CustomerCreateDto dto, string performedByUserId)
         {
             var c = new Customer
             {
                 CustomerId = Guid.NewGuid(),
-                //FullName = dto.FullName,
                 FirstName = dto.FirstName,
                 SurName = dto.SurName,
                 MiddleName = dto.MiddleName,
@@ -64,12 +68,22 @@ namespace CRM.Server.Services
                 CreatedByUserId = dto.CreatedByUserId,
                 CreatedAt = DateTime.UtcNow.ToString("O")
             };
+
             await _repo.CreateAsync(c);
+
+            // Audit: Created
+            await SafeAudit(
+                performedByUserId,
+                c.CustomerId.ToString(),
+                "Customer Created",
+                "Customer",
+                null,
+                JsonSerializer.Serialize(c)
+            );
 
             return new CustomerResponseDto
             {
                 CustomerId = c.CustomerId,
-                //FullName = c.FullName,
                 FirstName = c.FirstName,
                 SurName = c.SurName,
                 MiddleName = c.MiddleName,
@@ -82,11 +96,14 @@ namespace CRM.Server.Services
             };
         }
 
-        public async Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto)
+        // UPDATE with old/new audit
+        public async Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto, string performedByUserId)
         {
             var c = await _repo.GetByIdAsync(id);
             if (c is null) return false;
-            //c.FullName = dto.FullName;
+
+            var oldValue = JsonSerializer.Serialize(c);
+
             c.FirstName = dto.FirstName;
             c.SurName = dto.SurName;
             c.MiddleName = dto.MiddleName;
@@ -94,17 +111,45 @@ namespace CRM.Server.Services
             c.Email = dto.Email;
             c.Phone = dto.Phone;
             c.Address = dto.Address;
+
             await _repo.UpdateAsync(c);
+
+            var newValue = JsonSerializer.Serialize(c);
+
+            await SafeAudit(
+                performedByUserId,
+                c.CustomerId.ToString(),
+                "Customer Updated",
+                "Customer",
+                oldValue,
+                newValue
+            );
+
             return true;
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        // DELETE with audit
+        public async Task<bool> DeleteAsync(Guid id, string performedByUserId)
         {
             var c = await _repo.GetByIdAsync(id);
             if (c is null) return false;
+
+            var oldValue = JsonSerializer.Serialize(c);
+
             await _repo.DeleteAsync(c);
+
+            await SafeAudit(
+                performedByUserId,
+                c.CustomerId.ToString(),
+                "Customer Deleted",
+                "Customer",
+                oldValue,
+                null
+            );
+
             return true;
         }
+
         public async Task<List<CustomerResponseDto>> FilterAsync(
             string? name,
             string? email,
@@ -114,7 +159,6 @@ namespace CRM.Server.Services
         {
             var customers = await _repo.GetAllAsync();
 
-            // Filter by name across FullName, MiddleName, PreferredName, SurName
             if (!string.IsNullOrWhiteSpace(name))
             {
                 name = name.Trim();
@@ -123,7 +167,7 @@ namespace CRM.Server.Services
                         (!string.IsNullOrEmpty(c.FirstName) &&
                             c.FirstName.Contains(name, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.SurName) &&
-                            c.SurName.Contains(name, StringComparison.OrdinalIgnoreCase))||
+                            c.SurName.Contains(name, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.MiddleName) &&
                             c.MiddleName.Contains(name, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.PreferredName) &&
@@ -158,7 +202,6 @@ namespace CRM.Server.Services
                     .ToList();
             }
 
-            // Global search across all main fields
             if (!string.IsNullOrWhiteSpace(search))
             {
                 search = search.Trim();
@@ -169,7 +212,7 @@ namespace CRM.Server.Services
                         (!string.IsNullOrEmpty(c.MiddleName) &&
                             c.MiddleName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.SurName) &&
-                            c.SurName.Contains(search, StringComparison.OrdinalIgnoreCase))||
+                            c.SurName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.PreferredName) &&
                             c.PreferredName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(c.Email) &&
@@ -186,7 +229,7 @@ namespace CRM.Server.Services
                 {
                     CustomerId = c.CustomerId,
                     FirstName = c.FirstName,
-                    SurName=c.SurName,
+                    SurName = c.SurName,
                     MiddleName = c.MiddleName,
                     PreferredName = c.PreferredName,
                     Email = c.Email,
@@ -198,5 +241,32 @@ namespace CRM.Server.Services
                 .ToList();
         }
 
+        // SAFE AUDIT helper
+        private async Task SafeAudit(
+            string? performedByUserId,
+            string? targetId,
+            string action,
+            string entityName,
+            string? oldValue,
+            string? newValue)
+        {
+            try
+            {
+                await _auditLogService.LogAsync(
+                    performedByUserId,
+                    targetId,
+                    action,
+                    entityName,
+                    true,
+                    null,
+                    oldValue,
+                    newValue
+                );
+            }
+            catch
+            {
+                // swallow - auditing must not break main flow
+            }
+        }
     }
 }

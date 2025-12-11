@@ -13,14 +13,27 @@ namespace CRM.Server.Services
             _auditRepository = auditRepository;
         }
 
-        public async Task LogAsync(string userId, string action, string? oldValue = null, string? newValue = null)
+        public async Task LogAsync(
+            string? performedByUserId,
+            string? targetUserId,
+            string action,
+            string entityName,
+            bool isSuccess,
+            string? ipAddress = null,
+            string? oldValue = null,
+            string? newValue = null)
         {
             var log = new AuditLog
             {
-                UserId = userId,
+                PerformedByUserId = performedByUserId,
+                TargetUserId = targetUserId,
                 Action = action,
+                EntityName = entityName,
+                IsSuccess = isSuccess,
+                IpAddress = ipAddress,
                 OldValue = oldValue,
-                NewValue = newValue
+                NewValue = newValue,
+                CreatedAt = DateTime.UtcNow
             };
 
             await _auditRepository.AddAsync(log);

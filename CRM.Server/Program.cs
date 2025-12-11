@@ -242,7 +242,7 @@ app.UseCors("LocalDev");
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // ✅ Audit logging middleware
-app.UseMiddleware<AuditLogMiddleware>();
+//app.UseMiddleware<AuditLogMiddleware>();
 
 // ✅ JWT Authentication & Authorization (ORDER MATTERS)
 app.UseAuthentication();

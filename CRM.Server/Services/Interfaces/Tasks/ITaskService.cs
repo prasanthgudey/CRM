@@ -4,10 +4,15 @@ namespace CRM.Server.Services
 {
     public interface ITaskService
     {
-        IEnumerable<TaskResponseDto> GetAll(TaskFilterDto? filter = null);
-        TaskResponseDto? GetById(Guid id);
-        TaskResponseDto Create(CreateTaskDto dto);
-        TaskResponseDto Update(Guid id, UpdateTaskDto dto);
-        void Delete(Guid id);
+        Task<IEnumerable<TaskResponseDto>> GetAllAsync(TaskFilterDto? filter = null);
+
+        Task<TaskResponseDto?> GetByIdAsync(Guid id);
+
+        // ✅ Audit-enabled signatures
+        Task<TaskResponseDto> CreateAsync(CreateTaskDto dto, string performedByUserId);
+
+        Task<TaskResponseDto> UpdateAsync(Guid id, UpdateTaskDto dto, string performedByUserId);
+
+        Task DeleteAsync(Guid id, string performedByUserId);
     }
 }
