@@ -63,7 +63,7 @@ namespace CRM.Server.Controllers
             if (user == null)
             {
                 await SafeAudit(null, "Login Failed", "Authentication", false, ip,
-                    null, $"Invalid email: {dto.Email}");
+                    null, null);
 
                 return Unauthorized("Invalid credentials");
             }
@@ -71,7 +71,7 @@ namespace CRM.Server.Controllers
             if (!user.IsActive)
             {
                 await SafeAudit(user.Id, "Login Failed", "Authentication", false, ip,
-                    null, "Account is deactivated");
+                    null,null);
 
                 return Unauthorized("Account is deactivated");
             }
@@ -80,7 +80,7 @@ namespace CRM.Server.Controllers
             if (!isValid)
             {
                 await SafeAudit(user.Id, "Login Failed", "Authentication", false, ip,
-                    null, "Invalid password");
+                    null, null);
 
                 return Unauthorized("Invalid credentials");
             }
@@ -100,7 +100,7 @@ namespace CRM.Server.Controllers
             {
                 // Audit the expired-login attempt (use existing SafeAudit helper)
                 await SafeAudit(user.Id, "Login Failed - Password Expired", "Authentication", false, ip,
-                    null, "Password expired");
+                    null, null);
 
                 // Return 403 with a clear payload the client can detect
                 return StatusCode(403, new { error = "password_expired", message = "Password expired. Please change your password." });
@@ -166,14 +166,14 @@ namespace CRM.Server.Controllers
                 await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(stored.UserId);
                 try { await _userSessionService.RevokeAllSessionsForUserAsync(stored.UserId); } catch { /* swallow */ }
 
-                await SafeAudit(stored.UserId, "Refresh Token Reuse Detected", "Authentication", false, ip, null, null);
+                //await SafeAudit(stored.UserId, "Refresh Token Reuse Detected", "Authentication", false, ip, null, null);
                 return Unauthorized(new { error = "invalid_token" });
             }
 
             // 3) If token expired -> deny
             if (stored.ExpiresAt <= DateTime.UtcNow)
             {
-                await SafeAudit(stored.UserId, "Refresh Token Expired", "Authentication", false, ip, null, null);
+                //await SafeAudit(stored.UserId, "Refresh Token Expired", "Authentication", false, ip, null, null);
                 return Unauthorized(new { error = "expired_token" });
             }
 
@@ -208,7 +208,7 @@ namespace CRM.Server.Controllers
                 // Defensive action: revoke all refresh tokens for the user and deny
                 await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(stored.UserId);
                 await _userSessionService.RevokeAllSessionsForUserAsync(stored.UserId);
-                await SafeAudit(stored.UserId, "Refresh Token - Missing Session", "Authentication", false, ip, null, null);
+                //await SafeAudit(stored.UserId, "Refresh Token - Missing Session", "Authentication", false, ip, null, null);
                 return Unauthorized(new { error = "invalid_token" });
             }
 
@@ -244,7 +244,7 @@ namespace CRM.Server.Controllers
                 returnedRefreshExpires = stored.ExpiresAt;
             }
 
-            await SafeAudit(user.Id, "Refresh Token Used", "Authentication", true, ip, null, null);
+            //await SafeAudit(user.Id, "Refresh Token Used", "Authentication", true, ip, null, null);
 
             return Ok(new AuthResponseDto
             {
@@ -269,7 +269,7 @@ namespace CRM.Server.Controllers
             if (user == null)
             {
                 await SafeAudit(null, "MFA Login Failed", "Authentication", false, ip,
-                    null, "Invalid email");
+                    null, null);
 
                 return Unauthorized("Invalid credentials");
             }
@@ -277,7 +277,7 @@ namespace CRM.Server.Controllers
             if (!user.IsActive)
             {
                 await SafeAudit(user.Id, "MFA Login Failed", "Authentication", false, ip,
-                    null, "Account is deactivated");
+                    null, null);
 
                 return Unauthorized("Account is deactivated");
             }
@@ -290,7 +290,7 @@ namespace CRM.Server.Controllers
             if (!isValid)
             {
                 await SafeAudit(user.Id, "MFA Login Failed", "Authentication", false, ip,
-                    null, "Invalid MFA code");
+                    null, null);
 
                 return Unauthorized("Invalid verification code");
             }
@@ -312,7 +312,7 @@ namespace CRM.Server.Controllers
 
             await _userSessionService.LinkRefreshTokenToSessionAsync(session.Id, refresh.Id);
 
-            await SafeAudit(user.Id, "MFA Login Success", "Authentication", true, ip, null, user.Email);
+            await SafeAudit(user.Id, "MFA Login Success", "Authentication", true, ip, null, null);
 
             return Ok(new AuthResponseDto
             {
@@ -344,7 +344,7 @@ namespace CRM.Server.Controllers
                 await _userService.ForgotPasswordAsync(dto.Email);
 
                 // Audit the request (do not include whether user existed)
-                await SafeAudit(null, "Forgot Password Requested", "Authentication", true, ip, null, dto.Email);
+                //await SafeAudit(null, "Forgot Password Requested", "Authentication", true, ip, null, dto.Email);
 
                 // Generic response
                 return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
@@ -352,7 +352,7 @@ namespace CRM.Server.Controllers
             catch (Exception ex)
             {
                 // Audit failure but still return same generic message to avoid leaking info
-                try { await SafeAudit(null, "Forgot Password Failed", "Authentication", false, ip, null, ex.Message); } catch { }
+                //try { await SafeAudit(null, "Forgot Password Failed", "Authentication", false, ip, null, ex.Message); } catch { }
 
                 return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
             }
@@ -375,7 +375,7 @@ namespace CRM.Server.Controllers
                 var user = await _userManager.FindByEmailAsync(dto.Email);
                 if (user == null)
                 {
-                    await SafeAudit(null, "Password Reset Failed", "Authentication", false, ip, null, "User not found after reset");
+                    await SafeAudit(null, "Password Reset Failed", "Authentication", false, ip, null, null);
                     // Return generic message
                     return BadRequest(new { error = "invalid_request", message = "Could not complete request." });
                 }
@@ -421,7 +421,7 @@ namespace CRM.Server.Controllers
             catch (Exception ex)
             {
                 // Audit failure (do not reveal details to client)
-                try { await SafeAudit(null, "Password Reset Failed", "Authentication", false, ip, null, ex.Message); } catch { }
+                try { await SafeAudit(null, "Password Reset Failed", "Authentication", false, ip, null, null); } catch { }
 
                 // Generic error response to avoid token/username enumeration or leaking internal errors
                 return BadRequest(new { error = "invalid_request", message = "Invalid token or request." });
@@ -519,7 +519,7 @@ namespace CRM.Server.Controllers
                 var user = await _userManager.FindByEmailAsync(dto.Email);
                 if (user == null)
                 {
-                    await SafeAudit(null, "Password Change Failed (Expired Flow)", "Authentication", false, ip, null, "User not found after change");
+                    await SafeAudit(null, "Password Change Failed (Expired Flow)", "Authentication", false, ip, null,null);
                     return BadRequest(new { error = "invalid_request", message = "Could not complete request." });
                 }
 
@@ -556,7 +556,7 @@ namespace CRM.Server.Controllers
             catch (Exception ex)
             {
                 // Audit failure / invalid credentials
-                await SafeAudit(null, "Password Change Failed (Expired Flow)", "Authentication", false, ip, null, ex.Message);
+                await SafeAudit(null, "Password Change Failed (Expired Flow)", "Authentication", false, ip, null, null);
 
                 // Return a generic message to avoid user enumeration
                 return BadRequest(new { error = "invalid_request", message = "Invalid credentials or request." });
