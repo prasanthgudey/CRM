@@ -1,6 +1,7 @@
 ﻿@page "/admin/audit-log"
 @layout MainLayout
-
+@attribute [Authorize(Roles ="Admin")]
+@using Microsoft.AspNetCore.Authorization
 @using System.Text.Json
 @using CRM.Client.Components.Layout
 @using CRM.Client.Components.Modals.CustomerModals

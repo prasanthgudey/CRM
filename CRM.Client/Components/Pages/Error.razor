@@ -1,5 +1,6 @@
 ﻿@page "/Error"
 @using System.Diagnostics
+@inject NavigationManager Navigation
 
 <PageTitle>Error</PageTitle>
 
@@ -24,13 +25,49 @@
     and restarting the app.
 </p>
 
-@code{
-    [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
-
+@code {
     private string? RequestId { get; set; }
     private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 
-    protected override void OnInitialized() =>
-        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    protected override void OnInitialized()
+    {
+        // Try 1: requestId from query string (e.g. /Error?requestId=abc)
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = uri.Query; // like "?requestId=abc"
+        if (!string.IsNullOrEmpty(query))
+        {
+            RequestId = ParseQueryStringValue(query, "requestId");
+        }
+
+        // Try 2: fallback to Activity.Current if present (may be null in WASM)
+        if (string.IsNullOrEmpty(RequestId))
+        {
+            RequestId = Activity.Current?.Id;
+        }
+    }
+
+    // Minimal query-string parser (no extra packages required)
+    private static string? ParseQueryStringValue(string query, string key)
+    {
+        // query expected like "?a=1&b=2"
+        if (string.IsNullOrEmpty(query) || string.IsNullOrEmpty(key))
+            return null;
+
+        var trimmed = query.StartsWith("?") ? query.Substring(1) : query;
+        var pairs = trimmed.Split('&', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var pair in pairs)
+        {
+            var idx = pair.IndexOf('=');
+            if (idx <= 0) continue;
+
+            var k = Uri.UnescapeDataString(pair.Substring(0, idx));
+            if (!string.Equals(k, key, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var v = pair.Length > idx + 1 ? Uri.UnescapeDataString(pair.Substring(idx + 1)) : string.Empty;
+            return v;
+        }
+
+        return null;
+    }
 }

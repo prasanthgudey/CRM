@@ -71,7 +71,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("LocalDev", policy =>
     {
-        policy.WithOrigins("https://localhost:7035")   // ✅ Blazor Client URL
+        policy.WithOrigins("https://localhost:7149")   // ✅ Blazor Client URL
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

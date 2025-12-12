@@ -1,0 +1,90 @@
+﻿@namespace CRM.Client
+@using CRM.Client.Components.Layout
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <div class="m-3">
+                        <div class="alert alert-info" role="alert">
+                            Checking authentication...
+                        </div>
+                    </div>
+                </Authorizing>
+
+                <NotAuthorized>
+                    <div class="m-3">
+                        <div class="alert alert-warning" role="alert">
+                            Please login to access the application.
+                        </div>
+
+                        <!-- Provide a visible link/button so user can immediately go to login -->
+                        <div class="mt-2">
+                            <a class="btn btn-primary" href="/login">Go to Login</a>
+                        </div>
+
+                        <!-- Attempt an automatic redirect once so the UX is smooth.
+                             This renders the tiny RedirectToLogin component below which will
+                             navigate only on first render. -->
+                        <RedirectToLogin DelayMs="800" />
+                    </div>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    // Small helper component embedded here:
+    // - waits a short time (milliseconds) then navigates to /login on first render.
+    // - DelayMs can be set (default 800ms) so user sees the alert briefly.
+    // This avoids navigation loops and keeps the UX clear.
+    public sealed class RedirectToLogin : Microsoft.AspNetCore.Components.ComponentBase
+    {
+        [Microsoft.AspNetCore.Components.Parameter]
+        public int DelayMs { get; set; } = 800;
+
+        [Microsoft.AspNetCore.Components.Inject]
+        public NavigationManager Nav { get; set; } = default!;
+
+        private bool _navigated;
+
+        protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender && !_navigated)
+            {
+                _navigated = true;
+                try
+                {
+                    // small delay so user sees the message
+                    if (DelayMs > 0)
+                        await System.Threading.Tasks.Task.Delay(DelayMs);
+
+                    // go to /login (force reload false so SPA navigation used)
+                    Nav.NavigateTo("/login");
+                }
+                catch
+                {
+                    // ignore navigation errors
+                }
+            }
+        }
+
+        // render nothing (just a behavioral component)
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+        }
+    }
+}

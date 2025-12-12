@@ -31,25 +31,29 @@ namespace CRM.Client.Services.Http
         private readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
 
         public ApiClientService(
-            HttpClient httpClient,
-            IOptions<ApiSettings> apiOptions,
-            AppState appState,
-            TokenService tokenService,
-            JwtAuthStateProvider jwtAuthStateProvider,
-            NavigationManager navigationManager)
+      HttpClient httpClient,
+      ApiSettings apiSettings,           // <- direct
+      AppState appState,
+      TokenService tokenService,
+      JwtAuthStateProvider jwtAuthStateProvider,
+      NavigationManager navigationManager)
         {
-            _httpClient = httpClient;
-            _apiSettings = apiOptions.Value;
-            _appState = appState;
-            _tokenService = tokenService;
-            _jwtAuthStateProvider = jwtAuthStateProvider;
-            _navigation = navigationManager;
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _apiSettings = apiSettings ?? throw new ArgumentNullException(nameof(apiSettings));
+            _appState = appState ?? throw new ArgumentNullException(nameof(appState));
+            _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
+            _jwtAuthStateProvider = jwtAuthStateProvider ?? throw new ArgumentNullException(nameof(jwtAuthStateProvider));
+            _navigation = navigationManager ?? throw new ArgumentNullException(nameof(navigationManager));
 
-            _httpClient.BaseAddress = new Uri(_apiSettings.BaseUrl);
+            if (string.IsNullOrWhiteSpace(_apiSettings.BaseUrl))
+                throw new InvalidOperationException("ApiSettings.BaseUrl is not configured. Add it to wwwroot/appsettings.json");
+
+            var baseUrl = _apiSettings.BaseUrl.EndsWith("/") ? _apiSettings.BaseUrl : _apiSettings.BaseUrl + "/";
+            _httpClient.BaseAddress = new Uri(baseUrl);
             _httpClient.Timeout = TimeSpan.FromSeconds(_apiSettings.TimeoutSeconds);
-
-            Console.WriteLine($"[HTTP INIT] BaseUrl = {_httpClient.BaseAddress}");
         }
+
+
 
         // -------------------------
         // Attach token (restore if needed)

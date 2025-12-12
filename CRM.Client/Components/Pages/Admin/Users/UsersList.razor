@@ -1,10 +1,12 @@
 ﻿@page "/admin/users"
 @layout MainLayout
+@attribute [Authorize]
 
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Components.Layout
 @using CRM.Client.Services.Users
 @using CRM.Client.Components.Modals.UserModals
+@using Microsoft.AspNetCore.Authorization
 
 @inject UserService UserService
 @inject IJSRuntime JSRuntime      // new code - SweetAlert

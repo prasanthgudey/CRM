@@ -1,0 +1,21 @@
+﻿@inject CRM.Client.Security.JwtAuthStateProvider JwtProvider
+
+@code {
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            try
+            {
+                await JwtProvider.InitializeAsync();
+            }
+            catch
+            {
+                // ignore, auth will remain anonymous
+            }
+        }
+    }
+}

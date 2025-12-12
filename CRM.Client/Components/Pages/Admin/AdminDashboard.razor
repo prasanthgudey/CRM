@@ -1,5 +1,7 @@
 ﻿
 @page "/admin/dashboard"
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Authorization
 @using System.Linq
 @using CRM.Client.Services.Tasks
 @using CRM.Client.Services.Customers

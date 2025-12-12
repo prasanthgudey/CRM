@@ -1,31 +1,44 @@
-﻿@inherits LayoutComponentBase
+﻿@using CRM.Client.Components.Pages.Authentication
+@using Microsoft.AspNetCore.Components.Authorization
+@inherits LayoutComponentBase
+
 @inject IJSRuntime JSRuntime
-@using CRM.Client.Components.Navigation
 @using CRM.Client.State
 @inject AppState AppState
+@* @using CRM.Client.Components.Pages.Authentication *@
+@using CRM.Client.Components.Navigation
+
+@inject IJSRuntime JSRuntime
+@inject AppState AppState
+@inject CRM.Client.Security.JwtAuthStateProvider JwtProvider
+
+<InitializeAuth />
 
 <div class="main-layout">
 
-    <!-- GLOBAL UI ALERT (TOP) -->
+    <!-- GLOBAL ALERT -->
     @if (!string.IsNullOrWhiteSpace(AppState.Ui.GlobalMessage))
     {
         <div class="container mt-2">
-            <div class="alert @GetAlertClass(AppState.Ui.GlobalMessageType) alert-dismissible fade show d-flex justify-content-between align-items-center" role="alert">
+            <div class="alert @GetAlertClass(AppState.Ui.GlobalMessageType) alert-dismissible fade show d-flex justify-content-between">
                 <div>
                     <strong>@(AppState.Ui.GlobalMessageType?.ToUpper() ?? "NOTICE")</strong>
                     <div>@AppState.Ui.GlobalMessage</div>
                 </div>
-                <div>
-                    <button type="button" class="btn-close" aria-label="Close" @onclick="ClearGlobalMessage"></button>
-                </div>
+                <button type="button" class="btn-close" @onclick="ClearGlobalMessage"></button>
             </div>
         </div>
     }
 
     <div class="page">
-        <div class="sidebar">
-            <NavMenu />
-        </div>
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="sidebar">
+                    <NavMenu />
+                </div>
+            </Authorized>
+        </AuthorizeView>
 
         <main>
             <Topbar />
@@ -34,43 +47,16 @@
                 @Body
             </article>
         </main>
+
     </div>
 
 </div>
 
-<div id="blazor-error-ui">
-    An unhandled error has occurred.
-    <a href="" class="reload">Reload</a>
-    <a class="dismiss">🗙</a>
-</div>
-
-
-
-@* SweetAlert2 *@
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
-<script src="js/alertHelper.js"></script>
-
 @code {
-    protected override void OnInitialized()
-    {
-        // Subscribe to UiState change notifications so layout re-renders
-        AppState.Ui.OnChange += UiStateChanged;
-    }
+    private void ClearGlobalMessage() => AppState.Ui.ClearGlobalMessage();
 
-    private void UiStateChanged()
-    {
-        // this executes on the sync context; ensure UI update
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void ClearGlobalMessage()
-    {
-        AppState.Ui.ClearGlobalMessage();
-    }
-
-    private string GetAlertClass(string? level)
-    {
-        return level switch
+    private string GetAlertClass(string? level) =>
+        level switch
         {
             "success" => "alert-success",
             "warning" => "alert-warning",
@@ -78,23 +64,13 @@
             "info" => "alert-info",
             _ => "alert-info"
         };
-    }
 
-    public void Dispose()
+    protected override void OnInitialized()
     {
-        // Unsubscribe to avoid leaks
-        AppState.Ui.OnChange -= UiStateChanged;
+        AppState.Ui.OnChange += UiStateChanged;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Initialize after render so JSInterop won't break
-            await JSRuntime.InvokeVoidAsync("console.log", "SweetAlert ready");  // optional debug
+    private void UiStateChanged() => InvokeAsync(StateHasChanged);
 
-            // No need to call initAlerts anymore since crmAlerts is already defined
-            // If you use initAlerts(), then add a function inside script
-        }
-    }
-} 
+    public void Dispose() => AppState.Ui.OnChange -= UiStateChanged;
+}
