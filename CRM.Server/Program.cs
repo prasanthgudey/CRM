@@ -1,4 +1,5 @@
-﻿using CRM.Server.Data;
+﻿
+using CRM.Server.Data;
 using CRM.Server.Middleware;
 using CRM.Server.Models;
 using CRM.Server.Repositories;
@@ -205,6 +206,9 @@ builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ISearchRepository, SearchRepository>();
+builder.Services.AddScoped<ISearchService, SearchService>();
+
 
 
 // ✅ Services
@@ -217,6 +221,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<IUserSessionService, UserSessionService>();
+
 
 // =========================
 // ✅ BUILD APPLICATION

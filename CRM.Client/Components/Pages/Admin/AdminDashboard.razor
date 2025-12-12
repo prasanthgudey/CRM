@@ -1,0 +1,447 @@
+﻿
+@page "/admin/dashboard"
+@using System.Linq
+@using CRM.Client.Services.Tasks
+@using CRM.Client.Services.Customers
+@using CRM.Client.Services.Audit
+@inject TaskService TaskService
+@inject CustomerService CustomerService
+@inject AuditService AuditService
+@inject NavigationManager Navigation
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12 mb-3">
+            <h1 class="h3">Welcome, Admin</h1>
+            <p class="text-muted">Role-specific widgets and analytics</p>
+        </div>
+    </div>
+
+    <!-- Top cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-3">
+            <div class="card shadow-sm dashboard-card primary-card">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <small class="text-white-50">Tasks</small>
+                            <h3 class="mb-0">@TasksCount</h3>
+                        </div>
+                        <div class="icon-circle bg-white-20">
+                            <i class="bi bi-check2-circle fs-3 text-white"></i>
+                        </div>
+                    </div>
+                    <div class="mt-auto">
+                        <small class="text-white-50">Open tasks</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-md-3">
+            <div class="card shadow-sm dashboard-card light-card">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">Customers</small>
+                        <h4 class="mb-0">@CustomersCount</h4>
+                    </div>
+                    <div class="icon-circle bg-muted">
+                        <i class="bi bi-people fs-4 text-muted"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-md-3">
+            <div class="card shadow-sm dashboard-card accent-card"
+                 @onclick="NavigateToAuditLogs"
+                 style="cursor:pointer">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">Audit Logs</small>
+                        <h4 class="mb-0">@AuditCount</h4>
+                    </div>
+
+                    <div class="icon-circle bg-accent">
+                        <i class="bi bi-journal-text fs-4 text-accent"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-md-3">
+            <div class="card shadow-sm dashboard-card alt-card">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">Analytics</small>
+                        <h4 class="mb-0">@AnalyticsMetric</h4>
+                    </div>
+                    <div class="icon-circle bg-muted">
+                        <i class="bi bi-graph-up fs-4 text-muted"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main panels -->
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Tasks</h5>
+                    <div class="table-responsive">
+                        <table class="table table-borderless align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Due</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (RecentTasks is null)
+                                {
+                                    <tr><td colspan="3">Loading...</td></tr>
+                                }
+                                else if (!RecentTasks.Any())
+                                {
+                                    <tr><td colspan="3">No tasks found</td></tr>
+                                }
+                                else
+                                {
+                                    @foreach (var t in RecentTasks)
+                                    {
+                                        <tr>
+                                            <td>@t.Title</td>
+                                            <td class="text-center">@t.Status</td>
+                                            <td class="text-end">@t.DueDate?.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Audit Logs -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="card-title mb-0">Recent Audit Logs</h5>
+                        <a class="small" href="/admin/audit-log">View all</a>
+                    </div>
+
+                    @if (RecentAudits is null)
+                    {
+                        <div>Loading...</div>
+                    }
+                    else if (!RecentAudits.Any())
+                    {
+                        <div>No audit events</div>
+                    }
+                    else
+                    {
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var a in RecentAudits)
+                            {
+                                <li class="py-2 border-bottom">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <strong>@a.Action</strong> &middot; <small class="text-muted">@a.EntityName</small>
+                                            <div class="text-muted small">@a.PerformedByUserId ?? "System"</div>
+                                        </div>
+                                        <div class="text-muted small">@a.CreatedAt.ToLocalTime().ToString("g")</div>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Tasks Due (last 8 months)</h5>
+                    <div class="chart-placeholder mt-3">
+                        <svg viewBox="0 0 300 140" width="100%" height="140" preserveAspectRatio="none">
+                            <rect x="0" y="0" width="100%" height="100%" fill="#f7fafc"></rect>
+                            <polyline points="@ChartPoints" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            @foreach (var p in ChartDots)
+                            {
+                                <circle cx="@p.X" cy="@p.Y" r="3.5" fill="#4f46e5">
+                                    <title>@(GetTooltipForPoint(p))</title>
+                                </circle>
+                            }
+                        </svg>
+
+                        @* month labels below svg *@
+                        @if (MonthLabels?.Any() == true)
+                        {
+                            <div class="d-flex justify-content-between mt-2 small text-muted" style="font-size: 0.85rem;">
+                                @foreach (var lbl in MonthLabels)
+                                {
+                                    <div style="width: calc(100% / @MonthLabels.Count); text-align:center;">@lbl</div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-3">
+                        <div>
+                            <small class="text-muted">This month</small>
+                            <div class="fw-bold">@MonthChangeText</div>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">Revenue</small>
+                            <div class="fw-bold">$34.2k</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- small stats -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="mb-3">Quick Stats</h6>
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <small class="text-muted">Open Tasks</small>
+                            <div class="fw-bold">@OpenTasksCount</div>
+                        </div>
+                        <div>
+                            <small class="text-muted">New Customers</small>
+                            <div class="fw-bold">@NewCustomersCount</div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Errors</small>
+                            <div class="fw-bold text-danger">@RecentErrorsCount</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private int TasksCount;
+    private int CustomersCount;
+    private int AuditCount;
+    private string AnalyticsMetric = "Analytics";
+    private int OpenTasksCount;
+    private int NewCustomersCount;
+    private int RecentErrorsCount = 0;
+
+    private List<TaskItemDto>? RecentTasks;
+    private List<AuditLogDto>? RecentAudits;
+
+    private string ChartPoints = "";
+    private List<(double X, double Y)> ChartDots = new();
+    private List<string> MonthLabels = new();
+    private List<int> ChartValues = new();
+    private string MonthChangeText = "";
+
+    private System.Threading.Timer? _refreshTimer;
+    private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(15); // poll every 15 seconds
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardAsync();
+
+        // start a simple polling timer so the dashboard updates when backend changes (use SignalR for real-time in future)
+        _refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            try
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadDashboardAsync(updateOnly: true);
+                    StateHasChanged();
+                });
+            }
+            catch
+            {
+                // swallow - dashboard should not crash the UI on polling failures
+            }
+        }, null, _refreshInterval, _refreshInterval);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _refreshTimer?.Dispose();
+    }
+
+    private async Task LoadDashboardAsync(bool updateOnly = false)
+    {
+        try
+        {
+            // Top-level counts (these should come from your services)
+            TasksCount = await TaskService.GetTotalCountAsync();
+            CustomersCount = await CustomerService.GetTotalCountAsync();
+            AuditCount = await AuditService.GetTotalCountAsync();
+
+            OpenTasksCount = await TaskService.GetOpenCountAsync();
+            NewCustomersCount = await CustomerService.GetNewCountAsync(7);
+
+
+            // Recent lists
+            // RecentTasks = await TaskService.GetRecentTasksAsync(50);
+            // RecentAudits = await AuditService.GetRecentAsync(6);
+
+            // build chart from real data
+            BuildChart(RecentTasks ?? new List<TaskItemDto>());
+
+            // compute small metric for "This month"
+            ComputeMonthChangeText();
+
+            if (!updateOnly)
+            {
+                // if full load, force render
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load dashboard data: {ex.Message}");
+            // keep previous values if any
+            RecentTasks ??= new List<TaskItemDto>();
+            RecentAudits ??= new List<AuditLogDto>();
+        }
+    }
+
+    void BuildChart(List<TaskItemDto>? tasks)
+    {
+        var list = tasks ?? new List<TaskItemDto>();
+
+        const int months = 8;
+        var now = DateTime.UtcNow;
+
+        // build month buckets from oldest -> newest
+        var buckets = new List<DateTime>();
+        for (int i = months - 1; i >= 0; i--)
+        {
+            var dt = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
+            buckets.Add(dt);
+        }
+
+        // Count tasks per bucket using DueDate if present; otherwise ignore
+        var values = new List<int>();
+        foreach (var bucket in buckets)
+        {
+            var start = bucket;
+            var end = bucket.AddMonths(1);
+            var count = list.Count(t => t.DueDate.HasValue
+                                        && t.DueDate.Value.ToUniversalTime() >= start
+                                        && t.DueDate.Value.ToUniversalTime() < end);
+            values.Add(count);
+        }
+
+        // avoid degenerate graph
+        if (values.All(v => v == 0))
+        {
+            // try to show recent tasks count if any
+            if (list.Any())
+            {
+                // spread total across months
+                var avg = Math.Max(1, list.Count / months);
+                values = Enumerable.Repeat(avg, months).ToList();
+            }
+            else
+            {
+                values = Enumerable.Repeat(1, months).ToList();
+            }
+        }
+
+        ChartValues = values;
+
+        // SVG drawing area (must match viewbox)
+        var width = 300.0;
+        var height = 140.0;
+        var margin = 10.0;
+        var innerWidth = width - margin * 2;
+        var innerHeight = height - margin * 2;
+
+        var max = values.Max();
+        var normalized = values.Select(v => max == 0 ? 0.0 : (double)v / max).ToList();
+
+        var points = new List<string>();
+        ChartDots = new List<(double X, double Y)>();
+
+        var step = innerWidth / (months - 1);
+        for (int i = 0; i < months; i++)
+        {
+            var x = margin + i * step;
+            var y = margin + innerHeight * (1.0 - normalized[i]);
+            points.Add($"{x},{y}");
+            ChartDots.Add((x, y));
+        }
+
+        ChartPoints = string.Join(" ", points);
+        MonthLabels = buckets.Select(d => d.ToString("MMM")).ToList();
+    }
+
+    private void ComputeMonthChangeText()
+    {
+        if (ChartValues == null || ChartValues.Count < 2)
+        {
+            MonthChangeText = "0%";
+            return;
+        }
+
+        var last = ChartValues.Last();
+        var prev = ChartValues.Count >= 2 ? ChartValues[ChartValues.Count - 2] : 0;
+
+        if (prev == 0)
+        {
+            MonthChangeText = last == 0 ? "0%" : "+100%";
+            return;
+        }
+
+        var change = (double)(last - prev) / prev * 100.0;
+        MonthChangeText = change >= 0 ? $"+{change:0.0}%" : $"{change:0.0}%";
+    }
+
+    // tooltip helper shows month label + task count
+    private string GetTooltipForPoint((double X, double Y) p)
+    {
+        // find nearest index by X coord
+        var idx = ChartDots.FindIndex(d => Math.Abs(d.X - p.X) < 0.1);
+        if (idx >= 0 && idx < MonthLabels.Count && idx < ChartValues.Count)
+        {
+            var label = MonthLabels[idx];
+            var count = ChartValues[idx];
+            return $"{label}: {count} tasks";
+        }
+        return string.Empty;
+    }
+
+    // Local DTO shapes used only for UI binding. If your services expose the same types, remove these and import the shared types.
+    public class TaskItemDto
+    {
+        public Guid TaskId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime? DueDate { get; set; }
+    }
+
+    public class AuditLogDto
+    {
+        public int Id { get; set; }
+        public string? PerformedByUserId { get; set; }
+        public string Action { get; set; } = string.Empty;
+        public string EntityName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    // NEW: navigation handler (fixes Razor parsing error)
+    private void NavigateToAuditLogs()
+    {
+        Navigation.NavigateTo("/admin/audit-log");
+    }
+}
+

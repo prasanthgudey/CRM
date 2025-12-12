@@ -129,9 +129,17 @@ else
         }
     }
 
-    protected override async Task OnInitializedAsync()
+    // protected override async Task OnInitializedAsync()
+    // {
+    //     await LoadPage();
+    // }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await LoadPage();
+        if (firstRender)
+        {
+            await LoadPage();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadPage()

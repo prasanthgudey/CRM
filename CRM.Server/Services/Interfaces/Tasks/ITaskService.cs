@@ -16,6 +16,25 @@ namespace CRM.Server.Services
 
         Task DeleteAsync(Guid id, string performedByUserId);
 
+        // -------------------------
+        // Dashboard-friendly helpers
+        // -------------------------
+
+        /// <summary>
+        /// Returns total number of tasks.
+        /// </summary>
+        Task<int> GetTotalCountAsync();
+
+        /// <summary>
+        /// Returns number of open (not completed) tasks.
+        /// </summary>
+        Task<int> GetOpenCountAsync();
+
+        /// <summary>
+        /// Returns recent tasks for dashboards (ordered newest first).
+        /// </summary>
+        Task<List<TaskResponseDto>> GetRecentTasksAsync(int take = 50);
+
         //paginig
         Task<PagedResult<TaskResponseDto>> GetPagedAsync(PageParams parms);
     }

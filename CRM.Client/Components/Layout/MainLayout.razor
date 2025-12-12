@@ -44,7 +44,10 @@
     <a class="dismiss">🗙</a>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
+@* SweetAlert2 *@
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 <script src="js/alertHelper.js"></script>
 
 @code {
@@ -87,7 +90,11 @@
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("console.log", "SweetAlert ready");
+            // Initialize after render so JSInterop won't break
+            await JSRuntime.InvokeVoidAsync("console.log", "SweetAlert ready");  // optional debug
+
+            // No need to call initAlerts anymore since crmAlerts is already defined
+            // If you use initAlerts(), then add a function inside script
         }
     }
-}
+} *@

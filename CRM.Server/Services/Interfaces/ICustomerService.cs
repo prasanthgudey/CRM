@@ -22,6 +22,21 @@ namespace CRM.Server.Services.Interfaces
 
         Task<bool> DeleteAsync(Guid id, string performedByUserId);
 
+        // -------------------------
+        // NEW: Dashboard-friendly helpers
+        // -------------------------
+
+        /// <summary>
+        /// Returns total number of customers.
+        /// </summary>
+        Task<int> GetTotalCountAsync();
+
+        /// <summary>
+        /// Returns number of customers created within the last `days`.
+        /// </summary>
+        Task<int> GetNewCustomersCountAsync(int days = 7);
+
+
         Task<PagedResult<CustomerResponseDto>> GetPagedAsync(PageParams parms);
 
     }
