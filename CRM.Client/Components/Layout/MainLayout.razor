@@ -1,6 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime     // ⭐ required for initialization
-
+@inject CRM.Client.Security.JwtAuthStateProvider JwtAuthStateProvider
 
 @using CRM.Client.Components.Navigation
 
@@ -28,60 +28,17 @@
 @* SweetAlert2 *@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 <script src="js/alertHelper.js"></script>
-@* 
-<script>
-    // ⭐ SweetAlert helper functions
-    window.crmAlerts = {
-        showSuccess: function (message) {
-            Swal.fire({
-                icon: "success",
-                title: message,
-                width: "300px",
-                padding: "12px",
-                confirmButtonText: "OK",
-                customClass: { popup: 'small-alert' }
-            });
-        },
+@code {
+    private bool _initialized = false;
 
-        showError: function (message) {
-            Swal.fire({
-                icon: "error",
-                title: message,
-                width: "300px",
-                padding: "12px",
-                confirmButtonText: "OK",
-                customClass: { popup: 'small-alert' }
-            });
-        },
-
-        confirmDelete: async function (message) {
-            const result = await Swal.fire({
-                title: "Are you sure?",
-                text: message || "This action cannot be undone.",
-                icon: "warning",
-                width: "320px",
-                padding: "12px",
-                showCancelButton: true,
-                confirmButtonText: "Yes, delete",
-                cancelButtonText: "Cancel",
-                customClass: { popup: 'small-alert' }
-            });
-
-            return result.isConfirmed;
-        }
-    };
-</script>
-
-@code {                      // 🔥 Add this entire block below script
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !_initialized)
         {
-            // Initialize after render so JSInterop won't break
-            await JSRuntime.InvokeVoidAsync("console.log", "SweetAlert ready");  // optional debug
+            _initialized = true;
 
-            // No need to call initAlerts anymore since crmAlerts is already defined
-            // If you use initAlerts(), then add a function inside script
+            // ⭐ SAFE CLIENT-SIDE AUTH INITIALIZATION
+            await JwtAuthStateProvider.InitializeFromClientAsync();
         }
     }
-} *@
+}

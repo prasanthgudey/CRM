@@ -1,32 +1,26 @@
 ﻿@page "/tasks"
 @layout MainLayout
+@attribute [Authorize]
 
 @using CRM.Client.Components.Layout
 @using CRM.Client.DTOs.Tasks
-@using CRM.Client.DTOs.Shared
+@using CRM.Client.DTOs.Customers
+@using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Tasks
-@using CRM.Client.Services.Users
 @using CRM.Client.Services.Customers
+@using CRM.Client.Services.Users
 @using CRM.Client.Components.Modals.TaskModals
 @using CRM.Client.Components.Shared
+@using Microsoft.AspNetCore.Authorization
 
 @inject TaskService TaskService
-@inject UserService UserService
 @inject CustomerService CustomerService
+@inject UserService UserService
 
 <h3>Tasks</h3>
 
 <div class="mb-3 d-flex gap-2 align-items-center">
-    <button type="button" class="btn btn-primary" @onclick="OpenCreate">+ New Task</button>
-
-    <!-- REMOVED SEARCH FIELD -->
-    <!-- PageSize selector -->
-    <select class="form-select w-auto ms-2" @bind="PageSize">
-        <option value="5">5</option>
-        <option value="10">10</option>
-        <option value="20">20</option>
-        <option value="50">50</option>
-    </select>
+    <button class="btn btn-primary" @onclick="OpenCreate">+ New Task</button>
 </div>
 
 @if (IsLoading)
@@ -49,13 +43,15 @@ else
                 <th>Priority</th>
                 <th>Status</th>
                 <th>Recurring</th>
-                <th style="width:220px">Actions</th>
+                <th style="width:200px;">Actions</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var task in Tasks)
             {
-                <tr>
+                bool isPast = task.DueDate.Date < DateTime.Today;
+
+                <tr class="@((isPast ? "table-danger" : ""))">
                     <td>@task.Title</td>
                     <td>@GetCustomerName(task.CustomerId)</td>
                     <td>@GetUserName(task.UserId)</td>
@@ -75,8 +71,15 @@ else
                     </td>
 
                     <td>
-                        <button class="btn btn-light btn-sm me-2" @onclick="() => OpenEdit(task)">Edit</button>
-                        <button class="btn btn-danger btn-sm" @onclick="() => OpenDelete(task.TaskId)">Delete</button>
+                        <button class="btn btn-light btn-sm me-2"
+                                @onclick="() => OpenEdit(task)">
+                            Edit
+                        </button>
+
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => OpenDelete(task.TaskId)">
+                            Delete
+                        </button>
                     </td>
                 </tr>
             }
@@ -84,7 +87,7 @@ else
     </table>
 
     <Pager CurrentPage="@CurrentPage"
-           PageSize="@PageSize"
+           PageSize="10"
            TotalCount="@TotalCount"
            OnPageChanged="OnPageChanged" />
 }
@@ -103,75 +106,57 @@ else
     private bool IsDeleteOpen;
 
     private int CurrentPage = 1;
-    private int _pageSize = 20;
+    private const int PageSize = 10;   // 🔥 ALWAYS 10 per page
     private long TotalCount = 0;
 
     private bool IsLoading = true;
     private bool _clamping = false;
 
-    private readonly Dictionary<Guid, string> _customerNames = new();
-    private readonly Dictionary<string, string> _userNames = new(StringComparer.OrdinalIgnoreCase);
-
-    private int PageSize
-    {
-        get => _pageSize;
-        set
-        {
-            if (_pageSize == value) return;
-            _pageSize = value;
-            CurrentPage = 1;
-
-            _ = InvokeAsync(async () =>
-            {
-                await LoadPage();
-                StateHasChanged();
-            });
-        }
-    }
+    private Dictionary<Guid, string> CustomerNames = new();
+    private Dictionary<string, string> UserNames = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            var customers = await CustomerService.GetAllAsync();
-            if (customers != null)
-                foreach (var c in customers)
-                    _customerNames[c.CustomerId] = $"{c.FirstName} {c.SurName}".Trim();
-
-            var users = await UserService.GetAllUsersAsync();
-            if (users != null)
-                foreach (var u in users)
-                    _userNames[u.Id] = string.IsNullOrWhiteSpace(u.FullName) ? u.Email : $"{u.FullName} ({u.Email})";
-
+            await LoadLookups();
             await LoadPage();
             StateHasChanged();
         }
     }
 
-    private string GetCustomerName(Guid customerId)
+    private async Task LoadLookups()
     {
-        if (_customerNames.TryGetValue(customerId, out var name)) return name;
-        return customerId == Guid.Empty ? "-" : customerId.ToString();
+        var customers = await CustomerService.GetAllAsync();
+        if (customers != null)
+            foreach (var c in customers)
+                CustomerNames[c.CustomerId] = $"{c.FirstName} {c.SurName}".Trim();
+
+        var users = await UserService.GetAllUsersAsync();
+        if (users != null)
+            foreach (var u in users)
+                UserNames[u.Id] = string.IsNullOrWhiteSpace(u.FullName)
+                    ? u.Email
+                    : $"{u.FullName} ({u.Email})";
     }
 
-    private string GetUserName(string? userId)
-    {
-        if (string.IsNullOrWhiteSpace(userId)) return "-";
-        if (_userNames.TryGetValue(userId, out var name)) return name;
-        return userId;
-    }
+    private string GetCustomerName(Guid id) =>
+        CustomerNames.TryGetValue(id, out var n) ? n : "-";
+
+    private string GetUserName(string id) =>
+        UserNames.TryGetValue(id, out var n) ? n : "-";
 
     private void OpenCreate() => IsCreateOpen = true;
 
-    private void OpenEdit(TaskResponseDto task)
+    private void OpenEdit(TaskResponseDto t)
     {
-        SelectedTask = task;
+        SelectedTask = t;
         IsEditOpen = true;
     }
 
-    private void OpenDelete(Guid taskId)
+    private void OpenDelete(Guid id)
     {
-        SelectedTaskId = taskId;
+        SelectedTaskId = id;
         IsDeleteOpen = true;
     }
 
@@ -200,10 +185,9 @@ else
         IsLoading = true;
         StateHasChanged();
 
-        // SearchText REMOVED
-        var paged = await TaskService.GetPagedAsync(CurrentPage, PageSize);
+        var result = await TaskService.GetPagedAsync(CurrentPage, PageSize);
 
-        if (paged == null)
+        if (result == null)
         {
             Tasks = new();
             TotalCount = 0;
@@ -211,19 +195,18 @@ else
             return;
         }
 
-        if (!_clamping && paged.TotalPages > 0 && CurrentPage > paged.TotalPages)
+        if (!_clamping && CurrentPage > result.TotalPages)
         {
             _clamping = true;
-            CurrentPage = paged.TotalPages;
+            CurrentPage = result.TotalPages;
             await LoadPage();
             _clamping = false;
             return;
         }
 
-        Tasks = paged.Items;
-        TotalCount = paged.TotalCount;
-        CurrentPage = paged.Page;
-        _pageSize = paged.PageSize;
+        Tasks = result.Items;
+        TotalCount = result.TotalCount;
+        CurrentPage = result.Page;
 
         IsLoading = false;
     }

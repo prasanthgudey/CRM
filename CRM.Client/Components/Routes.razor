@@ -1,6 +1,51 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@inject CRM.Client.Security.JwtAuthStateProvider JwtAuthProvider
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly" PreferExactMatches="true">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(CRM.Client.Components.Layout.MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+
+                <Authorizing>
+                    <div class="text-center p-4">
+                        <div class="spinner-border" role="status"></div>
+                        <div class="mt-2">Checking authorization...</div>
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+
+        <NotFound>
+            <LayoutView Layout="typeof(CRM.Client.Components.Layout.MainLayout)">
+                <h3>Page not found</h3>
+                <p>The requested page could not be found.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    // IMPORTANT: call the provider *on the client* after first render so it reads localStorage.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // This will attempt to read localStorage via JS interop.
+            // If there's a token stored, it will notify the authentication state and the UI will update.
+            try
+            {
+                await JwtAuthProvider.InitializeFromClientAsync();
+            }
+            catch
+            {
+                // swallow — initialization may fail during prerender, but we called from client already.
+            }
+        }
+    }
+}

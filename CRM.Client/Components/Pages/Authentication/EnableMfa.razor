@@ -1,5 +1,7 @@
 ﻿@page "/enable-mfa"
 @layout MainLayout
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 
 @using CRM.Client.Components.Layout
 @using CRM.Client.DTOs.Auth

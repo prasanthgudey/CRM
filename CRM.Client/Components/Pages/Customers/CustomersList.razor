@@ -1,5 +1,6 @@
 ﻿@page "/customers"
 @layout MainLayout
+@attribute [Authorize]
 
 @using CRM.Client.Components.Layout
 @using CRM.Client.DTOs.Customers
@@ -7,6 +8,7 @@
 @using CRM.Client.Components.Modals.CustomerModals
 @using CRM.Client.DTOs.Shared
 @using CRM.Client.Components.Shared
+@using Microsoft.AspNetCore.Authorization
 
 @inject CustomerService CustomerService
 
@@ -129,9 +131,17 @@ else
         }
     }
 
-    protected override async Task OnInitializedAsync()
+    // protected override async Task OnInitializedAsync()
+    // {
+    //     await LoadPage();
+    // }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await LoadPage();
+        if (firstRender)
+        {
+            await LoadPage();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadPage()

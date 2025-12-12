@@ -313,18 +313,25 @@ namespace CRM.Server.Services
         public async Task<PagedResult<TaskResponseDto>> GetPagedAsync(PageParams parms)
         {
             var paged = await _repo.GetPagedAsync(parms);
+
             return new PagedResult<TaskResponseDto>
             {
                 Items = paged.Items.Select(t => new TaskResponseDto
                 {
                     TaskId = t.TaskId,
+                    CustomerId = t.CustomerId,
+                    UserId = t.CreatedByUserId,   // <-- important
                     Title = t.Title,
                     Description = t.Description,
                     DueDate = t.DueDate,
                     Priority = t.Priority,
                     State = t.State,
-                    CreatedAt = t.CreatedAt
-                    // map other fields you need
+                    CreatedAt = t.CreatedAt,
+                    CompletedAt = t.CompletedAt,
+                    IsRecurring = t.IsRecurring,
+                    RecurrenceType = t.RecurrenceType,
+                    RecurrenceInterval = t.RecurrenceInterval,
+                    RecurrenceEndDate = t.RecurrenceEndDate
                 }).ToList(),
                 Page = paged.Page,
                 PageSize = paged.PageSize,

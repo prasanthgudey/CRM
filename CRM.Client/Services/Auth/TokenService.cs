@@ -27,7 +27,20 @@ namespace CRM.Client.Services.Auth
         // ✅ READ TOKEN from localStorage
         public async Task<string?> GetTokenAsync()
         {
-            return await _js.InvokeAsync<string?>("localStorage.getItem", TOKEN_KEY);
+            try
+            {
+                // localStorage call — may throw during prerender
+                return await _js.InvokeAsync<string?>("localStorage.getItem", TOKEN_KEY);
+            }
+            catch (InvalidOperationException) // JS interop not available (prerender)
+            {
+                return null;
+            }
+            catch (JSException)
+            {
+                // optionally log then return null
+                return null;
+            }
         }
 
         // ✅ CLEAR TOKEN everywhere

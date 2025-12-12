@@ -1,4 +1,3 @@
-
 using CRM.Client.Components;
 using CRM.Client.Config;
 using CRM.Client.Security;
@@ -12,6 +11,8 @@ using CRM.Client.Services.Users;
 using CRM.Client.State;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +34,7 @@ builder.Services.AddHttpClient("ApiClient", (sp, client) =>
 });
 
 // 3. Authentication + Authorization Setup (Client-side)
+// keep your JwtAuthStateProvider registration for Blazor authentication state
 builder.Services.AddScoped<JwtAuthStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthStateProvider>()
@@ -55,10 +57,32 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<CustomerService>();
 
-
 // 6. Razor Components
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// --- BEGIN: Minimal server-side authentication/authorization additions ---
+// Add server-side authentication so IAuthenticationService exists when Blazor's
+// AuthorizeRouteView / [Authorize] logic runs on the server.
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        // When server-side tries to challenge, redirect to this page
+        options.LoginPath = "/please-login";
+        options.AccessDeniedPath = "/please-login";
+        options.Cookie.Name = "CRM.ServerAuth";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    });
+
+// Server-side authorization (in addition to AddAuthorizationCore used by Blazor)
+builder.Services.AddAuthorization();
+
+// For component-level authorization
+builder.Services.AddAuthorizationCore();
+
+// Ensure the Blazor AuthenticationStateProvider (JWT) is still the one used by components
+builder.Services.AddScoped<AuthenticationStateProvider, JwtAuthStateProvider>();
+// --- END: additions ---
 
 var app = builder.Build();
 
@@ -71,8 +95,21 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// NOTE: removed the earlier misplaced UseAntiforgery() call here (we'll add it in the correct spot)
+
+// IMPORTANT: enable routing BEFORE authentication/authorization middlewares
+app.UseRouting();
+
+// Authentication + Authorization middleware — order matters
+app.UseAuthentication();
+app.UseAuthorization();
+
+// --- CORRECT PLACE for antiforgery middleware ---
+// Calls must appear after UseAuthentication/UseAuthorization and between UseRouting() and endpoint mapping.
 app.UseAntiforgery();
 
+// Now map endpoints / components
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

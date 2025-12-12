@@ -1,8 +1,11 @@
 ﻿@page "/admin/roles"
 @layout MainLayout
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 
 @using CRM.Client.DTOs.Roles
 @using CRM.Client.Components.Layout
+@using CRM.Client.Components.Shared
 @using CRM.Client.Services.Roles
 @using CRM.Client.Components.Modals.RoleModals
 @inject RoleService RoleService

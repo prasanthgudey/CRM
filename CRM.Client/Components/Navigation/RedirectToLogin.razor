@@ -1,0 +1,33 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Navigation
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly" PreferExactMatches="true">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData"
+                                DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    <!-- Show custom login-required page -->
+                    <PleaseLogin />
+                </NotAuthorized>
+
+                <Authorizing>
+                    <div class="text-center p-4">
+                        <div class="spinner-border" role="status"></div>
+                        <div class="mt-2">Checking authorization...</div>
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+
+        <NotFound>
+            <LayoutView Layout="typeof(Layout.MainLayout)">
+                <h3>Page not found</h3>
+                <p>The requested page could not be found.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
