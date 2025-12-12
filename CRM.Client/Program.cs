@@ -1,6 +1,7 @@
 using CRM.Client.Components;
 using CRM.Client.Config;
 using CRM.Client.Security;
+using CRM.Client.Services;
 using CRM.Client.Services.Audit;
 using CRM.Client.Services.Auth;
 using CRM.Client.Services.Customers;
@@ -56,6 +57,20 @@ builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<CustomerService>();
+
+//testing global search
+builder.Services.AddHttpClient<SearchService>(client =>
+{
+    // set this to the CRM.Server base URL from your logs.
+    // In your logs earlier, server listened at 
+    client.BaseAddress = new Uri("https://localhost:7194");
+});
+builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient());
+
+// register your service
+builder.Services.AddScoped<SearchService>();
+
+
 
 // 6. Razor Components
 builder.Services.AddRazorComponents()

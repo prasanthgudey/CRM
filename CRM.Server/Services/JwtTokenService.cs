@@ -20,32 +20,37 @@ namespace CRM.Server.Services
             _jwtSettings = jwtOptions.Value;
         }
 
-        public string GenerateToken(ApplicationUser user, IList<string> roles)
+        public string GenerateToken(ApplicationUser user, IList<string> roles, string? sessionId = null)
         {
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Email, user.Email!)
-            };
+            var now = DateTime.UtcNow;
 
-            // ✅ Role → JWT Claim
+            var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, user.Id),
+        new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+    };
+
+            // add roles
             foreach (var role in roles)
-            {
                 claims.Add(new Claim(ClaimTypes.Role, role));
+
+            // add session id if provided
+            if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                claims.Add(new Claim("session_id", sessionId));
             }
 
-            // ✅ Uses strongly-typed JwtSettings (NOT raw IConfiguration)
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(_jwtSettings.Key)
-            );
-
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
                 issuer: _jwtSettings.Issuer,
                 audience: _jwtSettings.Audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
+                notBefore: now,
+                expires: now.AddMinutes(_jwtSettings.ExpiryMinutes),
                 signingCredentials: creds
             );
 

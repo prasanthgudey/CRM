@@ -12,64 +12,75 @@
 @inject AuthService AuthService
 @inject AppState AppState
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
-<h3 class="auth-title">MFA Verification</h3>
+<div class="mfa-container">
 
-@if (!string.IsNullOrWhiteSpace(PageMessage))
-{
-    <div class="alert alert-info">@PageMessage</div>
-}
+    <div class="modal-card shadow"
+         style="
+            width: 540px;
+            border-radius: 14px;
+            padding: 32px 36px;
+            background: white;
+            margin-top: 30px;
+         ">
 
-@if (!string.IsNullOrWhiteSpace(ErrorMessage))
-{
-    <div class="auth-error">@ErrorMessage</div>
-}
+        <h4 class="text-center mb-3">MFA Verification</h4>
 
-<EditForm Model="@Model" OnValidSubmit="HandleVerify">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+        @if (!string.IsNullOrWhiteSpace(PageMessage))
+        {
+            <div class="alert alert-info py-2">@PageMessage</div>
+        }
 
-    <div class="form-group">
-        <label>Email</label>
-        <InputText class="form-control" @bind-Value="Model.Email" disabled />
+        <EditForm Model="@Model" OnValidSubmit="HandleVerify">
+            <DataAnnotationsValidator />
+
+            <!-- Email -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">Email</label>
+                <InputText class="form-control"
+                           @bind-Value="Model.Email"
+                           disabled />
+            </div>
+
+            <!-- 6-digit Code -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">6-digit Code</label>
+                <InputText class="form-control"
+                           maxlength="6"
+                           placeholder="123456"
+                           @bind-Value="Model.Code" />
+            </div>
+
+            <!-- BUTTONS -->
+            <div class="modal-actions mt-4 d-flex justify-content-end gap-2">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="Cancel">
+                    Cancel
+                </button>
+
+                <button class="btn btn-primary"
+                        disabled="@IsLoading">
+                    @(IsLoading ? "Verifying..." : "Verify")
+                </button>
+            </div>
+
+        </EditForm>
+
     </div>
 
-    <div class="form-group">
-        <label>6-digit Code</label>
-        <InputText class="form-control"
-                   maxlength="6"
-                   placeholder="123456"
-                   @bind-Value="Model.Code" />
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mt-3">
-        <button type="button"
-                class="btn btn-outline-secondary"
-                @onclick="Cancel">
-            Cancel
-        </button>
-
-        <button type="submit"
-                class="btn btn-primary"
-                disabled="@IsLoading">
-            @(IsLoading ? "Verifying..." : "Verify")
-        </button>
-    </div>
-</EditForm>
+</div>
 
 @code {
 
     private MfaLoginDto Model { get; set; } = new();
 
     private bool IsLoading;
-
-    private string? ErrorMessage;
-
     private string? PageMessage;
 
     protected override void OnInitialized()
     {
-        // ✅ Read email from query string
         var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
         var qs = QueryHelpers.ParseQuery(uri.Query);
 
@@ -80,11 +91,23 @@
             PageMessage = msg.ToString();
     }
 
+
+
     private async Task HandleVerify()
     {
-        ErrorMessage = null;
+        if (string.IsNullOrWhiteSpace(Model.Code))
+        {
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Please enter the 6-digit code");
+            return;
+        }
+
+        if (Model.Code.Trim().Length != 6)
+        {
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "The MFA code must be exactly 6 digits");
+            return;
+        }
+
         IsLoading = true;
-        StateHasChanged();
 
         try
         {
@@ -92,7 +115,7 @@
 
             if (response == null)
             {
-                ErrorMessage = "Invalid verification code.";
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Invalid verification code");
                 return;
             }
 
@@ -100,14 +123,15 @@
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", ex.Message);
         }
         finally
         {
             IsLoading = false;
-            StateHasChanged();
         }
     }
+
+
 
     private void RedirectByRole()
     {

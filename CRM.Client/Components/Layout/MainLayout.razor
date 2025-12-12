@@ -1,22 +1,41 @@
 ﻿@inherits LayoutComponentBase
-@inject IJSRuntime JSRuntime     // ⭐ required for initialization
-@inject CRM.Client.Security.JwtAuthStateProvider JwtAuthStateProvider
-
+@inject IJSRuntime JSRuntime
 @using CRM.Client.Components.Navigation
+@using CRM.Client.State
+@inject AppState AppState
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
+<div class="main-layout">
+
+    <!-- GLOBAL UI ALERT (TOP) -->
+    @if (!string.IsNullOrWhiteSpace(AppState.Ui.GlobalMessage))
+    {
+        <div class="container mt-2">
+            <div class="alert @GetAlertClass(AppState.Ui.GlobalMessageType) alert-dismissible fade show d-flex justify-content-between align-items-center" role="alert">
+                <div>
+                    <strong>@(AppState.Ui.GlobalMessageType?.ToUpper() ?? "NOTICE")</strong>
+                    <div>@AppState.Ui.GlobalMessage</div>
+                </div>
+                <div>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="ClearGlobalMessage"></button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <Topbar />
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
     </div>
 
-    <main>
-        <!-- REPLACE old "About" bar with your Topbar -->
-        <Topbar />
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
 </div>
 
 <div id="blazor-error-ui">
@@ -25,11 +44,47 @@
     <a class="dismiss">🗙</a>
 </div>
 
+
+
 @* SweetAlert2 *@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 <script src="js/alertHelper.js"></script>
+
 @code {
-    private bool _initialized = false;
+    protected override void OnInitialized()
+    {
+        // Subscribe to UiState change notifications so layout re-renders
+        AppState.Ui.OnChange += UiStateChanged;
+    }
+
+    private void UiStateChanged()
+    {
+        // this executes on the sync context; ensure UI update
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearGlobalMessage()
+    {
+        AppState.Ui.ClearGlobalMessage();
+    }
+
+    private string GetAlertClass(string? level)
+    {
+        return level switch
+        {
+            "success" => "alert-success",
+            "warning" => "alert-warning",
+            "danger" => "alert-danger",
+            "info" => "alert-info",
+            _ => "alert-info"
+        };
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe to avoid leaks
+        AppState.Ui.OnChange -= UiStateChanged;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -37,8 +92,8 @@
         {
             _initialized = true;
 
-            // ⭐ SAFE CLIENT-SIDE AUTH INITIALIZATION
-            await JwtAuthStateProvider.InitializeFromClientAsync();
+            // No need to call initAlerts anymore since crmAlerts is already defined
+            // If you use initAlerts(), then add a function inside script
         }
     }
-}
+} 

@@ -1,0 +1,408 @@
+﻿@using CRM.Client.Components.Modals.CustomerModals
+@using CRM.Client.Components.Modals.RoleModals
+@using CRM.Client.Components.Modals.TaskModals
+@using CRM.Client.Components.Modals.UserModals
+@using CRM.Client.DTOs.Shared
+@using CRM.Client.DTOs.Customers
+@using CRM.Client.DTOs.Tasks
+@using CRM.Client.DTOs.Users
+@using CRM.Client.DTOs.Roles
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject CRM.Client.Services.SearchService SearchService
+
+<div style="position: relative; display:inline-block;">
+    <input class="form-control border border-1 border-secondary"
+           style="height: 40px; width: 100%; font-size: 1.0rem;"
+           placeholder="🔍customers,users,tasks"
+           @oninput="OnInput"
+           @onkeydown="OnKeyDown"
+           value="@Query"
+           autocomplete="off" />
+
+    @if (IsLoading)
+    {
+        <div class="search-loading small text-muted">Searching...</div>
+    }
+
+    @if (ShowResults && Results?.Any() == true)
+    {
+        <ul class="list-group search-results" style="position:absolute; top:44px; right:0; width:420px; z-index:99999; background:white; border:1px solid #ddd;">
+            @for (int i = 0; i < Results.Count; i++)
+            {
+                var r = Results[i];
+                var isSelected = i == _selectedIndex;
+                <li class="list-group-item list-group-item-action @(isSelected ? "active" : "")"
+                    style="cursor:pointer"
+                    @onclick="@(async () => await OpenResult(r))">
+                    <div>@(Highlight(r.Title, Query))</div>
+                    <div class="text-muted small">
+                        @r.EntityType
+                        @if(!string.IsNullOrEmpty(r.Subtitle))
+                        {
+                            <text> - @r.Subtitle</text>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(r.Snippet))
+                    {
+                        <div class="small text-truncate">@((MarkupString)Highlight(r.Snippet, Query))</div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+<!-- Entity-specific view modals (same as your audit-log page) -->
+<ViewCustomerModal @ref="viewCustomerModal"
+                   IsOpen="@isViewCustomerOpen"
+                   Model="@customerViewModel"
+                   OnClose="OnCustomerModalClosed" />
+
+<ViewTaskModal @ref="viewTaskModal"
+               IsOpen="@isViewTaskOpen"
+               Model="@taskViewModel"
+               OnClose="OnTaskModalClosed" />
+
+<ViewUserModal @ref="viewUserModal"
+              IsOpen="@isViewUserOpen"
+              Model="@userViewModel"
+              OnClose="OnUserModalClosed" />
+
+<ViewRoleModal @ref="viewRoleModal"
+              IsOpen="@isViewRoleOpen"
+              Model="@roleViewModel"
+              OnClose="OnRoleModalClosed" />
+
+@code {
+    // Search state
+    private string Query { get; set; } = string.Empty;
+    private List<SearchResultDto> Results { get; set; } = new();
+    private bool IsLoading { get; set; } = false;
+    private bool ShowResults { get; set; } = false;
+    private CancellationTokenSource _cts;
+    private int _selectedIndex = -1;
+
+    private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    // modal refs & view models (mirror audit-log)
+    private ViewCustomerModal? viewCustomerModal;
+    private ViewTaskModal? viewTaskModal;
+    private ViewUserModal? viewUserModal;
+    private ViewRoleModal? viewRoleModal;
+
+    private bool isViewCustomerOpen;
+    private CustomerResponseDto? customerViewModel;
+
+    private bool isViewTaskOpen;
+    private TaskResponseDto? taskViewModel;
+
+    private bool isViewUserOpen;
+    private UserResponseDto? userViewModel;
+
+    private bool isViewRoleOpen;
+    private RoleResponseDto? roleViewModel;
+
+    // -------------------------
+    // Input / debounced search
+    // -------------------------
+    private void OnInput(ChangeEventArgs e)
+    {
+        Query = e?.Value?.ToString() ?? string.Empty;
+        _selectedIndex = -1;
+        _ = DebouncedSearchAsync(Query);
+    }
+
+    private async Task DebouncedSearchAsync(string q)
+    {
+        try { _cts?.Cancel(); } catch { }
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            Results.Clear();
+            ShowResults = false;
+            IsLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        IsLoading = true;
+        ShowResults = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(300, token);
+
+            var res = await SearchService.SearchAsync(q, 25);
+            if (token.IsCancellationRequested) return;
+
+            Results = res ?? new List<SearchResultDto>();
+            _selectedIndex = Results.Any() ? 0 : -1;
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[GlobalSearch] Search error: {ex.Message}");
+            Results = new List<SearchResultDto>();
+            _selectedIndex = -1;
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // -------------------------
+    // Open search result -> modal or route
+    // -------------------------
+    private async Task OpenResult(SearchResultDto r)
+    {
+        if (r == null) return;
+
+        // close any previously open view models
+        CloseAllViewModels();
+
+        // hide results (UX)
+        ShowResults = false;
+
+        var entity = (r.EntityType ?? string.Empty).Trim().ToLowerInvariant();
+        var id = r.Id;
+
+        try
+        {
+            // If no id, fall back to route navigation immediately
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                if (!string.IsNullOrEmpty(r.Route))
+                    Nav.NavigateTo(r.Route);
+                return;
+            }
+
+            // --- TASK ---
+            if (entity.Contains("task"))
+            {
+                try
+                {
+                    taskViewModel = await Http.GetFromJsonAsync<TaskResponseDto>($"/api/tasks/{id}");
+                }
+                catch (Exception fetchEx)
+                {
+                    Console.Error.WriteLine($"Failed to fetch task {id}: {fetchEx.Message}");
+                    taskViewModel = null;
+                }
+                isViewTaskOpen = taskViewModel != null;
+                if (isViewTaskOpen) { await InvokeAsync(StateHasChanged); return; }
+            }
+
+            // --- CUSTOMER ---
+            if (entity.Contains("customer"))
+            {
+                try
+                {
+                    customerViewModel = await Http.GetFromJsonAsync<CustomerResponseDto>($"/api/customers/{id}");
+                }
+                catch (Exception fetchEx)
+                {
+                    Console.Error.WriteLine($"Failed to fetch customer {id}: {fetchEx.Message}");
+                    customerViewModel = null;
+                }
+                isViewCustomerOpen = customerViewModel != null;
+                if (isViewCustomerOpen) { await InvokeAsync(StateHasChanged); return; }
+            }
+
+            // --- USER (use singular /api/user/{id} endpoint) ---
+            if (entity.Contains("user"))
+            {
+                try
+                {
+                    // Primary: singular controller route (case-insensitive)
+                    userViewModel = await Http.GetFromJsonAsync<UserResponseDto>($"/api/user/{id}");
+
+                    // Debug: write the fetched user to console (helps verify deserialization)
+                    if (userViewModel != null)
+                        Console.WriteLine($"[GlobalSearch] Fetched user: {System.Text.Json.JsonSerializer.Serialize(userViewModel)}");
+                }
+                catch (Exception ex1)
+                {
+                    Console.Error.WriteLine($"OpenResult: /api/user/{id} fetch failed: {ex1.Message}");
+                    userViewModel = null;
+                }
+
+                // Optional fallbacks (leave or remove as you prefer)
+                if (userViewModel == null)
+                {
+                    try
+                    {
+                        userViewModel = await Http.GetFromJsonAsync<UserResponseDto>($"/api/users/{id}");
+                    }
+                    catch { /* ignore */ }
+                }
+                if (userViewModel == null)
+                {
+                    try
+                    {
+                        userViewModel = await Http.GetFromJsonAsync<UserResponseDto>($"/api/admin/users/{id}");
+                    }
+                    catch { /* ignore */ }
+                }
+
+                isViewUserOpen = userViewModel != null;
+
+                if (isViewUserOpen)
+                {
+                    // Hide the results and open the modal
+                    ShowResults = false;
+                    await InvokeAsync(StateHasChanged);
+                    return;   // Important: stop further processing so we don't navigate away
+                }
+
+                // If fetch failed, do NOT navigate away: log and return so user stays in place
+                Console.Error.WriteLine($"OpenResult: failed to fetch user {id}. Modal not opened; not navigating.");
+                return;
+            }
+
+
+
+            // --- ROLE ---
+            if (entity.Contains("role"))
+            {
+                try
+                {
+                    roleViewModel = await Http.GetFromJsonAsync<RoleResponseDto>($"/api/roles/{id}");
+                }
+                catch (Exception fetchEx)
+                {
+                    Console.Error.WriteLine($"Failed to fetch role {id}: {fetchEx.Message}");
+                    roleViewModel = null;
+                }
+                isViewRoleOpen = roleViewModel != null;
+                if (isViewRoleOpen) { await InvokeAsync(StateHasChanged); return; }
+            }
+
+            // --- FALLBACK FOR OTHER ENTITIES: navigate if route present ---
+            if (!string.IsNullOrEmpty(r.Route))
+            {
+                Nav.NavigateTo(r.Route);
+                return;
+            }
+
+            Console.WriteLine("OpenResult: no modal opened and no route to navigate.");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"OpenResult error: {ex.Message}");
+        }
+    }
+
+
+
+    private void CloseAllViewModels()
+    {
+        isViewCustomerOpen = false;
+        customerViewModel = null;
+
+        isViewTaskOpen = false;
+        taskViewModel = null;
+
+        isViewUserOpen = false;
+        userViewModel = null;
+
+        isViewRoleOpen = false;
+        roleViewModel = null;
+    }
+
+    // Modal close callbacks (mirror audit-log)
+    private async Task OnCustomerModalClosed(bool refresh)
+    {
+        isViewCustomerOpen = false;
+        customerViewModel = null;
+        await Task.CompletedTask;
+    }
+    private async Task OnTaskModalClosed(bool refresh)
+    {
+        isViewTaskOpen = false;
+        taskViewModel = null;
+        await Task.CompletedTask;
+    }
+    private async Task OnUserModalClosed(bool refresh)
+    {
+        isViewUserOpen = false;
+        userViewModel = null;
+        await Task.CompletedTask;
+    }
+    private async Task OnRoleModalClosed(bool refresh)
+    {
+        isViewRoleOpen = false;
+        roleViewModel = null;
+        await Task.CompletedTask;
+    }
+
+    // -------------------------
+    // Keyboard handling
+    // -------------------------
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowDown")
+        {
+            if (!Results.Any()) return;
+            _selectedIndex = Math.Min(_selectedIndex + 1, Results.Count - 1);
+            await InvokeAsync(StateHasChanged);
+        }
+        else if (e.Key == "ArrowUp")
+        {
+            if (!Results.Any()) return;
+            _selectedIndex = Math.Max(_selectedIndex - 1, 0);
+            await InvokeAsync(StateHasChanged);
+        }
+        else if (e.Key == "Enter")
+        {
+            if (_selectedIndex >= 0 && _selectedIndex < Results.Count)
+            {
+                await OpenResult(Results[_selectedIndex]);
+            }
+            else if (Results.Any())
+            {
+                await OpenResult(Results.First());
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            ShowResults = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // -------------------------
+    // Helpers
+    // -------------------------
+    private MarkupString Highlight(string? text, string? query)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query))
+            return (MarkupString)(text ?? string.Empty);
+
+        try
+        {
+            var escapedQuery = System.Text.RegularExpressions.Regex.Escape(query);
+            var result = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                escapedQuery,
+                match => $"<mark>{match.Value}</mark>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            return (MarkupString)result;
+        }
+        catch
+        {
+            return (MarkupString)text;
+        }
+    }
+}

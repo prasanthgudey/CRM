@@ -1,102 +1,100 @@
 ﻿@page "/login"
 @layout AuthLayout
 
-@using CRM.Client.DTOs.Auth
 @using CRM.Client.Components.Layout
+@using CRM.Client.DTOs.Auth
 @using CRM.Client.Services.Auth
 @using CRM.Client.State
 @using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.WebUtilities
 @using CRM.Client.Components.Modals.AuthModals
+
 @inject AuthService AuthService
 @inject AppState AppState
 @inject NavigationManager Navigation
 
-<h3 class="auth-title">Sign In</h3>
+<div class="login-outer-card">
 
-<!-- ✅ SUCCESS MESSAGE AFTER REGISTRATION -->
-@if (QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query)
-    .TryGetValue("registered", out var reg))
-{
-    <div class="alert alert-success">
-        Your password is set. You may now login.
+    <div class="login-inner-card">
+
+        <h2 class="login-title">Sign In</h2>
+        <p class="login-subtitle">Access your CRM Platform</p>
+
+        <!-- Success alert -->
+        @if (QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query)
+                .TryGetValue("registered", out var reg))
+        {
+            <div class="alert alert-success">
+                Your password is set. You may now login.
+            </div>
+        }
+
+        <!-- Error message -->
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="auth-error">@ErrorMessage</div>
+        }
+
+        <EditForm Model="@LoginModel" OnValidSubmit="HandleLogin" class="login-form">
+            <DataAnnotationsValidator />
+
+            <!-- Email -->
+            <div class="form-group">
+                <label>Email</label>
+                <InputText class="form-control" @bind-Value="LoginModel.Email" />
+                <ValidationMessage For="@(() => LoginModel.Email)" />
+            </div>
+
+            <!-- Password -->
+            <div class="form-group">
+
+                <!-- Password + Forgot link row -->
+                <div class="password-row">
+                    <label>Password</label>
+
+                    <a class="forgot-link"
+                       href="javascript:void(0);"
+                       @onclick="OpenForgotPassword">
+                        Forgot password?
+                    </a>
+                </div>
+
+                <InputText class="form-control"
+                           @bind-Value="LoginModel.Password"
+                           type="password" />
+                <ValidationMessage For="@(() => LoginModel.Password)" />
+            </div>
+
+            <!-- Login button -->
+            <button type="submit" class="login-btn" disabled="@IsLoading">
+                @GetButtonText()
+            </button>
+
+        </EditForm>
+
     </div>
-}
-
-@if (!string.IsNullOrWhiteSpace(ErrorMessage))
-{
-    <div class="auth-error">
-        @ErrorMessage
-    </div>
-}
-
-<EditForm Model="@LoginModel" OnValidSubmit="HandleLogin">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
-
-    <div class="form-group">
-        <label>Email</label>
-        <InputText @bind-Value="LoginModel.Email"
-                   class="form-control"
-                   type="email" />
-        <ValidationMessage For="@(() => LoginModel.Email)" />
-    </div>
-
-    <div class="form-group">
-        <label>Password</label>
-        <InputText @bind-Value="LoginModel.Password"
-                   class="form-control"
-                   type="password" />
-        <ValidationMessage For="@(() => LoginModel.Password)" />
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <a href="javascript:void(0);" class="small" @onclick="OpenForgotPassword">
-                Forgot password?
-            </a>
-        </div>
-        <div class="text-muted small">Need help signing in?</div>
-    </div>
-
-    <button type="submit" class="btn btn-primary w-100" disabled="@IsLoading">
-        @GetButtonText()
-    </button>
-</EditForm>
+</div>
 
 <!-- Forgot password modal -->
 <ForgotPasswordModal IsOpen="@IsForgotOpen"
                      OnClose="CloseForgotPasswordModal" />
 
+
 @code {
     private LoginRequestDto LoginModel { get; set; } = new();
+    private bool IsLoading;
+    private string? ErrorMessage;
 
-    private bool IsLoading { get; set; }
-    private string? ErrorMessage { get; set; }
-
-    // Forgot password modal state
     private bool IsForgotOpen;
 
     private async Task HandleLogin()
     {
         ErrorMessage = null;
         IsLoading = true;
-        StateHasChanged();
-
-        Console.WriteLine("===== LOGIN UI DATA CHECK =====");
-        Console.WriteLine($"Email   : {LoginModel.Email ?? "NULL"}");
-        Console.WriteLine($"Password: {(string.IsNullOrWhiteSpace(LoginModel.Password) ? "EMPTY" : "RECEIVED")}");
-        Console.WriteLine("================================");
 
         try
         {
             var response = await AuthService.LoginAsync(LoginModel);
-
-            Console.WriteLine("===== SERVICE RESPONSE CHECK =====");
-            Console.WriteLine(response is null ? "Response is NULL" : "Response RECEIVED");
-            Console.WriteLine($"MfaRequired: {response?.MfaRequired}");
-            Console.WriteLine("===================================");
 
             if (response == null)
             {
@@ -104,53 +102,39 @@
                 return;
             }
 
-            // If server requires MFA, redirect to MFA page with email pre-filled
             if (response.MfaRequired)
             {
-                var emailToSend = Uri.EscapeDataString(response.Email ?? LoginModel.Email ?? "");
-                Navigation.NavigateTo($"/mfa-login?email={emailToSend}", true);
+                var email = Uri.EscapeDataString(response.Email ?? LoginModel.Email ?? "");
+                Navigation.NavigateTo($"/mfa-login?email={email}", true);
                 return;
             }
 
-            // Otherwise user is authenticated (AuthService already set auth state)
             RedirectByRole();
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine("===== LOGIN EXCEPTION =====");
-            Console.WriteLine(ex.Message);
-            ErrorMessage = "Login failed due to server error.";
+            ErrorMessage = "Login failed. Please try again.";
         }
         finally
         {
             IsLoading = false;
-            StateHasChanged();
         }
     }
-
 
     private void RedirectByRole()
     {
         var role = AppState.Auth?.Role;
 
-        if (role == "Admin")
-            Navigation.NavigateTo("/admin/users", true);
-        else if (role == "Manager")
-            Navigation.NavigateTo("/manager", true);
-        else
-            Navigation.NavigateTo("/tasks", true);
+        Navigation.NavigateTo(role switch
+        {
+            "Admin" => "/admin/users",
+            "Manager" => "/manager",
+            _ => "/user"
+        }, true);
     }
 
     private string GetButtonText() => IsLoading ? "Signing in..." : "Login";
 
-    // ----- Forgot password modal control -----
-    private void OpenForgotPassword()
-    {
-        IsForgotOpen = true;
-    }
-
-    private void CloseForgotPasswordModal(bool _)
-    {
-        IsForgotOpen = false;
-    }
+    private void OpenForgotPassword() => IsForgotOpen = true;
+    private void CloseForgotPasswordModal(bool _) => IsForgotOpen = false;
 }

@@ -21,6 +21,7 @@
     }
     else
     {
+        <div class="topbar-search"> <CRM.Client.Components.Shared.GlobalSearch /></div>
         <!-- LOGGED IN: show profile + Logout -->
         <div class="topbar-user-info" @onclick="GoToProfile" style="cursor:pointer">
             <div class="topbar-avatar">
@@ -35,7 +36,16 @@
                     @_roleDisplay
                 </div>
             </div>
-        </div>
+            <!-- example insertion -->
+@* <div class="topbar-search">
+    <GlobalSearch />
+</div> *@
+            <!-- temporary test inside Topbar.razor -->
+            @* <input placeholder="search test" class="form-control" /> *@
+ 
+            </div>
+        
+
 
         <button class="topbar-logout-btn" @onclick="Logout">
             Logout

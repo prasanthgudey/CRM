@@ -7,18 +7,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using CRM.Server.Security;
+using Microsoft.Extensions.Options;
 
 namespace CRM.Server.Services
 {
     public class UserService : IUserService
     {
         // ---------- Dependencies ----------
-        // _userRepository         => USER-DEFINED repository abstraction
-        // UserManager<TUser>      => FRAMEWORK: Microsoft.AspNetCore.Identity UserManager
-        // IEmailService           => USER-DEFINED service abstraction
-        // IConfiguration          => FRAMEWORK configuration
-        // IAuditLogService        => USER-DEFINED auditing service
-        // IRoleRepository         => USER-DEFINED repository abstraction
         private readonly IUserRepository _userRepository;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
@@ -26,13 +22,17 @@ namespace CRM.Server.Services
         private readonly IAuditLogService _auditLogService;
         private readonly IRoleRepository _roleRepository;
 
+        // NEW: password policy options
+        private readonly PasswordPolicySettings _passwordPolicySettings;
+
         public UserService(
             IUserRepository userRepository,
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IConfiguration config,
             IAuditLogService auditLogService,
-            IRoleRepository roleRepository
+            IRoleRepository roleRepository,
+            IOptions<PasswordPolicySettings> passwordPolicyOptions // NEW
         )
         {
             _userRepository = userRepository;
@@ -41,7 +41,34 @@ namespace CRM.Server.Services
             _config = config;
             _auditLogService = auditLogService;
             _roleRepository = roleRepository;
+
+            // NEW
+            _passwordPolicySettings = passwordPolicyOptions?.Value ?? new PasswordPolicySettings();
         }
+
+
+        // NEW: Check if password is expired
+        public Task<bool> IsPasswordExpiredAsync(ApplicationUser user)
+        {
+            if (user == null) throw new ArgumentNullException(nameof(user));
+
+            // If PasswordLastChanged is default/min value, treat it as created at time
+            var lastChanged = user.PasswordLastChanged == default
+                ? user.CreatedAt
+                : user.PasswordLastChanged;
+
+            var expiryMinutes = _passwordPolicySettings?.PasswordExpiryMinutes ?? 0;
+
+            if (expiryMinutes <= 0)
+            {
+                // 0 or negative => expiry disabled
+                return Task.FromResult(false);
+            }
+
+            var expired = DateTime.UtcNow - lastChanged > TimeSpan.FromMinutes(expiryMinutes);
+            return Task.FromResult(expired);
+        }
+
 
         // Helper DTO builder (uses FRAMEWORK UserManager to get roles)
         private async Task<UserResponseDto> MapToUserDto(ApplicationUser user)
@@ -406,26 +433,75 @@ namespace CRM.Server.Services
 
             var decodedToken = Uri.UnescapeDataString(token);
 
+            // Reset password without knowing the old password
             var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
 
             if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
+
+            // Update password timestamp for security policies (same as ChangePassword)
+            user.PasswordLastChanged = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            // OPTIONAL: revoke refresh tokens (recommended for security)
+            // await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(user.Id);
         }
+
 
         // ============================================================
         // 10) Change Password (no audit here - handled in auth)
         // ============================================================
+        // in UserService.cs
         public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
                 throw new Exception("User not found");
 
-            var result = await _userManager.ChangePasswordAsync(
-                user, currentPassword, newPassword);
+            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
 
             if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
+
+            // Update password timestamp
+            user.PasswordLastChanged = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            // OPTIONAL: revoke refresh tokens / sessions here via your JWT service or repository
+            // If you have a method like _jwtTokenService.RevokeAllTokensForUser(user.Id) - call it here.
+            // e.g. await _jwtTokenService.RevokeAllRefreshTokensAsync(user.Id);
+
+            // Note: AuthController already records audit after calling this service.
+        }
+
+
+
+        public async Task ChangePasswordByEmailAsync(string email, string currentPassword, string newPassword)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                throw new Exception("Invalid request");
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                throw new Exception("Invalid request");
+
+            // Verify old password (knowledge proof)
+            var isValid = await _userManager.CheckPasswordAsync(user, currentPassword);
+            if (!isValid)
+                throw new Exception("Invalid credentials");
+
+            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+
+            // Update password timestamp
+            user.PasswordLastChanged = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            // OPTIONAL: revoke refresh tokens / sessions via JWT service (implement later)
+            // e.g. await _jwtTokenService.RevokeAllRefreshTokensAsync(user.Id);
+
+            // NOTE: AuthController logs audit after calling service (or you can call SafeAudit here if you prefer)
         }
 
         // ============================================================

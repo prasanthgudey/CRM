@@ -1,4 +1,5 @@
-﻿using CRM.Server.Data;
+﻿
+using CRM.Server.Data;
 using CRM.Server.Middleware;
 using CRM.Server.Models;
 using CRM.Server.Repositories;
@@ -140,6 +141,16 @@ builder.Services.Configure<PasswordPolicySettings>(
 builder.Services.Configure<MfaSettings>(
     builder.Configuration.GetSection("MfaSettings"));
 
+// Program.cs (before building the app)
+builder.Services.Configure<PasswordPolicySettings>(
+    builder.Configuration.GetSection("PasswordPolicySettings"));
+
+builder.Services.Configure<RefreshTokenSettings>(
+    builder.Configuration.GetSection("RefreshTokenSettings"));
+
+// ... earlier in Program.cs where you configure options:
+builder.Services.Configure<SessionSettings>(
+    builder.Configuration.GetSection("SessionSettings"));
 
 
 // =========================
@@ -169,7 +180,10 @@ builder.Services.AddAuthentication(options =>
 
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(jwtSettings["Key"]!)
-        )
+        ),
+
+        // IMPORTANT: reduce/disable default clock skew for strict expiry (use TimeSpan.Zero for testing)
+        ClockSkew = TimeSpan.Zero
     };
 });
 
@@ -192,6 +206,9 @@ builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ISearchRepository, SearchRepository>();
+builder.Services.AddScoped<ISearchService, SearchService>();
+
 
 
 // ✅ Services
@@ -202,6 +219,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddScoped<IUserSessionService, UserSessionService>();
+
 
 // =========================
 // ✅ BUILD APPLICATION
@@ -236,19 +256,29 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ✅ ✅ ✅ CORS MUST BE HERE
+// GLOBAL EXCEPTION HANDLING - place early so it can catch downstream errors
+//app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// ROUTING must come before anything that uses endpoint metadata (context.GetEndpoint)
+app.UseRouting();
+
+// CORS when using endpoint routing: between UseRouting and endpoint execution
 app.UseCors("LocalDev");
 
-// ✅ Global exception handling
-app.UseMiddleware<GlobalExceptionMiddleware>();
-
-// ✅ Audit logging middleware
-//app.UseMiddleware<AuditLogMiddleware>();
-
-// ✅ JWT Authentication & Authorization (ORDER MATTERS)
+// Authentication populates HttpContext.User (required by SessionActivityMiddleware)
 app.UseAuthentication();
+
+// SessionActivityMiddleware needs:
+//  - endpoint metadata (so it must run after UseRouting)
+//  - an authenticated HttpContext.User (so it must run after UseAuthentication)
+// Place it BEFORE UseAuthorization so it can deny/revoke sessions before policy enforcement.
+app.UseMiddleware<SessionActivityMiddleware>();
+
+// Authorization runs after session checks, so policies and [Authorize] are enforced on validated sessions
 app.UseAuthorization();
 
+// Map controllers / endpoints last
 app.MapControllers();
 
 app.Run();
+

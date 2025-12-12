@@ -1,5 +1,6 @@
 ﻿using CRM.Server.DTOs.Auth;
 using CRM.Server.DTOs.Users;
+using CRM.Server.Models;
 
 namespace CRM.Server.Services.Interfaces
 {
@@ -19,6 +20,10 @@ namespace CRM.Server.Services.Interfaces
         Task ResetPasswordAsync(string email, string token, string newPassword);
         Task ChangePasswordAsync(string userId, string currentPassword, string newPassword);
 
+        Task ChangePasswordByEmailAsync(string email, string currentPassword, string newPassword);
+
+        Task<bool> IsPasswordExpiredAsync(ApplicationUser user);
+
         Task<UserResponseDto> GetUserByIdAsync(string userId);
         Task<List<UserResponseDto>> FilterUsersAsync(string? role, bool? isActive);
 
@@ -28,5 +33,9 @@ namespace CRM.Server.Services.Interfaces
         Task DisableMfaAsync(string userId, string code);
 
         Task AssignRoleAsync(string userId, string roleName, string performedByUserId);
+
+        // new method in IUserService
+      
+
     }
 }
