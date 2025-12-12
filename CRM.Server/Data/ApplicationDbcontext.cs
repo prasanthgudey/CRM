@@ -20,6 +20,11 @@ namespace CRM.Server.Data
         public DbSet<Customer> Customers { get; set; }
         //Tasks Database table
         public DbSet<TaskItem> Tasks { get; set; }
+
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+
+        public DbSet<UserSession> UserSessions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

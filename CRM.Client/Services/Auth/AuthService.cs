@@ -3,33 +3,92 @@ using CRM.Client.DTOs.Users;
 using CRM.Client.Security;
 using CRM.Client.Services.Http;
 using CRM.Client.State;
+using Microsoft.AspNetCore.Components;
+using System.Text.Json;
 
 namespace CRM.Client.Services.Auth
 {
     // ✅ USER-DEFINED: Authentication orchestration service
+  
     public class AuthService
     {
         private readonly ApiClientService _api;
         private readonly JwtAuthStateProvider _authProvider;
         private readonly AppState _appState;
+        private readonly TokenService _tokenService;
+        private readonly NavigationManager _navigation;
 
         public AuthService(
             ApiClientService api,
             JwtAuthStateProvider authProvider,
-            AppState appState)
+            AppState appState,
+            TokenService tokenService,
+            NavigationManager navigationManager)
         {
             _api = api;
             _authProvider = authProvider;
             _appState = appState;
+            _tokenService = tokenService;
+            _navigation = navigationManager;
         }
 
         // =====================================================
         // ✅ LOGIN → Calls: POST api/auth/login
         // =====================================================
-        public async Task<AuthResponseDto?> LoginAsync(LoginRequestDto dto)
+          public async Task<AuthResponseDto?> LoginAsync(LoginRequestDto dto)
         {
-            var response = await _api.PostAsync<LoginRequestDto, AuthResponseDto>(
-                "api/auth/login", dto);
+            // Use PostRawAsync so we can read non-success responses (e.g. password_expired)
+            var resp = await _api.PostRawAsync("api/auth/login", dto);
+
+            if (resp == null)
+                return null;
+
+            var body = await resp.Content.ReadAsStringAsync();
+
+            // If server indicates password expired (403 + { error: "password_expired" })
+            if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                try
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (dict != null && dict.TryGetValue("error", out var code) && code == "password_expired")
+                    {
+                        // Show global message and redirect user to change-expired-password flow
+                        try
+                        {
+                            _appState.Ui.ShowGlobalMessage("Your password has expired. Please change your password now.", "warning");
+                        }
+                        catch { /* swallow */ }
+
+                        // Redirect to change-expired-password page (client should implement page)
+                        _navigation.NavigateTo("/change-expired-password", true);
+
+                        return null;
+                    }
+                }
+                catch
+                {
+                    // ignore parse errors - fall through to generic handling
+                }
+
+                // For other non-success, return null
+                return null;
+            }
+
+            if (!resp.IsSuccessStatusCode)
+                return null;
+
+            // Parse success response
+            AuthResponseDto? response;
+            try
+            {
+                response = JsonSerializer.Deserialize<AuthResponseDto>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch
+            {
+                return null;
+            }
 
             if (response == null)
                 return null;
@@ -42,24 +101,33 @@ namespace CRM.Client.Services.Auth
             if (string.IsNullOrWhiteSpace(response.Token))
                 return null;
 
+            // Update Blazor auth state and persist tokens centrally
             await _authProvider.MarkUserAsAuthenticated(response.Token);
+            await _tokenService.SaveTokenAsync(response.Token);
 
             var authState = await _authProvider.GetAuthenticationStateAsync();
             _appState.Auth.SetAuthenticated(response.Token, authState.User);
 
+            // Save refresh token + expiry for silent refresh
+            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
+            {
+                await _tokenService.SaveRefreshTokenAsync(
+                    response.RefreshToken!,
+                    response.RefreshExpiresAt
+                );
+            }
+
             return response;
         }
-
-
         // =====================================================
         // ✅ COMPLETE REGISTRATION → POST api/auth/complete-registration
         // =====================================================
         public async Task<OperationResultDto?> CompleteRegistrationAsync(CompleteRegistrationDto dto)
         {
             var response = await _api.PostAsync<CompleteRegistrationDto, OperationResultDto>(
-                "api/auth/complete-registration", dto);   // new code
+                "api/auth/complete-registration", dto);
 
-            return response;                               // new code
+            return response;
         }
 
         // =====================================================
@@ -67,7 +135,17 @@ namespace CRM.Client.Services.Auth
         // =====================================================
         public async Task LogoutAsync()
         {
+            try
+            {
+                await _api.PostAsync<object, object>("api/auth/logout", new { });
+            }
+            catch
+            {
+                // ignore errors from server-side cleanup
+            }
+
             await _authProvider.MarkUserAsLoggedOut();
+            await _tokenService.ClearAsync();
             _appState.Auth.Clear();
         }
 
@@ -125,14 +203,70 @@ namespace CRM.Client.Services.Auth
                 "api/auth/forgot-password", dto);
         }
 
-
         // =====================================================
         // ✅ RESET PASSWORD → POST api/auth/reset-password
+        // (returns tokens; persist and sign-in)
         // =====================================================
-        public async Task ResetPasswordAsync(ResetPasswordDto dto)
+        public async Task<AuthResponseDto?> ResetPasswordAsync(ResetPasswordDto dto)
         {
-            await _api.PostAsync<ResetPasswordDto, object>(
+            var response = await _api.PostAsync<ResetPasswordDto, AuthResponseDto>(
                 "api/auth/reset-password", dto);
+
+            if (response == null)
+                return null;
+
+            // Save access token and update auth state
+            if (!string.IsNullOrWhiteSpace(response.Token))
+            {
+                await _authProvider.MarkUserAsAuthenticated(response.Token);
+                await _tokenService.SaveTokenAsync(response.Token);
+
+                var authState = await _authProvider.GetAuthenticationStateAsync();
+                _appState.Auth.SetAuthenticated(response.Token, authState.User);
+            }
+
+            // Save refresh token if provided
+            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
+            {
+                await _tokenService.SaveRefreshTokenAsync(
+                    response.RefreshToken!,
+                    response.RefreshExpiresAt
+                );
+            }
+
+            return response;
+        }
+
+        // =====================================================
+        // ✅ CHANGE EXPIRED PASSWORD → POST api/auth/change-expired-password
+        // (returns tokens; persist and sign-in)
+        // =====================================================
+        public async Task<AuthResponseDto?> ChangeExpiredPasswordAsync(ChangeExpiredPasswordDto dto)
+        {
+            var response = await _api.PostAsync<ChangeExpiredPasswordDto, AuthResponseDto>(
+                "api/auth/change-expired-password", dto);
+
+            if (response == null)
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(response.Token))
+            {
+                await _authProvider.MarkUserAsAuthenticated(response.Token);
+                await _tokenService.SaveTokenAsync(response.Token);
+
+                var authState = await _authProvider.GetAuthenticationStateAsync();
+                _appState.Auth.SetAuthenticated(response.Token, authState.User);
+            }
+
+            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
+            {
+                await _tokenService.SaveRefreshTokenAsync(
+                    response.RefreshToken!,
+                    response.RefreshExpiresAt
+                );
+            }
+
+            return response;
         }
 
         // =====================================================
@@ -163,7 +297,6 @@ namespace CRM.Client.Services.Auth
                 new { code });
         }
 
-
         // =====================================================
         // ✅ FINAL MFA LOGIN → POST api/auth/mfa/login
         // =====================================================
@@ -175,17 +308,22 @@ namespace CRM.Client.Services.Auth
             if (response == null || string.IsNullOrWhiteSpace(response.Token))
                 return null;
 
-            // ✅ Update Blazor authentication state
+            // Update Blazor authentication state and persist tokens centrally
             await _authProvider.MarkUserAsAuthenticated(response.Token);
+            await _tokenService.SaveTokenAsync(response.Token);
 
             var authState = await _authProvider.GetAuthenticationStateAsync();
-
             _appState.Auth.SetAuthenticated(response.Token, authState.User);
+
+            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
+            {
+                await _tokenService.SaveRefreshTokenAsync(
+                    response.RefreshToken!,
+                    response.RefreshExpiresAt
+                );
+            }
 
             return response;
         }
-
-
-
     }
 }

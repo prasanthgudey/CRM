@@ -9,7 +9,7 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // ✅ All task actions require login
+    //[Authorize] // ✅ All task actions require login
     public class TasksController : ControllerBase
     {
         private readonly ITaskService _service;

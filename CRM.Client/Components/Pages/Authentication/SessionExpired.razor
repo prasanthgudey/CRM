@@ -1,0 +1,23 @@
+﻿@page "/session-expired"
+@using CRM.Client.State
+@inject AppState AppState
+@inject NavigationManager Navigation
+
+<div class="d-flex align-items-center justify-content-center" style="min-height:60vh;">
+    <div class="card p-4 shadow" style="max-width:520px; width:100%;">
+        <h5>Session expired</h5>
+        <p>@(AppState.Ui.GlobalMessage ?? "Your session has expired. Please login again.")</p>
+
+        <div class="d-flex justify-content-end">
+            <button class="btn btn-primary" @onclick="GoToLogin">Go to login</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private void GoToLogin()
+    {
+        AppState.Ui.ClearGlobalMessage();
+        Navigation.NavigateTo("/login", true);
+    }
+}

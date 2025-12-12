@@ -18,5 +18,8 @@ namespace CRM.Server.Models
         public bool IsInvitePending { get; set; } = false;
         public DateTime? InviteExpiry { get; set; }
 
+        public DateTime PasswordLastChanged { get; set; } = DateTime.UtcNow;
+
+
     }
 }
