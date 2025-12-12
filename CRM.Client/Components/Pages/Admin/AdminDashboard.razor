@@ -1,30 +1,39 @@
-﻿
-@page "/admin/dashboard"
+﻿@page "/dashboard"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @using System.Linq
+@using System.Security.Claims
 @using CRM.Client.Services.Tasks
 @using CRM.Client.Services.Customers
 @using CRM.Client.Services.Audit
+@using Microsoft.AspNetCore.Components.Authorization
 @inject TaskService TaskService
 @inject CustomerService CustomerService
 @inject AuditService AuditService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <div class="container-fluid py-4">
     <div class="row">
         <div class="col-12 mb-3">
-            <h1 class="h3">Welcome, Admin</h1>
-            <p class="text-muted">Role-specific widgets and analytics</p>
+            <h1 class="h3">Welcome</h1>
+            @* <p class="text-muted">Role: @UserRoleDisplay — Role-specific widgets and analytics</p> *@
         </div>
     </div>
 
-    <!-- Top cards -->
+    <!-- Top cards (clickable) -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-md-3">
-            <div class="card shadow-sm dashboard-card primary-card">
+            <div class="card shadow-sm dashboard-card primary-card clickable-card"
+                 role="link"
+                 tabindex="0"
+                 @onclick="() => NavigateToTasks()"
+                 @onkeydown="@(e => HandleKeyDown(e, () => NavigateToTasks()))">
                 <div class="card-body d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <small class="text-white-50">Tasks</small>
+                            @* <small class="text-white-50">Tasks</small> *@
+                            <small class="text-muted">Tasks</small>
                             <h3 class="mb-0">@TasksCount</h3>
                         </div>
                         <div class="icon-circle bg-white-20">
@@ -39,7 +48,11 @@
         </div>
 
         <div class="col-sm-6 col-md-3">
-            <div class="card shadow-sm dashboard-card light-card">
+            <div class="card shadow-sm dashboard-card light-card clickable-card"
+                 role="link"
+                 tabindex="0"
+                 @onclick="() => NavigateToCustomers()"
+                 @onkeydown="@(e => HandleKeyDown(e, () => NavigateToCustomers()))">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div>
                         <small class="text-muted">Customers</small>
@@ -52,25 +65,35 @@
             </div>
         </div>
 
-        <div class="col-sm-6 col-md-3">
-            <div class="card shadow-sm dashboard-card accent-card"
-                 @onclick="NavigateToAuditLogs"
-                 style="cursor:pointer">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <small class="text-muted">Audit Logs</small>
-                        <h4 class="mb-0">@AuditCount</h4>
-                    </div>
+        @* Audit Logs card: visible only to Admin *@
+        @if (IsAdmin)
+        {
+            <div class="col-sm-6 col-md-3">
+                <div class="card shadow-sm dashboard-card accent-card clickable-card"
+                     role="link"
+                     tabindex="0"
+                     @onclick="() => NavigateToAuditLogs()"
+                     @onkeydown="@(e => HandleKeyDown(e, () => NavigateToAuditLogs()))">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted">Audit Logs</small>
+                            <h4 class="mb-0">@AuditCount</h4>
+                        </div>
 
-                    <div class="icon-circle bg-accent">
-                        <i class="bi bi-journal-text fs-4 text-accent"></i>
+                        <div class="icon-circle bg-accent">
+                            <i class="bi bi-journal-text fs-4 text-accent"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        }
 
         <div class="col-sm-6 col-md-3">
-            <div class="card shadow-sm dashboard-card alt-card">
+            <div class="card shadow-sm dashboard-card alt-card clickable-card"
+                 role="link"
+                 tabindex="0"
+                 @onclick="() => NavigateToAnalytics()"
+                 @onkeydown="@(e => HandleKeyDown(e, () => NavigateToAnalytics()))">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div>
                         <small class="text-muted">Analytics</small>
@@ -84,37 +107,43 @@
         </div>
     </div>
 
+
     <!-- Main panels -->
     <div class="row g-3">
         <div class="col-lg-7">
+            <!-- Tasks card: shows top 5 tasks and a View all link -->
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">Tasks</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Tasks</h5>
+
+                        @* View all (link navigates to all tasks page) *@
+                        <a class="small" href="tasks">View all</a>
+                    </div>
+
                     <div class="table-responsive">
                         <table class="table table-borderless align-middle">
                             <thead>
                                 <tr>
                                     <th>Title</th>
-                                    <th class="text-center">Status</th>
                                     <th class="text-end">Due</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @if (RecentTasks is null)
                                 {
-                                    <tr><td colspan="3">Loading...</td></tr>
+                                    <tr><td colspan="2">Loading...</td></tr>
                                 }
                                 else if (!RecentTasks.Any())
                                 {
-                                    <tr><td colspan="3">No tasks found</td></tr>
+                                    <tr><td colspan="2">No tasks found</td></tr>
                                 }
                                 else
                                 {
-                                    @foreach (var t in RecentTasks)
+                                    @foreach (var t in RecentTasks.Take(5))
                                     {
                                         <tr>
                                             <td>@t.Title</td>
-                                            <td class="text-center">@t.Status</td>
                                             <td class="text-end">@t.DueDate?.ToLocalTime().ToString("MMM dd, yyyy")</td>
                                         </tr>
                                     }
@@ -122,44 +151,51 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @* <div class="d-flex justify-content-end mt-2">
+                        <a class="btn btn-link btn-sm" href="tasks">View all tasks</a>
+                    </div> *@
                 </div>
             </div>
 
-            <!-- Recent Audit Logs -->
-            <div class="card shadow-sm mt-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="card-title mb-0">Recent Audit Logs</h5>
-                        <a class="small" href="/admin/audit-log">View all</a>
-                    </div>
+            <!-- Recent Audit Logs: shown only to Admin -->
+            @if (IsAdmin)
+            {
+                <div class="card shadow-sm mt-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="card-title mb-0">Recent Audit Logs</h5>
+                            <a class="small" href="/admin/audit-log">View all</a>
+                        </div>
 
-                    @if (RecentAudits is null)
-                    {
-                        <div>Loading...</div>
-                    }
-                    else if (!RecentAudits.Any())
-                    {
-                        <div>No audit events</div>
-                    }
-                    else
-                    {
-                        <ul class="list-unstyled mb-0">
-                            @foreach (var a in RecentAudits)
-                            {
-                                <li class="py-2 border-bottom">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <strong>@a.Action</strong> &middot; <small class="text-muted">@a.EntityName</small>
-                                            <div class="text-muted small">@a.PerformedByUserId ?? "System"</div>
+                        @if (RecentAudits is null)
+                        {
+                            <div>Loading...</div>
+                        }
+                        else if (!RecentAudits.Any())
+                        {
+                            <div>No audit events</div>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var a in RecentAudits)
+                                {
+                                    <li class="py-2 border-bottom">
+                                        <div class="d-flex justify-content-between">
+                                            <div>
+                                                <strong>@a.Action</strong> &middot; <small class="text-muted">@a.EntityName</small>
+                                                <div class="text-muted small">@a.PerformedByUserId ?? "System"</div>
+                                            </div>
+                                            <div class="text-muted small">@a.CreatedAt.ToLocalTime().ToString("g")</div>
                                         </div>
-                                        <div class="text-muted small">@a.CreatedAt.ToLocalTime().ToString("g")</div>
-                                    </div>
-                                </li>
-                            }
-                        </ul>
-                    }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
                 </div>
-            </div>
+            }
         </div>
 
         <div class="col-lg-5">
@@ -178,7 +214,6 @@
                             }
                         </svg>
 
-                        @* month labels below svg *@
                         @if (MonthLabels?.Any() == true)
                         {
                             <div class="d-flex justify-content-between mt-2 small text-muted" style="font-size: 0.85rem;">
@@ -195,10 +230,10 @@
                             <small class="text-muted">This month</small>
                             <div class="fw-bold">@MonthChangeText</div>
                         </div>
-                        <div class="text-end">
+                        @* <div class="text-end">
                             <small class="text-muted">Revenue</small>
                             <div class="fw-bold">$34.2k</div>
-                        </div>
+                        </div> *@
                     </div>
                 </div>
             </div>
@@ -229,6 +264,7 @@
 </div>
 
 @code {
+    // counts & metrics
     private int TasksCount;
     private int CustomersCount;
     private int AuditCount;
@@ -237,23 +273,54 @@
     private int NewCustomersCount;
     private int RecentErrorsCount = 0;
 
+    // lists
     private List<TaskItemDto>? RecentTasks;
     private List<AuditLogDto>? RecentAudits;
 
+    // chart data
     private string ChartPoints = "";
     private List<(double X, double Y)> ChartDots = new();
     private List<string> MonthLabels = new();
     private List<int> ChartValues = new();
     private string MonthChangeText = "";
 
+    // polling timer
     private System.Threading.Timer? _refreshTimer;
-    private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(15); // poll every 15 seconds
+    private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(15);
+
+    // auth / role
+    private ClaimsPrincipal? _user;
+    private string? UserId;
+    private string UserDisplayName = "User";
+    private string UserRoleDisplay = "Unknown";
+    private bool IsAdmin = false;
+    private bool IsManager = false;
+    private bool IsUser = false;
 
     protected override async Task OnInitializedAsync()
     {
+        // determine user and role
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _user = authState.User;
+
+        if (_user?.Identity?.IsAuthenticated == true)
+        {
+            // get id and name from claims (adjust claim types if different in your token)
+            UserId = _user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? _user.FindFirst("sub")?.Value;
+            UserDisplayName = _user.Identity?.Name ?? _user.FindFirst("name")?.Value ?? "User";
+
+            // role claim commonly has type ClaimTypes.Role or "role"
+            var roleClaim = _user.FindFirst(ClaimTypes.Role)?.Value ?? _user.FindFirst("role")?.Value ?? "";
+            UserRoleDisplay = string.IsNullOrWhiteSpace(roleClaim) ? "User" : roleClaim;
+
+            IsAdmin = roleClaim?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true;
+            IsManager = roleClaim?.Equals("Manager", StringComparison.OrdinalIgnoreCase) == true;
+            IsUser = !IsAdmin && !IsManager;
+        }
+
         await LoadDashboardAsync();
 
-        // start a simple polling timer so the dashboard updates when backend changes (use SignalR for real-time in future)
+        // polling timer (keeps UI up to date)
         _refreshTimer = new System.Threading.Timer(async _ =>
         {
             try
@@ -264,10 +331,7 @@
                     StateHasChanged();
                 });
             }
-            catch
-            {
-                // swallow - dashboard should not crash the UI on polling failures
-            }
+            catch { /* swallow polling errors */ }
         }, null, _refreshInterval, _refreshInterval);
     }
 
@@ -276,44 +340,167 @@
         _refreshTimer?.Dispose();
     }
 
+    /// <summary>
+    /// Loads dashboard data according to role:
+    /// - Admin: all counts + top tasks + recent audits
+    /// - Manager: like admin but no audits
+    /// - User: only user-specific tasks and customers (no audits)
+    /// </summary>
     private async Task LoadDashboardAsync(bool updateOnly = false)
     {
         try
         {
-            // Top-level counts (these should come from your services)
-            TasksCount = await TaskService.GetTotalCountAsync();
-            CustomersCount = await CustomerService.GetTotalCountAsync();
-            AuditCount = await AuditService.GetTotalCountAsync();
+            if (IsAdmin)
+            {
+                // admin: load everything
+                TasksCount = await TaskService.GetTotalCountAsync();
+                CustomersCount = await CustomerService.GetTotalCountAsync();
+                AuditCount = await AuditService.GetTotalCountAsync();
 
-            OpenTasksCount = await TaskService.GetOpenCountAsync();
-            NewCustomersCount = await CustomerService.GetNewCountAsync(7);
+                OpenTasksCount = await TaskService.GetOpenCountAsync();
+                NewCustomersCount = await CustomerService.GetNewCountAsync(7);
 
+                // top tasks (server API supports take)
+                await LoadRecentTasksAsync();
 
-            // Recent lists
-            // RecentTasks = await TaskService.GetRecentTasksAsync(50);
-            // RecentAudits = await AuditService.GetRecentAsync(6);
+                // recent audits: client filters top 6 from GetAllAsync()
+                var all = await AuditService.GetAllAsync();
+                RecentAudits = all?
+                    .OrderByDescending(a => a.CreatedAt)
+                    .Take(6)
+                    .Select(a => new AuditLogDto
+                    {
+                        Id = a.Id,
+                        PerformedByUserId = a.PerformedByUserId,
+                        Action = a.Action,
+                        EntityName = a.EntityName,
+                        CreatedAt = a.CreatedAt
+                    })
+                    .ToList() ?? new List<AuditLogDto>();
+            }
+            else if (IsManager)
+            {
+                // manager: same as admin but do NOT fetch audit logs
+                TasksCount = await TaskService.GetTotalCountAsync();
+                CustomersCount = await CustomerService.GetTotalCountAsync();
 
-            // build chart from real data
+                OpenTasksCount = await TaskService.GetOpenCountAsync();
+                NewCustomersCount = await CustomerService.GetNewCountAsync(7);
+
+                await LoadRecentTasksAsync();
+
+                RecentAudits = new List<AuditLogDto>(); // intentionally empty
+                AuditCount = 0;
+            }
+            else // regular user
+            {
+                // user: only his tasks and his customers
+                // Tasks: call TaskService.GetByUserIdAsync(userId) - method exists in your TaskService
+                if (!string.IsNullOrWhiteSpace(UserId))
+                {
+                    try
+                    {
+                        var userTasks = await TaskService.GetByUserIdAsync(UserId);
+                        // map to TaskItemDto used by UI
+                        RecentTasks = userTasks?.Select(t => new TaskItemDto
+                        {
+                            TaskId = t.TaskId,
+                            Title = t.Title,
+                            DueDate = t.DueDate,
+                            Status = (t.GetType().GetProperty("Status") != null) ? t.GetType().GetProperty("Status")?.GetValue(t)?.ToString() ?? "" : ""
+                        }).Take(5).ToList() ?? new List<TaskItemDto>();
+
+                        TasksCount = RecentTasks.Count;
+                    }
+                    catch
+                    {
+                        // fallback to empty
+                        RecentTasks ??= new List<TaskItemDto>();
+                        TasksCount = RecentTasks.Count;
+                    }
+
+                    // Customers: your CustomerService may have a method to get customers for user.
+                    // Replace the method name below if your service exposes a different method.
+                    try
+                    {
+                        // TODO: if your CustomerService exposes GetByUserIdAsync use that.
+                        // Example: var userCustomers = await CustomerService.GetByUserIdAsync(UserId);
+                        // For now, fall back to total count or a paged fetch and filter on client side if needed.
+                        CustomersCount = await CustomerService.GetTotalCountAsync(); // fallback if no per-user method
+                    }
+                    catch
+                    {
+                        CustomersCount = 0;
+                    }
+
+                    // user should not see audit logs
+                    RecentAudits = new List<AuditLogDto>();
+                    AuditCount = 0;
+
+                    // Open tasks / new customers metrics for user
+                    try
+                    {
+                        OpenTasksCount = await TaskService.GetOpenCountAsync(); // you can implement user-scoped open count on server later
+                        NewCustomersCount = await CustomerService.GetNewCountAsync(7);
+                    }
+                    catch
+                    {
+                        OpenTasksCount = RecentTasks.Count(t => !string.IsNullOrWhiteSpace(t.Title));
+                        NewCustomersCount = 0;
+                    }
+                }
+                else
+                {
+                    // anonymous or missing user id: show nothing
+                    RecentTasks = new List<TaskItemDto>();
+                    RecentAudits = new List<AuditLogDto>();
+                    TasksCount = 0;
+                    CustomersCount = 0;
+                    OpenTasksCount = 0;
+                    NewCustomersCount = 0;
+                }
+            }
+
+            // build chart from real data (safe to call with empty list)
             BuildChart(RecentTasks ?? new List<TaskItemDto>());
 
             // compute small metric for "This month"
             ComputeMonthChangeText();
 
             if (!updateOnly)
-            {
-                // if full load, force render
                 StateHasChanged();
-            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to load dashboard data: {ex.Message}");
-            // keep previous values if any
             RecentTasks ??= new List<TaskItemDto>();
             RecentAudits ??= new List<AuditLogDto>();
         }
     }
 
+    // ---------- ADDED: Load top recent tasks (used by Tasks card) ----------
+    private async Task LoadRecentTasksAsync()
+    {
+        try
+        {
+            var list = await TaskService.GetRecentTasksAsync(5);
+            // TaskResponseDto -> TaskItemDto mapping
+            RecentTasks = list?.Select(t => new TaskItemDto
+            {
+                TaskId = t.TaskId,
+                Title = t.Title,
+                Status = t.GetType().GetProperty("Status") != null ? t.GetType().GetProperty("Status")?.GetValue(t)?.ToString() ?? "" : "",
+                DueDate = t.DueDate
+            }).ToList() ?? new List<TaskItemDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LoadRecentTasksAsync failed: {ex.Message}");
+            RecentTasks = RecentTasks ?? new List<TaskItemDto>();
+        }
+    }
+
+    // chart & helpers (unchanged)
     void BuildChart(List<TaskItemDto>? tasks)
     {
         var list = tasks ?? new List<TaskItemDto>();
@@ -321,7 +508,6 @@
         const int months = 8;
         var now = DateTime.UtcNow;
 
-        // build month buckets from oldest -> newest
         var buckets = new List<DateTime>();
         for (int i = months - 1; i >= 0; i--)
         {
@@ -329,7 +515,6 @@
             buckets.Add(dt);
         }
 
-        // Count tasks per bucket using DueDate if present; otherwise ignore
         var values = new List<int>();
         foreach (var bucket in buckets)
         {
@@ -341,13 +526,10 @@
             values.Add(count);
         }
 
-        // avoid degenerate graph
         if (values.All(v => v == 0))
         {
-            // try to show recent tasks count if any
             if (list.Any())
             {
-                // spread total across months
                 var avg = Math.Max(1, list.Count / months);
                 values = Enumerable.Repeat(avg, months).ToList();
             }
@@ -359,7 +541,6 @@
 
         ChartValues = values;
 
-        // SVG drawing area (must match viewbox)
         var width = 300.0;
         var height = 140.0;
         var margin = 10.0;
@@ -406,10 +587,8 @@
         MonthChangeText = change >= 0 ? $"+{change:0.0}%" : $"{change:0.0}%";
     }
 
-    // tooltip helper shows month label + task count
     private string GetTooltipForPoint((double X, double Y) p)
     {
-        // find nearest index by X coord
         var idx = ChartDots.FindIndex(d => Math.Abs(d.X - p.X) < 0.1);
         if (idx >= 0 && idx < MonthLabels.Count && idx < ChartValues.Count)
         {
@@ -438,10 +617,38 @@
         public DateTime CreatedAt { get; set; }
     }
 
-    // NEW: navigation handler (fixes Razor parsing error)
+    // navigation helpers
     private void NavigateToAuditLogs()
     {
         Navigation.NavigateTo("/admin/audit-log");
     }
-}
 
+    private void NavigateToTasks()
+    {
+        Navigation.NavigateTo("/tasks");
+    }
+    // helper to activate link on Enter or Space for accessibility
+    private void HandleKeyDown(KeyboardEventArgs e, Action action)
+    {
+        if (e == null) return;
+        // Enter or Space
+        if (e.Key == "Enter" || e.Key == " " || e.Key == "Spacebar")
+        {
+            action?.Invoke();
+        }
+    }
+
+    // navigation helpers (add/replace if you already have NavigateToTasks/NavigateToAuditLogs)
+  
+
+    private void NavigateToCustomers()
+    {
+        Navigation.NavigateTo("/customers");
+    }
+
+    private void NavigateToAnalytics()
+    {
+        Navigation.NavigateTo("/dashboard"); // change route if your analytics route differs
+    }
+
+}

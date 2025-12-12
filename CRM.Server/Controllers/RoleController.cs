@@ -8,7 +8,8 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")] // ✅ Enforced as per spec
+    [Authorize]
+    //[Authorize(Roles = "Admin")] // ✅ Enforced as per spec
     public class RoleController : ControllerBase
     {
         private readonly IRoleService _roleService;

@@ -2,129 +2,128 @@
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Customers
 @using CRM.Client.Services.Users
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 
 @inject CustomerService CustomerService
 @inject UserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 @if (IsOpen)
 {
     <div class="modal fade show d-block customer-modal-backdrop" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered customer-modal-dialog">
             <div class="modal-content customer-modal-content">
+
+                <!-- HEADER -->
                 <div class="modal-header customer-modal-header">
-                    <h5 class="modal-title customer-modal-title">
-                        🧑‍💼 Create Customer
-                    </h5>
+                    <h5 class="modal-title customer-modal-title">🧑‍💼 Create Customer</h5>
                     <button type="button" class="btn-close btn-close-white"
                             @onclick="() => Close(false)"></button>
                 </div>
 
+                <!-- BODY -->
                 <div class="modal-body customer-modal-body">
+
                     <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
-                        <ValidationSummary />
 
+                        <!-- NAME -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Name</div>
+
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label class="form-label">First Name</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.FirstName" />
+                                    <InputText class="form-control" @bind-Value="Model.FirstName" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label">Middle Name</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.MiddleName" />
+                                    <InputText class="form-control" @bind-Value="Model.MiddleName" />
                                 </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label">Surname</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.SurName" />
+                                    <InputText class="form-control" @bind-Value="Model.SurName" />
+                                    <ValidationMessage For="@(() => Model.SurName)" class="text-danger validation-message" />
                                 </div>
                             </div>
 
                             <div class="mt-3">
                                 <label class="form-label">Preferred Name</label>
-                                <InputText class="form-control"
-                                           @bind-Value="Model.PreferredName" />
+                                <InputText class="form-control" @bind-Value="Model.PreferredName" />
                             </div>
                         </div>
 
+                        <!-- CONTACT -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Contact</div>
+
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Email</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.Email" />
+                                    <InputText class="form-control" @bind-Value="Model.Email" />
+                                    <ValidationMessage For="@(() => Model.Email)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label">Phone</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.Phone" />
+                                    <InputText class="form-control" @bind-Value="Model.Phone" />
+                                    <ValidationMessage For="@(() => Model.Phone)" class="text-danger validation-message" />
                                 </div>
                             </div>
                         </div>
 
+                        <!-- ADDRESS -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Address</div>
-                            <div>
-                                <label class="form-label">Address</label>
-                                <InputTextArea class="form-control"
-                                               rows="3"
-                                               @bind-Value="Model.Address" />
-                            </div>
+
+                            <InputTextArea class="form-control" rows="3" @bind-Value="Model.Address" />
+                            <ValidationMessage For="@(() => Model.Address)" class="text-danger validation-message" />
                         </div>
 
-                        <div class="customer-section mb-1">
+                        <!-- META -->
+                        <div class="customer-section mb-2">
                             <div class="customer-section-title">Meta</div>
 
-                            <div class="row g-3 align-items-end">
+                            <div class="row g-3 align-items-center">
+
                                 <div class="col-md-8">
                                     <label class="form-label">Created By User</label>
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="SelectedUserId">
-                                        <option value="">-- Select user --</option>
-                                        @if (Users is not null)
-                                        {
-                                            @foreach (var user in Users)
-                                            {
-                                                var display = string.IsNullOrWhiteSpace(user.FullName)
-                                                ? user.Email
-                                                : $"{user.FullName} ({user.Email})";
 
-                                                <option value="@user.Id">@display</option>
-                                            }
+                                    <!-- FROZEN DROPDOWN: ALWAYS DISABLED, ALWAYS LOGGED-IN USER -->
+                                    <InputSelect class="form-select" @bind-Value="SelectedUserId" disabled>
+                                        @if (LoggedInUser != null)
+                                        {
+                                            <option value="@LoggedInUser.Id">
+                                                @LoggedInUserLabel
+                                            </option>
                                         }
                                     </InputSelect>
+
+                                    <ValidationMessage For="@(() => Model.CreatedByUserId)" class="text-danger validation-message" />
                                 </div>
 
-                                <div class="col-md-4">
-                                    <div class="customer-meta-note">
-                                        Later we can auto-fill this with the logged-in user.
-                                    </div>
-                                </div>
                             </div>
                         </div>
+
+                        <button type="submit" class="btn btn-success w-100 mt-3">
+                            Save Customer
+                        </button>
+
                     </EditForm>
                 </div>
 
+                <!-- FOOTER -->
                 <div class="modal-footer customer-modal-footer">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
+                    <button class="btn btn-outline-secondary"
                             @onclick="() => Close(false)">
                         Cancel
                     </button>
-                    <button type="button"
-                            class="btn btn-success"
-                            @onclick="Submit">
-                        Save Customer
-                    </button>
                 </div>
+
             </div>
         </div>
     </div>
@@ -135,47 +134,62 @@
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private CustomerCreateDto Model { get; set; } = new();
-
     private List<UserResponseDto>? Users;
+
+    private UserResponseDto? LoggedInUser;
     private string? SelectedUserId;
+
+    private string LoggedInUserLabel =>
+        string.IsNullOrWhiteSpace(LoggedInUser?.FullName)
+            ? LoggedInUser?.Email ?? ""
+            : $"{LoggedInUser.FullName} ({LoggedInUser.Email})";
+
+    private bool _lookupsLoaded;
 
     protected override async Task OnParametersSetAsync()
     {
-        if (IsOpen && Users == null)
+        if (IsOpen && !_lookupsLoaded)
         {
-            // Load users list once when modal is first opened
-            Users = await UserService.GetAllUsersAsync();
+            await LoadLoggedInUser();
+            _lookupsLoaded = true;
+        }
+    }
+
+    private async Task LoadLoggedInUser()
+    {
+        Users = await UserService.GetAllUsersAsync();
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = auth.User;
+
+        string? userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? user.FindFirst("sub")?.Value;
+
+        string? email = user.FindFirst(ClaimTypes.Email)?.Value;
+
+        LoggedInUser = Users?.FirstOrDefault(u => u.Id == userId)
+                    ?? Users?.FirstOrDefault(u => u.Email == email);
+
+        if (LoggedInUser != null)
+        {
+            SelectedUserId = LoggedInUser.Id;
+
+            if (Guid.TryParse(LoggedInUser.Id, out var uid))
+                Model.CreatedByUserId = uid;
         }
     }
 
     private async Task HandleValidSubmit()
     {
-        // Need a user selected and convertible to Guid
-        if (string.IsNullOrWhiteSpace(SelectedUserId) ||
-            !Guid.TryParse(SelectedUserId, out var createdById))
-        {
-            // You can add a validation message later
-            return;
-        }
-
-        Model.CreatedByUserId = createdById;
+        if (Guid.TryParse(SelectedUserId, out var uid))
+            Model.CreatedByUserId = uid;
 
         await CustomerService.CreateAsync(Model);
-
         await Close(true);
-    }
-
-    private async Task Submit()
-    {
-        await HandleValidSubmit();
     }
 
     private async Task Close(bool refresh)
     {
-        // reset form for next open
         Model = new CustomerCreateDto();
-        SelectedUserId = null;
-
         await OnClose.InvokeAsync(refresh);
     }
 }

@@ -110,7 +110,8 @@ builder.Entity<TaskItem>(entity =>
     entity.HasOne(t => t.CreatedBy)
           .WithMany()                       // or .WithMany(u => u.TasksCreated) if you add a collection
           .HasForeignKey(t => t.CreatedByUserId)
-          .OnDelete(DeleteBehavior.NoAction);
+          .OnDelete(DeleteBehavior.SetNull);
+    // Update property name to match your model if different
 });
 
 
