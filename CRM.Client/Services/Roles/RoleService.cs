@@ -19,7 +19,8 @@ namespace CRM.Client.Services.Roles
         // CREATE ROLE
         public async Task CreateRoleAsync(CreateRoleDto dto)
         {
-            await _api.PostAsync("api/role/create", dto);
+            // explicit generic args: request type and response type
+            await _api.PostAsync<CreateRoleDto, object?>("api/role/create", dto);
         }
 
         // GET ALL ROLES
@@ -101,7 +102,7 @@ namespace CRM.Client.Services.Roles
         // ASSIGN ROLE TO USER
         public async Task AssignRoleAsync(AssignRoleDto dto)
         {
-            await _api.PostAsync("api/user/assign", dto);
+            await _api.PostAsync<AssignRoleDto, object?>("api/user/assign", dto);
         }
     }
 }
