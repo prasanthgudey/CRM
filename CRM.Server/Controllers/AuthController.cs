@@ -54,6 +54,7 @@ namespace CRM.Server.Controllers
         // ✅ LOGIN WITH JWT + ROLE + ACTIVE CHECK + AUDIT
         // =====================================================
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<IActionResult> Login(LoginRequestDto dto)
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -325,6 +326,115 @@ namespace CRM.Server.Controllers
         // =====================================================
         // ✅ FORGOT PASSWORD  
         // =====================================================
+
+
+        // DTOs assumed to exist in CRM.Server.DTOs.Auth:
+        // public class ForgotPasswordDto { public string Email { get; set; } }
+        // public class ResetPasswordDto { public string Email { get; set; } public string Token { get; set; } public string NewPassword { get; set; } }
+
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+            try
+            {
+                // The service handles "no user found" silently to avoid enumeration
+                await _userService.ForgotPasswordAsync(dto.Email);
+
+                // Audit the request (do not include whether user existed)
+                await SafeAudit(null, "Forgot Password Requested", "Authentication", true, ip, null, dto.Email);
+
+                // Generic response
+                return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
+            }
+            catch (Exception ex)
+            {
+                // Audit failure but still return same generic message to avoid leaking info
+                try { await SafeAudit(null, "Forgot Password Failed", "Authentication", false, ip, null, ex.Message); } catch { }
+
+                return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
+            }
+        }
+
+
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = Request.Headers["User-Agent"].ToString();
+
+            try
+            {
+                // 1) Perform the reset (service updates PasswordLastChanged)
+                await _userService.ResetPasswordAsync(dto.Email, dto.Token, dto.NewPassword);
+
+                // 2) Load user; if not found, treat as generic failure (avoid enumeration)
+                var user = await _userManager.FindByEmailAsync(dto.Email);
+                if (user == null)
+                {
+                    await SafeAudit(null, "Password Reset Failed", "Authentication", false, ip, null, "User not found after reset");
+                    // Return generic message
+                    return BadRequest(new { error = "invalid_request", message = "Could not complete request." });
+                }
+
+                // 3) Revoke all existing refresh tokens & sessions for security (optional but recommended)
+                try
+                {
+                    await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(user.Id);
+                    await _userSessionService.RevokeAllSessionsForUserAsync(user.Id);
+                }
+                catch
+                {
+                    // swallow — don't block the flow if cleanup fails
+                }
+
+                // 4) Create a new session
+                int? absoluteLifetime = _sessionSettings.AbsoluteSessionLifetimeMinutes > 0
+                    ? _sessionSettings.AbsoluteSessionLifetimeMinutes
+                    : (int?)null;
+
+                var session = await _userSessionService.CreateSessionAsync(user.Id, ip, userAgent, absoluteLifetime);
+
+                // 5) Generate JWT including session id
+                var roles = await _userManager.GetRolesAsync(user);
+                var token = _jwtTokenService.GenerateToken(user, roles, session.Id);
+
+                // 6) Create refresh token and link it to the session
+                var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays);
+                await _userSessionService.LinkRefreshTokenToSessionAsync(session.Id, refresh.Id);
+
+                // 7) Audit
+                await SafeAudit(user.Id, "Password Reset (Token)", "Authentication", true, ip, null, null);
+
+                // 8) Return tokens
+                return Ok(new AuthResponseDto
+                {
+                    Token = token,
+                    Expiration = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
+                    RefreshToken = refresh.Token,
+                    RefreshExpiresAt = refresh.ExpiresAt
+                });
+            }
+            catch (Exception ex)
+            {
+                // Audit failure (do not reveal details to client)
+                try { await SafeAudit(null, "Password Reset Failed", "Authentication", false, ip, null, ex.Message); } catch { }
+
+                // Generic error response to avoid token/username enumeration or leaking internal errors
+                return BadRequest(new { error = "invalid_request", message = "Invalid token or request." });
+            }
+        }
+
+
+
+
+
+
+
+
         [HttpPost("logout")]
         [Authorize]
         public async Task<IActionResult> Logout()

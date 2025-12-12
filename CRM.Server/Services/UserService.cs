@@ -433,11 +433,20 @@ namespace CRM.Server.Services
 
             var decodedToken = Uri.UnescapeDataString(token);
 
+            // Reset password without knowing the old password
             var result = await _userManager.ResetPasswordAsync(user, decodedToken, newPassword);
 
             if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
+
+            // Update password timestamp for security policies (same as ChangePassword)
+            user.PasswordLastChanged = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            // OPTIONAL: revoke refresh tokens (recommended for security)
+            // await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(user.Id);
         }
+
 
         // ============================================================
         // 10) Change Password (no audit here - handled in auth)

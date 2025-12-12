@@ -251,22 +251,29 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ✅ ✅ ✅ CORS MUST BE HERE
+// GLOBAL EXCEPTION HANDLING - place early so it can catch downstream errors
+//app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// ROUTING must come before anything that uses endpoint metadata (context.GetEndpoint)
+app.UseRouting();
+
+// CORS when using endpoint routing: between UseRouting and endpoint execution
 app.UseCors("LocalDev");
 
-// ✅ Global exception handling
-app.UseMiddleware<GlobalExceptionMiddleware>();
-
-// ✅ Audit logging middleware
-//app.UseMiddleware<AuditLogMiddleware>();
-
-// ✅ JWT Authentication & Authorization (ORDER MATTERS)
+// Authentication populates HttpContext.User (required by SessionActivityMiddleware)
 app.UseAuthentication();
 
+// SessionActivityMiddleware needs:
+//  - endpoint metadata (so it must run after UseRouting)
+//  - an authenticated HttpContext.User (so it must run after UseAuthentication)
+// Place it BEFORE UseAuthorization so it can deny/revoke sessions before policy enforcement.
 app.UseMiddleware<SessionActivityMiddleware>();
+
+// Authorization runs after session checks, so policies and [Authorize] are enforced on validated sessions
 app.UseAuthorization();
 
-
+// Map controllers / endpoints last
 app.MapControllers();
 
 app.Run();
+
