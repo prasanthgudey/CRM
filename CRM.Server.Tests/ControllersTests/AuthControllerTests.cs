@@ -1,311 +1,249 @@
-﻿//using System;
-//using System.Collections.Generic;
-//using System.Security.Claims;
-//using System.Threading.Tasks;
-//using CRM.Server.Controllers;
-//using CRM.Server.DTOs.Auth;
-//using CRM.Server.Models;
-//using CRM.Server.Services.Interfaces;
-//using Microsoft.AspNetCore.Http;
-//using Microsoft.AspNetCore.Identity;
-//using Microsoft.AspNetCore.Mvc;
-//using Moq;
-//using Xunit;
+﻿using Xunit;
+using Moq;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Security.Claims;
 
-//namespace CRM.Tests.Controllers
-//{
-//    public class AuthControllerTests
-//    {
-//        private readonly Mock<UserManager<ApplicationUser>> _userManagerMock;
-//        private readonly Mock<IJwtTokenService> _jwtMock;
-//        private readonly Mock<IUserService> _userServiceMock;
-//        private readonly Mock<IAuditLogService> _auditMock;
-//        private readonly AuthController _controller;
+using CRM.Server.Controllers;
+using CRM.Server.Models;
+using CRM.Server.DTOs.Auth;
+using CRM.Server.Security;
+using CRM.Server.Services.Interfaces;
 
-//        public AuthControllerTests()
-//        {
-//            _userManagerMock = MockUserManager();
-//            _jwtMock = new Mock<IJwtTokenService>();
-//            _userServiceMock = new Mock<IUserService>();
-//            _auditMock = new Mock<IAuditLogService>();
+public class AuthControllerTests
+{
+    private readonly Mock<UserManager<ApplicationUser>> _userManager;
+    private readonly Mock<IJwtTokenService> _jwt = new();
+    private readonly Mock<IUserService> _userService = new();
+    private readonly Mock<IAuditLogService> _audit = new();
+    private readonly Mock<IRefreshTokenService> _refresh = new();
+    private readonly Mock<IUserSessionService> _session = new();
+    private readonly Mock<ILogger<AuthController>> _logger = new();
 
-//            _controller = new AuthController(
-//                _userManagerMock.Object,
-//                _jwtMock.Object,
-//                _userServiceMock.Object,
-//                _auditMock.Object);
+    private readonly AuthController _controller;
 
-//            // Fake request context for IP
-//            _controller.ControllerContext = new ControllerContext
-//            {
-//                HttpContext = new DefaultHttpContext()
-//                {
-//                    Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("1.2.3.4") }
-//                }
-//            };
-//        }
+    public AuthControllerTests()
+    {
+        _userManager = CreateUserManagerMock();
 
-//        // Helper to mock UserManager
-//        private Mock<UserManager<ApplicationUser>> MockUserManager()
-//        {
-//            var store = new Mock<IUserStore<ApplicationUser>>();
-//            return new Mock<UserManager<ApplicationUser>>(
-//                store.Object, null, null, null, null, null, null, null, null
-//            );
-//        }
+        var refreshOpts = Options.Create(new RefreshTokenSettings
+        {
+            RefreshTokenExpiryDays = 30,
+            RotationEnabled = true
+        });
 
-//        private ApplicationUser User(string id = "u1", string email = "test@crm.com", bool active = true)
-//        {
-//            return new ApplicationUser
-//            {
-//                Id = id,
-//                Email = email,
-//                UserName = email,
-//                IsActive = active,
-//                TwoFactorEnabled = false
-//            };
-//        }
+        var jwtOpts = Options.Create(new JwtSettings
+        {
+            ExpiryMinutes = 60
+        });
 
-//        // ---------------------------------------------------------
-//        // 1) LOGIN SUCCESS
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task Login_WhenValid_ReturnsToken()
-//        {
-//            var user = User();
-//            _userManagerMock.Setup(u => u.FindByEmailAsync("test@crm.com")).ReturnsAsync(user);
-//            _userManagerMock.Setup(u => u.CheckPasswordAsync(user, "pass")).ReturnsAsync(true);
-//            _userManagerMock.Setup(u => u.GetRolesAsync(user))
-//                .ReturnsAsync(new List<string> { "Admin" });
+        var sessionOpts = Options.Create(new SessionSettings
+        {
+            AbsoluteSessionLifetimeMinutes = 120
+        });
 
-//            _jwtMock.Setup(j => j.GenerateToken(user, It.IsAny<IList<string>>()))
-//        .Returns("jwt_token");
+        _controller = new AuthController(
+            _userManager.Object,
+            _jwt.Object,
+            _userService.Object,
+            _audit.Object,
+            _refresh.Object,
+            refreshOpts,
+            jwtOpts,
+            _session.Object,
+            sessionOpts,
+            _logger.Object
+        );
 
+        // Mock HttpContext + IP + User-Agent
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
 
-//            var result = await _controller.Login(new LoginRequestDto
-//            {
-//                Email = "test@crm.com",
-//                Password = "pass"
-//            }) as OkObjectResult;
+        _controller.HttpContext.Connection.RemoteIpAddress = IPAddress.Parse("127.0.0.1");
+        _controller.HttpContext.Request.Headers["User-Agent"] = "UnitTest-Agent";
+    }
 
-//            Assert.NotNull(result);
-//            var dto = result.Value as AuthResponseDto;
-//            Assert.Equal("jwt_token", dto!.Token);
+    // --------------------------------------------
+    // 1. User not found → Unauthorized
+    // --------------------------------------------
+    [Fact]
+    public async Task Login_UserNotFound_ReturnsUnauthorized()
+    {
+        _userManager.Setup(x => x.FindByEmailAsync("test@mail.com"))
+            .ReturnsAsync((ApplicationUser?)null);
 
-//            _auditMock.Verify(a => a.LogAsync(
-//                "u1",
-//                null,
-//                "Login Success",
-//                "Authentication",
-//                true,
-//                "1.2.3.4",
-//                null,
-//                null
-//            ), Times.Once);
-//        }
+        var result = await _controller.Login(new LoginRequestDto
+        {
+            Email = "test@mail.com",
+            Password = "123"
+        });
 
-//        // ---------------------------------------------------------
-//        // 2) LOGIN INVALID PASSWORD
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task Login_WhenInvalidPassword_ReturnsUnauthorized()
-//        {
-//            var user = User();
-//            _userManagerMock.Setup(u => u.FindByEmailAsync("test@crm.com")).ReturnsAsync(user);
-//            _userManagerMock.Setup(u => u.CheckPasswordAsync(user, "pass")).ReturnsAsync(false);
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
 
-//            var result = await _controller.Login(new LoginRequestDto
-//            {
-//                Email = "test@crm.com",
-//                Password = "pass"
-//            });
+    // --------------------------------------------
+    // 2. User inactive → Unauthorized
+    // --------------------------------------------
+    [Fact]
+    public async Task Login_UserInactive_ReturnsUnauthorized()
+    {
+        var user = new ApplicationUser { Email = "test@mail.com", IsActive = false };
 
-//            Assert.IsType<UnauthorizedObjectResult>(result);
+        _userManager.Setup(x => x.FindByEmailAsync(user.Email)).ReturnsAsync(user);
 
-//            _auditMock.Verify(a => a.LogAsync(
-//                "u1",
-//                null,
-//                "Login Failed",
-//                "Authentication",
-//                false,
-//                "1.2.3.4",
-//                null,
-//                "Invalid password"
-//            ), Times.Once);
-//        }
+        var result = await _controller.Login(new LoginRequestDto
+        {
+            Email = user.Email,
+            Password = "123"
+        });
 
-//        // ---------------------------------------------------------
-//        // 3) LOGIN INACTIVE USER
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task Login_WhenUserInactive_ReturnsUnauthorized()
-//        {
-//            var user = User(active: false);
-//            _userManagerMock.Setup(u => u.FindByEmailAsync("test@crm.com")).ReturnsAsync(user);
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
 
-//            var result = await _controller.Login(new LoginRequestDto
-//            {
-//                Email = "test@crm.com",
-//                Password = "pass"
-//            });
+    // --------------------------------------------
+    // 3. Invalid password → Unauthorized
+    // --------------------------------------------
+    [Fact]
+    public async Task Login_InvalidPassword_ReturnsUnauthorized()
+    {
+        var user = new ApplicationUser { Email = "test@mail.com", IsActive = true };
 
-//            Assert.IsType<UnauthorizedObjectResult>(result);
+        _userManager.Setup(x => x.FindByEmailAsync(user.Email)).ReturnsAsync(user);
+        _userManager.Setup(x => x.CheckPasswordAsync(user, "wrong"))
+            .ReturnsAsync(false);
 
-//            _auditMock.Verify(a => a.LogAsync(
-//                "u1",
-//                null,
-//                "Login Failed",
-//                "Authentication",
-//                false,
-//                "1.2.3.4",
-//                null,
-//                "Account is deactivated"
-//            ));
-//        }
+        var result = await _controller.Login(new LoginRequestDto
+        {
+            Email = user.Email,
+            Password = "wrong"
+        });
 
-//        // ---------------------------------------------------------
-//        // 4) LOGIN WITH MFA REQUIRED
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task Login_WhenMfaEnabled_ReturnsMfaRequired()
-//        {
-//            var user = User();
-//            user.TwoFactorEnabled = true;
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
 
-//            _userManagerMock.Setup(u => u.FindByEmailAsync("test@crm.com")).ReturnsAsync(user);
-//            _userManagerMock.Setup(u => u.CheckPasswordAsync(user, "pass")).ReturnsAsync(true);
+    // --------------------------------------------
+    // 4. MFA required → Returns MFA prompt
+    // --------------------------------------------
+    [Fact]
+    public async Task Login_MfaEnabled_ReturnsMfaRequired()
+    {
+        var user = new ApplicationUser
+        {
+            Email = "test@mail.com",
+            IsActive = true,
+            TwoFactorEnabled = true
+        };
 
-//            var result = await _controller.Login(new LoginRequestDto
-//            {
-//                Email = "test@crm.com",
-//                Password = "pass"
-//            }) as OkObjectResult;
+        _userManager.Setup(x => x.FindByEmailAsync(user.Email)).ReturnsAsync(user);
+        _userManager.Setup(x => x.CheckPasswordAsync(user, "123")).ReturnsAsync(true);
 
-//            Assert.NotNull(result);
-//            var dto = result.Value as AuthResponseDto;
-//            Assert.True(dto!.MfaRequired);
-//        }
+        var result = await _controller.Login(new LoginRequestDto
+        {
+            Email = user.Email,
+            Password = "123"
+        });
 
-//        // ---------------------------------------------------------
-//        // 5) MFA LOGIN SUCCESS
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task MfaLogin_WhenValid_ReturnsToken()
-//        {
-//            var user = User();
-//            _userManagerMock.Setup(u => u.FindByEmailAsync("test@crm.com")).ReturnsAsync(user);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<AuthResponseDto>(ok.Value);
 
-//            _userManagerMock.Setup(u => u.VerifyTwoFactorTokenAsync(
-//                user,
-//                TokenOptions.DefaultAuthenticatorProvider,
-//                "123456"))
-//                .ReturnsAsync(true);
+        Assert.True(dto.MfaRequired);
+        Assert.Equal(user.Email, dto.Email);
+    }
 
-//            _userManagerMock.Setup(u => u.GetRolesAsync(user))
-//                .ReturnsAsync(new List<string> { "Admin" });
+    // --------------------------------------------
+    // 5. Password expired → 403 Forbidden
+    // --------------------------------------------
+    [Fact]
+    public async Task Login_PasswordExpired_Returns403()
+    {
+        var user = new ApplicationUser
+        {
+            Id = "U1",
+            Email = "expired@mail.com",
+            IsActive = true
+        };
 
-//            _jwtMock.Setup(j => j.GenerateToken(user, It.IsAny<IList<string>>()))
-//         .Returns("jwt_token");
+        _userManager.Setup(x => x.FindByEmailAsync(user.Email)).ReturnsAsync(user);
+        _userManager.Setup(x => x.CheckPasswordAsync(user, "123")).ReturnsAsync(true);
 
+        _userService.Setup(x => x.IsPasswordExpiredAsync(user))
+            .ReturnsAsync(true);
 
-//            var result = await _controller.MfaLogin(new MfaLoginDto
-//            {
-//                Email = "test@crm.com",
-//                Code = "123456"
-//            }) as OkObjectResult;
+        var result = await _controller.Login(new LoginRequestDto
+        {
+            Email = user.Email,
+            Password = "123"
+        });
 
-//            Assert.NotNull(result);
-//            var dto = result.Value as AuthResponseDto;
-//            Assert.Equal("jwt_token", dto!.Token);
-//        }
+        var res = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, res.StatusCode);
+    }
 
-//        // ---------------------------------------------------------
-//        // 6) MFA LOGIN INVALID
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task MfaLogin_WhenInvalidCode_ReturnsUnauthorized()
-//        {
-//            var user = User();
-//            _userManagerMock.Setup(u => u.FindByEmailAsync("test@crm.com")).ReturnsAsync(user);
+    // --------------------------------------------
+    // 6. Login success → Returns JWT + Refresh token
+    // --------------------------------------------
+    [Fact]
+    public async Task Login_Success_ReturnsTokens()
+    {
+        var user = new ApplicationUser
+        {
+            Id = "U1",
+            Email = "active@mail.com",
+            IsActive = true
+        };
 
-//            _userManagerMock.Setup(u => u.VerifyTwoFactorTokenAsync(
-//                user,
-//                TokenOptions.DefaultAuthenticatorProvider,
-//                "111"))
-//                .ReturnsAsync(false);
+        _userManager.Setup(x => x.FindByEmailAsync(user.Email)).ReturnsAsync(user);
+        _userManager.Setup(x => x.CheckPasswordAsync(user, "123")).ReturnsAsync(true);
+        _userService.Setup(x => x.IsPasswordExpiredAsync(user)).ReturnsAsync(false);
 
-//            var result = await _controller.MfaLogin(new MfaLoginDto
-//            {
-//                Email = "test@crm.com",
-//                Code = "111"
-//            });
+        _userManager.Setup(x => x.GetRolesAsync(user))
+            .ReturnsAsync(new List<string> { "Admin" });
 
-//            Assert.IsType<UnauthorizedObjectResult>(result);
-//        }
+        var session = new UserSession { Id = "SID1" };
+        _session.Setup(x => x.CreateSessionAsync(user.Id, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()))
+            .ReturnsAsync(session);
 
-//        // ---------------------------------------------------------
-//        // 7) LOGOUT
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task Logout_LogsAudit()
-//        {
-//            // Mock user identity
-//            var claims = new ClaimsIdentity(new[]
-//            {
-//                new Claim(ClaimTypes.NameIdentifier, "u1")
-//            });
+        _jwt.Setup(x => x.GenerateToken(user, It.IsAny<IList<string>>(), "SID1"))
+     .Returns("jwt-token");
 
-//            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(claims);
+        var refreshToken = new RefreshToken
+        {
+            Id = "R1",
+            Token = "refresh-token",
+            ExpiresAt = DateTime.UtcNow.AddDays(30)
+        };
 
-//            var result = await _controller.Logout() as OkObjectResult;
+        _refresh.Setup(x => x.CreateRefreshTokenAsync(user.Id, It.IsAny<string>(), It.IsAny<string>(), 30, "SID1"))
+            .ReturnsAsync(refreshToken);
 
-//            Assert.NotNull(result);
+        var result = await _controller.Login(new LoginRequestDto
+        {
+            Email = user.Email,
+            Password = "123"
+        });
 
-//            _auditMock.Verify(a => a.LogAsync(
-//                "u1",
-//                null,
-//                "Logout",
-//                "Authentication",
-//                true,
-//                "1.2.3.4",
-//                null,
-//                null
-//            ), Times.Once);
-//        }
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<AuthResponseDto>(ok.Value);
 
-//        // ---------------------------------------------------------
-//        // 8) CHANGE PASSWORD
-//        // ---------------------------------------------------------
-//        [Fact]
-//        public async Task ChangePassword_ReturnsOk_AndAudits()
-//        {
-//            var claims = new ClaimsIdentity(new[]
-//            {
-//                new Claim(ClaimTypes.NameIdentifier, "u1")
-//            });
+        Assert.Equal("jwt-token", dto.Token);
+        Assert.Equal("refresh-token", dto.RefreshToken);
+    }
 
-//            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(claims);
-
-//            var dto = new ChangePasswordDto
-//            {
-//                CurrentPassword = "old",
-//                NewPassword = "new"
-//            };
-
-//            var result = await _controller.ChangePassword(dto);
-
-//            Assert.IsType<OkObjectResult>(result);
-
-//            _auditMock.Verify(a => a.LogAsync(
-//                "u1",
-//                null,
-//                "Password Changed",
-//                "Authentication",
-//                true,
-//                "1.2.3.4",
-//                null,
-//                null
-//            ), Times.Once);
-//        }
-//    }
-//}
+    // --------------------------------------------
+    // Helper: Create mock UserManager
+    // --------------------------------------------
+    private static Mock<UserManager<ApplicationUser>> CreateUserManagerMock()
+    {
+        var store = new Mock<IUserStore<ApplicationUser>>();
+        return new Mock<UserManager<ApplicationUser>>(
+            store.Object,
+            null, null, null, null, null, null, null, null
+        );
+    }
+}

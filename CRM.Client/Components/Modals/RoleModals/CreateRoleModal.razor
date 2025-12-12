@@ -7,11 +7,7 @@
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
         <div class="modal-card shadow"
-             style="
-                width: 540px;
-                border-radius: 14px;
-                padding: 32px 36px;
-                background: white;">
+             style="width: 540px; border-radius: 14px; padding: 32px 36px; background: white;">
 
             <h5 class="mb-3 text-center">Create New Role</h5>
 
@@ -20,15 +16,18 @@
                 <div class="alert alert-info py-2">@Message</div>
             }
 
-            <EditForm Model="RoleModel" OnValidSubmit="CreateRole">
+            <EditForm EditContext="editContext" OnValidSubmit="CreateRole">
                 <DataAnnotationsValidator />
 
                 <!-- Role Name -->
                 <div class="form-group mt-3">
                     <label class="small text-muted">Role Name</label>
+
                     <InputText class="form-control"
                                placeholder="Enter role name (e.g. Admin)"
                                @bind-Value="RoleModel.RoleName" />
+
+                    <ValidationMessage For="@(() => RoleModel.RoleName)" />
                 </div>
 
                 <!-- Buttons -->
@@ -45,11 +44,9 @@
                     </button>
                 </div>
             </EditForm>
-
         </div>
     </div>
 }
-
 
 @code {
 
@@ -57,94 +54,60 @@
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private CreateRoleDto RoleModel { get; set; } = new();
+    private EditContext editContext;
     private bool IsLoading;
     private string? Message;
 
-    // Guard: true after first client render (JS interop available)
-    private bool _isInteractive = false;
-
-    // Mark component interactive after first render
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnParametersSet()
     {
-        if (firstRender)
+        if (IsOpen)
         {
-            _isInteractive = true;
-        }
-        return base.OnAfterRenderAsync(firstRender);
-    }
-
-    // Helper to safely call your crmAlerts. If JS not ready, fallback to inline message.
-    private async Task ShowAlertAsync(string kind, string text)
-    {
-        // kind: "success", "error", "warning", etc — maps to your crmAlerts functions
-        if (!_isInteractive)
-        {
-            // Fallback while prerendering or before circuit ready
-            // For validation (warning) we want immediate feedback in UI
-            Message = text;
-            return;
-        }
-
-        try
-        {
-            // prefer calling your crmAlerts helpers - adjust names if different
-            if (kind.Equals("success", StringComparison.OrdinalIgnoreCase))
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", text);
-            else if (kind.Equals("error", StringComparison.OrdinalIgnoreCase))
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", text);
-            else if (kind.Equals("warning", StringComparison.OrdinalIgnoreCase))
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showWarning", text);
-            else
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showInfo", text);
-        }
-        catch
-        {
-            // In case JS call still fails for some reason, show inline message
-            Message = text;
+            RoleModel = new CreateRoleDto();
+            editContext = new EditContext(RoleModel);
+            Message = null;
         }
     }
 
     private async Task CreateRole()
     {
-        Message = null;
-
-        // client-side validation: require a role name
-        if (string.IsNullOrWhiteSpace(RoleModel?.RoleName))
-        {
-            await ShowAlertAsync("warning", "Please enter a role name.");
-            return;
-        }
-
         IsLoading = true;
+        Message = null;
 
         try
         {
-            // Call API
             await RoleService.CreateRoleAsync(RoleModel);
 
-            // SUCCESS: exact same behavior as before
-            await ShowAlertAsync("success", "Role created successfully!");
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role created successfully!");
 
-            RoleModel = new CreateRoleDto(); // reset form
+            RoleModel = new CreateRoleDto();
+            editContext = new EditContext(RoleModel);
 
             await Task.Delay(400);
-            await OnClose.InvokeAsync(true);  // parent reload
+            await OnClose.InvokeAsync(true);
         }
         catch (Exception ex)
         {
+            Console.WriteLine("🔥 RAW API ERROR: " + ex.Message);
+
             var msg = ex.Message?.ToLower() ?? "";
 
-            // Duplicate role detection - same messages as you used before
-            if (msg.Contains("exists") || msg.Contains("already") || msg.Contains("duplicate"))
+            // 1️⃣ Try to extract backend JSON { message: "..." }
+            string cleanMessage = ExtractBackendMessage(ex.Message).ToLower();
+
+            // 2️⃣ Detect duplicate role (backend OR raw text)
+            if (cleanMessage.Contains("role") && cleanMessage.Contains("exist") ||
+                msg.Contains("already") ||
+                msg.Contains("exists") ||
+                msg.Contains("duplicate") ||
+                msg.Contains("409"))
             {
                 Message = "Role already exists.";
-                await ShowAlertAsync("error", "Role already exists!");
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Role already exists!");
             }
             else
             {
-                // Generic failure (same text as your original catch)
                 Message = "Failed to create role.";
-                await ShowAlertAsync("error", "Failed to create role!");
+                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", cleanMessage);
             }
         }
         finally
@@ -153,10 +116,31 @@
         }
     }
 
+
+
     private async Task Close()
     {
         RoleModel = new();
+        editContext = new EditContext(RoleModel);
         Message = null;
+
         await OnClose.InvokeAsync(false);
     }
+    private string ExtractBackendMessage(string raw)
+    {
+        try
+        {
+            var json = System.Text.Json.JsonDocument.Parse(raw);
+
+            if (json.RootElement.TryGetProperty("message", out var msgProp))
+                return msgProp.GetString() ?? raw;
+        }
+        catch
+        {
+            // not JSON → return raw
+        }
+
+        return raw;
+    }
+
 }
