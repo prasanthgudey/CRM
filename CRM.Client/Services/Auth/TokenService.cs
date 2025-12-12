@@ -32,7 +32,7 @@ namespace CRM.Client.Services.Auth
             try
             {
                 // localStorage call — may throw during prerender
-                return await _js.InvokeAsync<string?>("localStorage.getItem", TOKEN_KEY);
+                return await _js.InvokeAsync<string?>("localStorage.getItem", ACCESS_TOKEN_KEY);
             }
             catch (InvalidOperationException) // JS interop not available (prerender)
             {

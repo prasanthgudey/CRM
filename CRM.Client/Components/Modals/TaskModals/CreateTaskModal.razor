@@ -34,7 +34,6 @@
 
                     <EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
-                        
 
                         <!-- ASSIGNMENT -->
                         <div class="task-section mb-3">
@@ -55,7 +54,7 @@
                                             }
                                         }
                                     </InputSelect>
-                                    <ValidationMessage For="@(() => Model.CustomerId)" />
+                                    <ValidationMessage For="@(() => Model.CustomerId)" class="text-danger validation-message" />
                                 </div>
 
                                 <!-- USER (bound to model so validation sees it) -->
@@ -75,7 +74,7 @@
                                             }
                                         }
                                     </InputSelect>
-                                    <ValidationMessage For="@(() => Model.UserId)" />
+                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger validation-message" />
                                 </div>
                             </div>
                         </div>
@@ -87,13 +86,13 @@
                                 <div class="col-12">
                                     <label class="form-label">Title</label>
                                     <InputText class="form-control" @bind-Value="Model.Title" />
-                                    <ValidationMessage For="@(() => Model.Title)" />
+                                    <ValidationMessage For="@(() => Model.Title)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-12">
                                     <label class="form-label">Description</label>
                                     <InputTextArea class="form-control" rows="3" @bind-Value="Model.Description" />
-                                    <ValidationMessage For="@(() => Model.Description)" />
+                                    <ValidationMessage For="@(() => Model.Description)" class="text-danger validation-message" />
                                 </div>
                             </div>
                         </div>
@@ -105,7 +104,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Due Date</label>
                                     <InputDate class="form-control" @bind-Value="Model.DueDate" />
-                                    <ValidationMessage For="@(() => Model.DueDate)" />
+                                    <ValidationMessage For="@(() => Model.DueDate)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -116,7 +115,7 @@
                                             <option value="@p">@p</option>
                                         }
                                     </InputSelect>
-                                    <ValidationMessage For="@(() => Model.Priority)" />
+                                    <ValidationMessage For="@(() => Model.Priority)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -158,7 +157,7 @@
                                     <div class="col-md-4">
                                         <label class="form-label">Interval (1–365)</label>
                                         <InputNumber class="form-control" @bind-Value="Model.RecurrenceInterval" />
-                                        <ValidationMessage For="@(() => Model.RecurrenceInterval)" />
+                                        <ValidationMessage For="@(() => Model.RecurrenceInterval)" class="text-danger validation-message" />
                                     </div>
 
                                     <div class="col-md-4">

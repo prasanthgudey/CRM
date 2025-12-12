@@ -1,6 +1,7 @@
 ﻿@page "/tasks"
 @layout MainLayout
 
+@using CRM.Client.Components.Layout
 @using CRM.Client.DTOs.Tasks
 @using CRM.Client.DTOs.Customers
 @using CRM.Client.DTOs.Users
@@ -9,7 +10,6 @@
 @using CRM.Client.Services.Users
 @using CRM.Client.Components.Modals.TaskModals
 @using CRM.Client.Components.Shared
-@using CRM.Client.Components.Layout
 
 @inject TaskService TaskService
 @inject CustomerService CustomerService
@@ -37,25 +37,8 @@ else
                 <th>Title</th>
                 <th>Customer</th>
                 <th>User</th>
-
-                <th @onclick='() => SortByColumn("dueDate")' style="cursor:pointer">
-                    Due Date
-                    @if (SortBy == "dueDate")
-                    {
-                        <span> (@(SortDir == "desc" ? "↓" : "↑"))</span>
-                    }
-                </th>
-
+                <th>Due Date</th>
                 <th>Priority</th>
-
-                <th @onclick='() => SortByColumn("createdAt")' style="cursor:pointer">
-                    Created
-                    @if (SortBy == "createdAt")
-                    {
-                        <span> (@(SortDir == "desc" ? "↓" : "↑"))</span>
-                    }
-                </th>
-
                 <th>Status</th>
                 <th>Recurring</th>
                 <th style="width:200px;">Actions</th>
@@ -72,8 +55,8 @@ else
                     <td>@GetUserName(task.UserId)</td>
                     <td>@task.DueDate.ToString("dd MMM yyyy")</td>
                     <td>@task.Priority</td>
-                    <td>@task.CreatedAt.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</td>
                     <td>@task.State</td>
+
                     <td>
                         @if (task.IsRecurring)
                         {
@@ -84,6 +67,7 @@ else
                             <span class="badge bg-secondary">No</span>
                         }
                     </td>
+
                     <td>
                         <button class="btn btn-light btn-sm me-2"
                                 @onclick="() => OpenEdit(task)">
@@ -111,24 +95,18 @@ else
 <DeleteTaskModal IsOpen="@IsDeleteOpen" TaskId="@SelectedTaskId" OnClose="HandleDeleteClosed" />
 
 @code {
-    // data
     private List<TaskResponseDto> Tasks = new();
     private TaskResponseDto? SelectedTask;
     private Guid? SelectedTaskId;
 
-    // modals
     private bool IsCreateOpen;
     private bool IsEditOpen;
     private bool IsDeleteOpen;
 
-    // lookup caches
-    private readonly Dictionary<Guid, string> _customerNames = new();
-    private readonly Dictionary<string, string> _userNames = new(StringComparer.OrdinalIgnoreCase);
-
-    // pagination, search, sort
     private int CurrentPage = 1;
     private const int PageSize = 10;   // 🔥 ALWAYS 10 per page
     private long TotalCount = 0;
+
     private bool IsLoading = true;
     private bool _clamping = false;
 
@@ -166,7 +144,6 @@ else
     private string GetUserName(string id) =>
         UserNames.TryGetValue(id, out var n) ? n : "-";
 
-    // --- modals & actions ---
     private void OpenCreate() => IsCreateOpen = true;
 
     private void OpenEdit(TaskResponseDto t)

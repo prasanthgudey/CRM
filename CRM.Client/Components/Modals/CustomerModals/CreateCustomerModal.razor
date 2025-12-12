@@ -27,8 +27,6 @@
 
                     <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
-                       
-
 
                         <!-- NAME -->
                         <div class="customer-section mb-3">
@@ -38,7 +36,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">First Name</label>
                                     <InputText class="form-control" @bind-Value="Model.FirstName" />
-                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -49,7 +47,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Surname</label>
                                     <InputText class="form-control" @bind-Value="Model.SurName" />
-                                    <ValidationMessage For="@(() => Model.SurName)" />
+                                    <ValidationMessage For="@(() => Model.SurName)" class="text-danger validation-message" />
                                 </div>
                             </div>
 
@@ -67,13 +65,13 @@
                                 <div class="col-md-6">
                                     <label class="form-label">Email</label>
                                     <InputText class="form-control" @bind-Value="Model.Email" />
-                                    <ValidationMessage For="@(() => Model.Email)" />
+                                    <ValidationMessage For="@(() => Model.Email)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label">Phone</label>
                                     <InputText class="form-control" @bind-Value="Model.Phone" />
-                                    <ValidationMessage For="@(() => Model.Phone)" />
+                                    <ValidationMessage For="@(() => Model.Phone)" class="text-danger validation-message" />
                                 </div>
                             </div>
                         </div>
@@ -82,9 +80,8 @@
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Address</div>
 
-                             
                             <InputTextArea class="form-control" rows="3" @bind-Value="Model.Address" />
-                            <ValidationMessage For="@(() => Model.Address)" />
+                            <ValidationMessage For="@(() => Model.Address)" class="text-danger validation-message" />
                         </div>
 
                         <!-- META -->
@@ -106,14 +103,8 @@
                                         }
                                     </InputSelect>
 
-                                    <ValidationMessage For="@(() => Model.CreatedByUserId)" />
+                                    <ValidationMessage For="@(() => Model.CreatedByUserId)" class="text-danger validation-message" />
                                 </div>
-
-                                @* <div class="col-md-4">
-                                    <small class="text-muted">
-                                        Auto-set from your account.
-                                    </small>
-                                </div> *@
 
                             </div>
                         </div>

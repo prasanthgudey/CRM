@@ -564,3 +564,41 @@ h1:focus {
         font-size: 1.7rem;
     }
 }
+
+/* make Blazor ValidationMessage outputs match bootstrap danger visuals */
+.validation-message {
+    color: #dc3545 !important; /* bootstrap danger */
+    font-size: .875rem;
+    margin-top: .25rem;
+    display: block;
+}
+
+/* keep specificity for modal scoped styling if you want */
+.customer-modal-content .validation-message,
+.task-modal-content .validation-message {
+    color: #dc3545 !important;
+    font-size: .875rem;
+    margin-top: .25rem;
+    display: block;
+}
+
+/* optional: style a validation summary if you use one */
+.validation-summary-errors,
+.validation-summary-errors ul {
+    color: #dc3545;
+}
+
+/* optional: if you later toggle `is-invalid` on inputs, show red border */
+.form-control.is-invalid,
+.form-select.is-invalid,
+textarea.form-control.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.12rem rgba(220,53,69,.12) !important;
+}
+
+/* small helper to align spacing under inputs */
+.form-control + .validation-message,
+.form-select + .validation-message,
+textarea + .validation-message {
+    margin-bottom: .5rem;
+}

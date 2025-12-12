@@ -22,11 +22,7 @@ namespace CRM.Client.Security
         // Called by Blazor to get current auth state
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            try
-            {
-                // Try to read token from localStorage. This will throw InvalidOperationException
-                // when called during server prerendering (JS interop not available).
-                var token = await _js.InvokeAsync<string>("localStorage.getItem", TokenKey);
+            var token = await _js.InvokeAsync<string>("localStorage.getItem", TokenKey);
 
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -43,8 +39,8 @@ namespace CRM.Client.Security
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
 
-                var identity = new ClaimsIdentity(ParseClaims(token), "jwt");
-                var user = new ClaimsPrincipal(identity);
+            var identity = new ClaimsIdentity(ParseClaims(token), "jwt");
+            var user = new ClaimsPrincipal(identity);
 
             SetHttpClientAuthHeader(token);
 
