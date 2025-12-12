@@ -1,4 +1,11 @@
-﻿
+﻿/* remove the black focus border shown when Blazor focuses the page heading */
+h1:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+
+
 /* ============================================================
    LOGIN PAGE — OUTER + INNER CARDS
 ============================================================ */
