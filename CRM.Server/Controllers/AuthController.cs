@@ -24,6 +24,7 @@ namespace CRM.Server.Controllers
         private readonly JwtSettings _jwtSettings;  // add this
         private readonly IUserSessionService _userSessionService;
         private readonly SessionSettings _sessionSettings;
+        private readonly ILogger<AuthController> _logger;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
@@ -34,7 +35,8 @@ namespace CRM.Server.Controllers
             IOptions<RefreshTokenSettings> refreshOptions,
             IOptions<JwtSettings> jwtOptions,
             IUserSessionService userSessionService,              // NEW
-            IOptions<SessionSettings> sessionOptions             // NEW
+            IOptions<SessionSettings> sessionOptions ,            // NEW
+            ILogger<AuthController> logger
         )
         {
             _userManager = userManager;
@@ -47,6 +49,8 @@ namespace CRM.Server.Controllers
 
             _userSessionService = userSessionService;
             _sessionSettings = sessionOptions.Value;
+            _logger = logger;
+
         }
 
 
@@ -123,7 +127,7 @@ namespace CRM.Server.Controllers
             var token = _jwtTokenService.GenerateToken(user, roles, session.Id);
 
             // 3) create refresh token and persist
-            var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays);
+            var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays,session.Id);
 
             // 4) link refresh token id to session
             await _userSessionService.LinkRefreshTokenToSessionAsync(session.Id, refresh.Id);
@@ -156,24 +160,24 @@ namespace CRM.Server.Controllers
             var stored = await _refreshTokenService.GetByTokenAsync(incomingToken);
             if (stored == null)
             {
-                // token not found
+                _logger.LogInformation("Refresh token not found for token: {TokenPrefix}...", incomingToken?.Substring(0, Math.Min(8, incomingToken?.Length ?? 0)));
                 return Unauthorized(new { error = "invalid_token" });
             }
 
             // 2) If token is revoked -> treat as reuse; revoke all tokens & sessions for user and deny
             if (stored.IsRevoked)
             {
+                _logger.LogWarning("Refresh token reuse detected. RefreshId={RefreshId} UserId={UserId}", stored.Id, stored.UserId);
                 await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(stored.UserId);
                 try { await _userSessionService.RevokeAllSessionsForUserAsync(stored.UserId); } catch { /* swallow */ }
 
-                //await SafeAudit(stored.UserId, "Refresh Token Reuse Detected", "Authentication", false, ip, null, null);
                 return Unauthorized(new { error = "invalid_token" });
             }
 
             // 3) If token expired -> deny
             if (stored.ExpiresAt <= DateTime.UtcNow)
             {
-                //await SafeAudit(stored.UserId, "Refresh Token Expired", "Authentication", false, ip, null, null);
+                _logger.LogInformation("Refresh token expired. RefreshId={RefreshId} UserId={UserId}", stored.Id, stored.UserId);
                 return Unauthorized(new { error = "expired_token" });
             }
 
@@ -181,34 +185,30 @@ namespace CRM.Server.Controllers
             var user = await _userManager.FindByIdAsync(stored.UserId);
             if (user == null || !user.IsActive)
             {
-                // revoke the single token and user's sessions, defensive
+                _logger.LogInformation("Refresh token user invalid or inactive. RefreshId={RefreshId} UserId={UserId}", stored.Id, stored.UserId);
+                // revoke the single token defensively
                 await _refreshTokenService.RevokeRefreshTokenAsync(stored, ip, null);
                 try { await _userSessionService.RevokeAllSessionsForUserAsync(stored.UserId); } catch { }
-
                 return Unauthorized(new { error = "invalid_user" });
             }
 
             // 4.5) Determine session id associated with this refresh token
-            string? sessionId = null;
+            string? sessionId = stored.SessionId; // prefer SessionId stored on the token
 
-            // If your RefreshToken model contains SessionId (preferred), use it:
-            // sessionId = stored.SessionId;
-
-            // Otherwise, try to find the session row that references this refresh token
+            // If not present on token, try to find by service (backward-compat)
             if (string.IsNullOrWhiteSpace(sessionId))
             {
-                // This requires IUserSessionService.GetByRefreshTokenIdAsync(refreshTokenId) implementation
                 var linkedSession = await _userSessionService.GetByRefreshTokenIdAsync(stored.Id);
                 sessionId = linkedSession?.Id;
             }
 
-            // If no session found, this is unexpected — treat defensively: revoke tokens and deny
+            // If no session found, REVOKE only the single refresh token and return unauthorized.
             if (string.IsNullOrWhiteSpace(sessionId))
             {
-                // Defensive action: revoke all refresh tokens for the user and deny
-                await _refreshTokenService.RevokeAllRefreshTokensForUserAsync(stored.UserId);
-                await _userSessionService.RevokeAllSessionsForUserAsync(stored.UserId);
-                //await SafeAudit(stored.UserId, "Refresh Token - Missing Session", "Authentication", false, ip, null, null);
+                // Safer than revoking everything: revoke this token and log details for investigation
+                await _refreshTokenService.RevokeRefreshTokenAsync(stored, ip, null);
+                _logger.LogWarning("Refresh token found with no linked session. RefreshId={RefreshId} UserId={UserId}", stored.Id, stored.UserId);
+
                 return Unauthorized(new { error = "invalid_token" });
             }
 
@@ -224,15 +224,15 @@ namespace CRM.Server.Controllers
             {
                 var userAgent = Request.Headers["User-Agent"].ToString();
 
-                // create replacement token
+                // create replacement token and store sessionId on it
                 var replacement = await _refreshTokenService.CreateRefreshTokenAsync(
-                    user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays);
+                    user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays, sessionId);
 
                 // revoke old and link to replacement (ReplacedByToken stored in old token row)
                 await _refreshTokenService.RevokeRefreshTokenAsync(stored, ip, replacement.Token);
 
-                // Link the new refresh token to the same session
-                await _userSessionService.LinkRefreshTokenToSessionAsync(sessionId, replacement.Id);
+                // Link the new refresh token to the same session row (optional if CreateRefreshToken already set SessionId)
+                try { await _userSessionService.LinkRefreshTokenToSessionAsync(sessionId, replacement.Id); } catch { /* swallow */ }
 
                 returnedRefreshToken = replacement.Token;
                 returnedRefreshExpires = replacement.ExpiresAt;
@@ -244,7 +244,7 @@ namespace CRM.Server.Controllers
                 returnedRefreshExpires = stored.ExpiresAt;
             }
 
-            //await SafeAudit(user.Id, "Refresh Token Used", "Authentication", true, ip, null, null);
+            _logger.LogInformation("Refresh successful. UserId={UserId} SessionId={SessionId} RefreshId={RefreshId}", stored.UserId, sessionId, stored.Id);
 
             return Ok(new AuthResponseDto
             {
@@ -254,6 +254,7 @@ namespace CRM.Server.Controllers
                 RefreshExpiresAt = returnedRefreshExpires
             });
         }
+
 
 
         // =====================================================
@@ -308,7 +309,7 @@ namespace CRM.Server.Controllers
 
             // --- create refresh token and link to session ---
             var refresh = await _refreshTokenService.CreateRefreshTokenAsync(
-                user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays);
+                user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays,session.Id);
 
             await _userSessionService.LinkRefreshTokenToSessionAsync(session.Id, refresh.Id);
 
@@ -403,7 +404,7 @@ namespace CRM.Server.Controllers
                 var token = _jwtTokenService.GenerateToken(user, roles, session.Id);
 
                 // 6) Create refresh token and link it to the session
-                var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays);
+                var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays, session.Id);
                 await _userSessionService.LinkRefreshTokenToSessionAsync(session.Id, refresh.Id);
 
                 // 7) Audit
@@ -538,7 +539,7 @@ namespace CRM.Server.Controllers
                 var token = _jwtTokenService.GenerateToken(user, roles, session.Id);
 
                 // 6) Create a new refresh token and link it to the session
-                var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays);
+                var refresh = await _refreshTokenService.CreateRefreshTokenAsync(user.Id, ip, userAgent, _refreshTokenSettings.RefreshTokenExpiryDays, session.Id);
                 await _userSessionService.LinkRefreshTokenToSessionAsync(session.Id, refresh.Id);
 
                 // 7) Audit success

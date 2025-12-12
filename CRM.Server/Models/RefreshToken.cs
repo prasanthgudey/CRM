@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿// file: Models/RefreshToken.cs
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CRM.Server.Models
@@ -25,6 +26,9 @@ namespace CRM.Server.Models
         // Optional auditing / device info
         public string? CreatedByIp { get; set; }
         public string? UserAgent { get; set; }
+
+        // NEW: link to server-side Session row (if you have a session table/service)
+        public string? SessionId { get; set; }
 
         // FK
         [ForeignKey("UserId")]

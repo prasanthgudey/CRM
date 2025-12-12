@@ -16,7 +16,13 @@ namespace CRM.Server.Services
             _db = db;
         }
 
-        public async Task<RefreshToken> CreateRefreshTokenAsync(string userId, string ipAddress, string? userAgent, int daysValid)
+        // file: Services/RefreshTokenService.cs
+        public async Task<RefreshToken> CreateRefreshTokenAsync(
+            string userId,
+            string ipAddress,
+            string? userAgent,
+            int daysValid,
+            string? sessionId = null)   // <-- new optional parameter
         {
             var tokenString = GenerateSecureToken();
 
@@ -27,7 +33,8 @@ namespace CRM.Server.Services
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddDays(daysValid),
                 CreatedByIp = ipAddress,
-                UserAgent = userAgent
+                UserAgent = userAgent,
+                SessionId = sessionId          // <-- store the session id
             };
 
             _db.RefreshTokens.Add(refresh);
@@ -35,6 +42,7 @@ namespace CRM.Server.Services
 
             return refresh;
         }
+
 
         public async Task<RefreshToken?> GetByTokenAsync(string token)
         {
