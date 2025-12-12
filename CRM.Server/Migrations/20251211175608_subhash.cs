@@ -5,7 +5,7 @@
 namespace CRM.Server.Migrations
 {
     /// <inheritdoc />
-    public partial class pk : Migration
+    public partial class subhash : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

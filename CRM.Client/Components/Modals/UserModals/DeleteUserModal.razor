@@ -5,10 +5,18 @@
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
-        <div class="modal-card shadow" style="width: 360px; border-radius: 12px; padding: 18px; background: white;">
+
+        <div class="modal-card shadow"
+             style="
+                width: 540px;
+                border-radius: 14px;
+                padding: 32px 36px;
+                background: white;">
             <h5 class="mb-2 text-center">Delete User</h5>
 
-            <p>Are you sure you want to permanently delete this user?</p>
+            <div class="modal-body" style="text-align: center;">
+                Are you sure you want to permanently delete this user?
+            </div>
 
             <div class="modal-actions mt-3 d-flex justify-content-end gap-2">
                 <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>

@@ -8,7 +8,7 @@ namespace CRM.Server.Data
         public static async Task SeedAdminUserAsync(
             UserManager<ApplicationUser> userManager)
         {
-            var adminEmail = "admin@crm.com";
+            var adminEmail = "adminn@crm.com";
             var adminPassword = "Admin@123";
 
             var admin = await userManager.FindByEmailAsync(adminEmail);

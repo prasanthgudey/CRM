@@ -77,9 +77,43 @@ namespace CRM.Client.Services.Auth
         // =====================================================
         public async Task ChangePasswordAsync(ChangePasswordDto dto)
         {
-            await _api.PostAsync<ChangePasswordDto, object>(
-                "api/auth/change-password", dto);
+            var response = await _api.PostRawAsync("api/auth/change-password", dto);
+
+            if (response.IsSuccessStatusCode)
+                return;
+
+            var raw = await response.Content.ReadAsStringAsync();
+
+            // Try to extract clean message
+            try
+            {
+                var json = System.Text.Json.JsonDocument.Parse(raw);
+
+                // Case 1: Standard { message: "..." }
+                if (json.RootElement.TryGetProperty("message", out var msgProp))
+                    throw new Exception(msgProp.GetString()!);
+
+                // Case 2: ASP.NET Validation error: errors -> field -> message
+                if (json.RootElement.TryGetProperty("errors", out var errors))
+                {
+                    foreach (var prop in errors.EnumerateObject())
+                    {
+                        var msg = prop.Value[0].GetString();
+                        if (!string.IsNullOrWhiteSpace(msg))
+                            throw new Exception(msg!);
+                    }
+                }
+
+                throw new Exception("Password update failed. Check input.");
+            }
+            catch
+            {
+                // fallback: raw message
+                throw new Exception("Password update failed. Please try again.");
+            }
         }
+
+
 
 
         // =====================================================

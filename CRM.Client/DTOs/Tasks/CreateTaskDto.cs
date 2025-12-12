@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace CRM.Client.DTOs.Tasks
 {
@@ -6,7 +7,7 @@ namespace CRM.Client.DTOs.Tasks
     {
         public Guid CustomerId { get; set; }
         public string UserId { get; set; } = string.Empty;
-
+        [Required]
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
 

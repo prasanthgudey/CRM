@@ -11,80 +11,104 @@
                 </div>
 
                 <div class="modal-body task-modal-body">
-                    <div class="row g-3">
 
-                        <!-- BASIC INFO -->
-                        <div class="col-12">
-                            <label class="form-label text-muted small">Title</label>
-                            <div class="form-control-plaintext">@Model.Title</div>
+                    <div class="task-section">
+                        <div class="task-section-title">Basic Info</div>
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Title</label>
+                                <div class="form-control-plaintext">@Model.Title</div>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <div class="form-control-plaintext">@DisplayOrDash(Model.Description)</div>
+                            </div>
                         </div>
-
-                        <div class="col-12">
-                            <label class="form-label text-muted small">Description</label>
-                            <div class="form-control-plaintext">@DisplayOrDash(Model.Description)</div>
-                        </div>
-
-                        <!-- ASSIGNMENT -->
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Customer ID</label>
-                            <div class="form-control-plaintext">@Model.CustomerId</div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Assigned User ID</label>
-                            <div class="form-control-plaintext">@Model.UserId</div>
-                        </div>
-
-                        <!-- STATUS -->
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">State</label>
-                            <div class="form-control-plaintext">@Model.State</div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Priority</label>
-                            <div class="form-control-plaintext">@Model.Priority</div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Due Date</label>
-                            <div class="form-control-plaintext">@FormatDate(Model.DueDate)</div>
-                        </div>
-
-                        <!-- TIMESTAMPS -->
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Created At</label>
-                            <div class="form-control-plaintext">@FormatDate(Model.CreatedAt)</div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Completed At</label>
-                            <div class="form-control-plaintext">@FormatNullable(Model.CompletedAt)</div>
-                        </div>
-
-                        <!-- RECURRENCE -->
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Is Recurring</label>
-                            <div class="form-control-plaintext">@Model.IsRecurring</div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Recurrence Type</label>
-                            <div class="form-control-plaintext">@Model.RecurrenceType</div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Recurrence Interval</label>
-                            <div class="form-control-plaintext">@DisplayOrDash(Model.RecurrenceInterval?.ToString())</div>
-                        </div>
-
-                        <div class="col-md-12">
-                            <label class="form-label text-muted small">Recurrence End Date</label>
-                            <div class="form-control-plaintext">@FormatNullable(Model.RecurrenceEndDate)</div>
-                        </div>
-
                     </div>
+
+                    <div class="task-section">
+                        <div class="task-section-title">Assignment</div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Customer ID</label>
+                                <div class="form-control-plaintext">@Model.CustomerId</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Assigned User ID</label>
+                                <div class="form-control-plaintext">@Model.UserId</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="task-section">
+                        <div class="task-section-title">Status</div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">State</label>
+                                <div class="form-control-plaintext">@Model.State</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Priority</label>
+                                <div class="form-control-plaintext">@Model.Priority</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Due Date</label>
+                                <div class="form-control-plaintext">@FormatDate(Model.DueDate)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="task-section">
+                        <div class="task-section-title">Timestamps</div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Created At</label>
+                                <div class="form-control-plaintext">@FormatDate(Model.CreatedAt)</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Completed At</label>
+                                <div class="form-control-plaintext">@FormatNullable(Model.CompletedAt)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="task-section">
+                        <div class="task-section-title">Recurrence</div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Is Recurring</label>
+                                <div class="form-control-plaintext">@Model.IsRecurring</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Recurrence Type</label>
+                                <div class="form-control-plaintext">@Model.RecurrenceType</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Recurrence Interval</label>
+                                <div class="form-control-plaintext">@DisplayOrDash(Model.RecurrenceInterval?.ToString())</div>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label">Recurrence End Date</label>
+                                <div class="form-control-plaintext">@FormatNullable(Model.RecurrenceEndDate)</div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
+
 
                 <div class="modal-footer task-modal-footer">
                     <button type="button" class="btn btn-outline-secondary" @onclick="Close">Close</button>

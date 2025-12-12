@@ -12,11 +12,10 @@
 
         <div class="modal-card shadow"
              style="
-            width: 540px;
-            border-radius: 14px;
-            padding: 32px 36px;
-            background: white;">
-
+                    width: 540px;
+                    border-radius: 14px;
+                    padding: 32px 36px;
+                    background: white;">
 
             <h5 class="text-center mb-3">Invite New User</h5>
 
@@ -25,33 +24,37 @@
                 <div class="alert alert-info py-2">@Message</div>
             }
 
-        <EditForm Model="InviteModel" OnValidSubmit="SendInvite">
-
+        <EditForm EditContext="editContext" OnValidSubmit="SendInvite">
             <DataAnnotationsValidator />
 
             <!-- Full Name -->
             <div class="form-group">
                 <label class="small text-muted">Full Name</label>
+
                 <InputText class="form-control"
                            placeholder="Enter user's full name"
                            @bind-Value="InviteModel.FullName" />
+
+                <ValidationMessage For="@(() => InviteModel.FullName)" />
             </div>
 
             <!-- Email -->
             <div class="form-group mt-2">
                 <label class="small text-muted">Email Address</label>
+
                 <InputText class="form-control"
                            placeholder="Enter user's email address"
                            @bind-Value="InviteModel.Email" />
+
+                <ValidationMessage For="@(() => InviteModel.Email)" />
             </div>
 
-            <!-- CUSTOM SCROLLABLE DROPDOWN -->
+            <!-- Role Dropdown -->
             <div class="form-group mt-2">
                 <label class="small text-muted">Select Role</label>
 
                 <div class="role-dropdown-container position-relative">
 
-                    <!-- Selected Item -->
                     <div class="role-selected" @onclick="ToggleDropdown">
                         @(string.IsNullOrWhiteSpace(InviteModel.Role)
                                                 ? "-- Select a role --"
@@ -70,6 +73,8 @@
                             </div>
                         }
                     </div>
+
+                    <ValidationMessage For="@(() => InviteModel.Role)" />
                 </div>
 
                 <!-- Buttons -->
@@ -80,7 +85,8 @@
                         Cancel
                     </button>
 
-                    <button class="btn btn-primary"
+                    <button type="submit"
+                            class="btn btn-primary"
                             disabled="@IsLoading">
                         @(IsLoading ? "Sending..." : "Send Invite")
                     </button>
@@ -95,6 +101,7 @@
 @code {
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
+    private EditContext editContext;
 
     private InviteUserDto InviteModel { get; set; } = new();
     private List<RoleResponseDto>? Roles { get; set; }
@@ -107,9 +114,13 @@
     {
         if (IsOpen)
         {
-            Roles = await RoleService.GetAllRolesAsync();   // Load roles from DB
+            InviteModel = new InviteUserDto();
+            editContext = new EditContext(InviteModel);   // <--- IMPORTANT!
+
+            Roles = await RoleService.GetAllRolesAsync();
         }
     }
+
 
     private void ToggleDropdown()
     {
@@ -120,6 +131,9 @@
     {
         InviteModel.Role = role;
         ShowDropdown = false;
+
+        editContext.NotifyFieldChanged(FieldIdentifier.Create(() => InviteModel.Role));
+
     }
 
     private async Task SendInvite()
@@ -160,4 +174,8 @@
         Message = null;
         await OnClose.InvokeAsync(false);
     }
+    
+
+   
+
 }

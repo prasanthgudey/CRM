@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace CRM.Server.Migrations
 {
     /// <inheritdoc />
-    public partial class Intialsetup : Migration
+    public partial class admindataseedingtodb : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
