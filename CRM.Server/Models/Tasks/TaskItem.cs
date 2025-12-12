@@ -15,7 +15,7 @@ namespace CRM.Server.Models.Tasks
         public Customer Customer { get; set; }
         public string CreatedByUserId { get; set; }
 
-        public ApplicationUser CreatedBy { get; set; }
+        public ApplicationUser? CreatedBy { get; set; }
         [Required]
         [MaxLength(200)]
         public string Title { get; set; } = string.Empty;

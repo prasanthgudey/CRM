@@ -62,23 +62,49 @@ namespace CRM.Server.Repositories
                 })
                 .AsNoTracking();
 
-            // USER QUERY (Identity users)
-            var users = _db.Users
-                .Where(u =>
-                       (u.UserName != null && EF.Functions.Like(u.UserName, $"%{query}%"))
-                    || (u.Email != null && EF.Functions.Like(u.Email, $"%{query}%"))
-                )
+            // USER QUERY (supports full-name searching)
+            var userQuery = _db.Users.AsQueryable();
+
+            // Split incoming query into tokens for partial matches
+            var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var raw in tokens)
+            {
+                var token = raw.Trim();
+                if (string.IsNullOrEmpty(token)) continue;
+
+                userQuery = userQuery.Where(u =>
+                       (u.FullName != null && EF.Functions.Like(u.FullName, $"%{token}%"))
+                    || (u.UserName != null && EF.Functions.Like(u.UserName, $"%{token}%"))
+                    || (u.Email != null && EF.Functions.Like(u.Email, $"%{token}%"))
+                );
+            }
+
+            // Project into anonymous DTOs
+            var users = userQuery
                 .Select(u => new
                 {
                     EntityType = "User",
                     Id = u.Id.ToString(),
-                    Title = !string.IsNullOrEmpty(u.UserName) ? u.UserName : u.Email,
+
+                    // Title matches what GlobalSearch highlights
+                    Title = !string.IsNullOrWhiteSpace(u.FullName)
+                                ? u.FullName
+                                : (!string.IsNullOrWhiteSpace(u.UserName)
+                                    ? u.UserName
+                                    : u.Email ?? string.Empty),
+
                     Subtitle = u.Email ?? string.Empty,
                     Snippet = (string?)null,
+
+                    // Your route for viewing users
                     Route = $"/admin/users/{u.Id}",
-                    Date = (DateTime?)null
+
+                    Date = (DateTime?)u.CreatedAt
                 })
                 .AsNoTracking();
+
+
 
             // Materialize queries
             var customerList = await customers.ToListAsync();
