@@ -106,14 +106,21 @@ namespace CRM.Client.Services.Http
                 return false;
             }
 
+            // Capture the access token that triggered this refresh attempt.
+            // If another flow refreshes while we wait, we'll detect it and skip calling the backend.
+            var originalAccessToken = _appState.Auth?.Token ?? await _tokenService.GetTokenAsync();
+
             await _refreshLock.WaitAsync();
             try
             {
-                // Another caller might already have refreshed while we waited
+                // Another caller might already have refreshed while we waited — re-check the current token.
                 var currentToken = _appState.Auth?.Token ?? await _tokenService.GetTokenAsync();
-                if (!string.IsNullOrWhiteSpace(currentToken))
+
+                // If token changed (and is non-empty) then someone else already refreshed successfully.
+                if (!string.IsNullOrWhiteSpace(currentToken) && currentToken != originalAccessToken)
                 {
-                    Console.WriteLine("[REFRESH] Auth token already updated by another flow");
+                    Console.WriteLine("[REFRESH] Token was already refreshed by another flow. Skipping refresh call.");
+                    return true;
                 }
 
                 Console.WriteLine("[REFRESH] Calling /api/auth/refresh");
@@ -181,13 +188,24 @@ namespace CRM.Client.Services.Http
                     return false;
                 }
 
-                // 1) Save access token
+                // 1) Save access token (persistent)
                 await _tokenService.SaveTokenAsync(authResp.Token);
 
-                // 2) Update Blazor auth state
+                // 2) Update in-memory app state and http client header
+                var principal = _jwtAuthStateProvider.BuildClaimsPrincipal(authResp.Token);
+                _appState.Auth.SetAuthenticated(authResp.Token, principal);
+
+                try
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", authResp.Token);
+                }
+                catch { /* swallow if header update fails, but we still proceed */ }
+
+                // 3) Notify Blazor auth provider (updates UI)
                 await _jwtAuthStateProvider.MarkUserAsAuthenticated(authResp.Token);
 
-                // 3) Save refresh token (may be rotated) and expiry
+                // 4) Save refresh token (may be rotated) and expiry
                 if (!string.IsNullOrWhiteSpace(authResp.RefreshToken))
                 {
                     await _tokenService.SaveRefreshTokenAsync(authResp.RefreshToken, authResp.RefreshExpiresAt);
