@@ -7,7 +7,7 @@ using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [ApiController]
     [Route("api/[controller]")]
     //[Authorize(Roles = "Admin")]
@@ -26,6 +26,21 @@ namespace CRM.Server.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            // ⭐ DUPLICATE CHECK ADDED
+            var users = await _userService.GetAllUsersAsync();
+            var normalizedEmail = dto.Email?.Trim().ToLower();
+
+            if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
+                users.Any(u => u.Email != null &&
+                               u.Email.Trim().ToLower() == normalizedEmail))
+            {
+                return Ok(new
+                {
+                    success = false,
+                    message = "A user with this email already exists."
+                });
+            }
+
             try
             {
                 var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -39,10 +54,10 @@ namespace CRM.Server.Controllers
             }
             catch (Exception ex)
             {
-                return Ok(new                      // ⭐ CHANGED FROM BadRequest to Ok
-                {                                  //   so frontend always receives JSON safely
-                    success = false,               // ⭐ NEW
-                    message = ex.Message           // ⭐ NEW (eg: "Email already exists")
+                return Ok(new
+                {
+                    success = false,
+                    message = ex.Message
                 });
             }
         }
@@ -61,12 +76,26 @@ namespace CRM.Server.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            // ⭐ DUPLICATE CHECK ADDED
+            var users = await _userService.GetAllUsersAsync();
+            var normalizedEmail = dto.Email?.Trim().ToLower();
+
+            if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
+                users.Any(u => u.Email != null &&
+                               u.Email.Trim().ToLower() == normalizedEmail))
+            {
+                return Ok(new
+                {
+                    success = false,
+                    message = "A user with this email already exists."
+                });
+            }
+
             try
             {
                 var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 await _userService.InviteUserAsync(dto, performedBy!);
 
-                // ✅ ALWAYS JSON, includes success flag
                 return Ok(new
                 {
                     success = true,
@@ -75,7 +104,6 @@ namespace CRM.Server.Controllers
             }
             catch (Exception ex)
             {
-                // ✅ ALSO JSON on error (eg: "Email already exists")
                 return Ok(new
                 {
                     success = false,
@@ -103,6 +131,26 @@ namespace CRM.Server.Controllers
         [HttpPut("update/{userId}")]
         public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserDto dto)
         {
+            // ⭐ DUPLICATE CHECK ADDED
+            var users = await _userService.GetAllUsersAsync();
+
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var normalizedEmail = dto.Email.Trim().ToLower();
+
+                if (users.Any(u =>
+                        u.Id != userId &&
+                        u.Email != null &&
+                        u.Email.Trim().ToLower() == normalizedEmail))
+                {
+                    return Ok(new
+                    {
+                        success = false,
+                        message = "Another user already uses this email."
+                    });
+                }
+            }
+
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
             await _userService.UpdateUserAsync(userId, dto, performedBy!);
             return Ok(new { message = "User updated successfully" });
@@ -115,12 +163,6 @@ namespace CRM.Server.Controllers
             await _userService.DeleteUserAsync(userId, performedBy!);
             return Ok(new { message = "User deleted successfully" });
         }
-
-        //[HttpGet]
-        //public async Task<IActionResult> GetAllUsers()
-        //{
-        //    return Ok(await _userService.GetAllUsersAsync());
-        //}
 
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetUserById(string userId)
@@ -136,7 +178,6 @@ namespace CRM.Server.Controllers
             }
         }
 
-
         // =====================================================
         // ✅ GET MY PROFILE (LOGGED-IN USER)
         // =====================================================
@@ -147,13 +188,9 @@ namespace CRM.Server.Controllers
             var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
 
             var user = await _userService.GetUserByIdAsync(userId!);
-            //commnt by eswar
 
             return Ok(user);
         }
-
-
-
 
         [HttpPost("assign")]
         public async Task<IActionResult> AssignRole(AssignRoleDto dto)
@@ -170,6 +207,7 @@ namespace CRM.Server.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpGet("filter")]
         public async Task<IActionResult> Filter([FromQuery] string? role, [FromQuery] bool? isActive)
         {

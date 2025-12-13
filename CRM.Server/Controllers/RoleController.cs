@@ -8,8 +8,7 @@ namespace CRM.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
-    //[Authorize(Roles = "Admin")] // ✅ Enforced as per spec
+    //[Authorize]
     public class RoleController : ControllerBase
     {
         private readonly IRoleService _roleService;
@@ -19,41 +18,42 @@ namespace CRM.Server.Controllers
             _roleService = roleService;
         }
 
-        //[HttpPost("create")]
-        //public async Task<IActionResult> CreateRole(CreateRoleDto dto)
-        //{
-        //    await _roleService.CreateRoleAsync(dto.RoleName);
-        //    return Ok("Role created successfully");
-        //}
+        // =============================================
+        // CREATE ROLE
+        // =============================================
         [HttpPost("create")]
         public async Task<IActionResult> CreateRole(CreateRoleDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto?.RoleName))
                 return BadRequest("RoleName is required.");
 
-            // CHECK: if role already exists -> return 409
-            var existing = await _roleService.GetRoleAsync(dto.RoleName);
+            // ⭐ ADDED: Normalize the input
+            var normalizedName = dto.RoleName.Trim().ToUpper();
+
+            // ⭐ ADDED: Check if role already exists (case-insensitive)
+            var existing = await _roleService.GetRoleAsync(normalizedName);
             if (existing != null)
             {
-                return Conflict("Role already exists");
+                return Conflict("Role already exists.");
             }
 
             try
             {
                 var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-                await _roleService.CreateRoleAsync(dto.RoleName, performedBy!);
+                await _roleService.CreateRoleAsync(normalizedName, performedBy!);
 
                 return Ok("Role created successfully");
             }
             catch (Exception ex)
             {
-                // keep the same behavior: return BadRequest with message on other errors
                 return BadRequest(ex.Message);
             }
         }
 
-
+        // =============================================
+        // ASSIGN ROLE
+        // =============================================
         [HttpPost("assign")]
         public async Task<IActionResult> AssignRole(AssignRoleDto dto)
         {
@@ -70,6 +70,9 @@ namespace CRM.Server.Controllers
             }
         }
 
+        // =============================================
+        // GET ALL ROLES
+        // =============================================
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -77,6 +80,9 @@ namespace CRM.Server.Controllers
             return Ok(roles);
         }
 
+        // =============================================
+        // GET ROLE BY NAME
+        // =============================================
         [HttpGet("{name}")]
         public async Task<IActionResult> Get(string name)
         {
@@ -85,29 +91,9 @@ namespace CRM.Server.Controllers
             return Ok(role);
         }
 
-        //[HttpPut("update")]
-        //public async Task<IActionResult> UpdateRole(UpdateRoleDto dto)
-        //{
-        //    await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName);
-        //    return Ok("Role updated successfully");
-        //}
-        // ===============================
+        // =============================================
         // UPDATE ROLE
-        // ===============================
-        //[HttpPut("update")]
-        //public async Task<IActionResult> Update([FromBody] UpdateRoleDto dto)
-        //{
-        //    if (string.IsNullOrWhiteSpace(dto.OldName) ||
-        //        string.IsNullOrWhiteSpace(dto.NewName))
-        //    {
-        //        return BadRequest("OldName and NewName are required.");
-        //    }
-
-        //    await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName);
-
-        //    // No body, just status 204 = success
-        //    return NoContent();
-        //}
+        // =============================================
         [HttpPut("update")]
         public async Task<IActionResult> Update([FromBody] UpdateRoleDto dto)
         {
@@ -117,25 +103,28 @@ namespace CRM.Server.Controllers
                 return BadRequest("OldName and NewName are required.");
             }
 
-            // If the new name equals the old name (case-insensitive), treat as no-op
-            if (string.Equals(dto.OldName, dto.NewName, StringComparison.OrdinalIgnoreCase))
+            // ⭐ ADDED: Normalize names
+            var oldNameNormalized = dto.OldName.Trim().ToUpper();
+            var newNameNormalized = dto.NewName.Trim().ToUpper();
+
+            // ⭐ ADDED: Prevent NewName == OldName
+            if (oldNameNormalized == newNameNormalized)
             {
-                // nothing to change — return 204 as before
-                return NoContent();
+                return BadRequest("New role name cannot be the same as the old role name.");
             }
 
-            // CHECK: if new name already exists -> return 409
-            var existing = await _roleService.GetRoleAsync(dto.NewName);
+            // ⭐ ADDED: Prevent renaming into an existing role
+            var existing = await _roleService.GetRoleAsync(newNameNormalized);
             if (existing != null)
             {
-                return Conflict("Role already exists");
+                return Conflict("A role with this name already exists.");
             }
 
             try
             {
                 var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-                await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName, performedBy!);
+                await _roleService.UpdateRoleAsync(oldNameNormalized, newNameNormalized, performedBy!);
 
                 return Ok("Role updated successfully");
             }
@@ -145,8 +134,9 @@ namespace CRM.Server.Controllers
             }
         }
 
-
-
+        // =============================================
+        // DELETE ROLE
+        // =============================================
         [HttpDelete("{name}")]
         public async Task<IActionResult> Delete(string name)
         {
