@@ -1,4 +1,5 @@
 ﻿using CRM.Server.DTOs.Auth;
+using CRM.Server.DTOs.Users;
 using CRM.Server.Models;
 using CRM.Server.Security;
 using CRM.Server.Services.Interfaces;
@@ -324,6 +325,62 @@ namespace CRM.Server.Controllers
             });
         }
 
+
+        [HttpPost("invite")]
+        public async Task<IActionResult> InviteUser([FromBody] InviteUserDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                await _userService.InviteUserAsync(dto, performedBy!);
+
+                // ✅ ALWAYS JSON, includes success flag
+                return Ok(new
+                {
+                    success = true,
+                    message = "Invitation sent successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                // ✅ ALSO JSON on error (eg: "Email already exists")
+                return Ok(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+        [HttpPost("complete-registration")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CompleteRegistration([FromBody] CompleteRegistrationDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                await _userService.CompleteRegistrationAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Registration completed successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                // Always return JSON (same pattern as InviteUser / CreateUser)
+                return Ok(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
         // =====================================================
         // ✅ FORGOT PASSWORD  
         // =====================================================

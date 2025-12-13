@@ -34,7 +34,11 @@ namespace CRM.Server.Controllers
                 return BadRequest("RoleName is required.");
             }
 
-            var existing = await _roleService.GetRoleAsync(dto.RoleName);
+            // ⭐ ADDED: Normalize the input
+            var normalizedName = dto.RoleName.Trim().ToUpper();
+
+            // ⭐ ADDED: Check if role already exists (case-insensitive)
+            var existing = await _roleService.GetRoleAsync(normalizedName);
             if (existing != null)
             {
                 _logger.LogWarning("CreateRole conflict — Role already exists: {RoleName}", dto.RoleName);
@@ -117,22 +121,26 @@ namespace CRM.Server.Controllers
                 return BadRequest("OldName and NewName are required.");
             }
 
-            if (string.Equals(dto.OldName, dto.NewName, StringComparison.OrdinalIgnoreCase))
+            // ⭐ ADDED: Normalize names
+            var oldNameNormalized = dto.OldName.Trim().ToUpper();
+            var newNameNormalized = dto.NewName.Trim().ToUpper();
+
+            // ⭐ ADDED: Prevent NewName == OldName
+            if (oldNameNormalized == newNameNormalized)
             {
-                _logger.LogInformation("UpdateRole no-op — names are identical");
-                return NoContent();
+                return BadRequest("New role name cannot be the same as the old role name.");
             }
 
-            var existing = await _roleService.GetRoleAsync(dto.NewName);
+            // ⭐ ADDED: Prevent renaming into an existing role
+            var existing = await _roleService.GetRoleAsync(newNameNormalized);
             if (existing != null)
             {
-                _logger.LogWarning("UpdateRole conflict — name exists: {NewName}", dto.NewName);
-                return Conflict("Role already exists");
+                return Conflict("A role with this name already exists.");
             }
 
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName, performedBy!);
+                await _roleService.UpdateRoleAsync(oldNameNormalized, newNameNormalized, performedBy!);
 
             _logger.LogInformation("Role updated successfully: {Old} -> {New}",
                 dto.OldName, dto.NewName);

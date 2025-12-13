@@ -1,4 +1,5 @@
-﻿using CRM.Server.DTOs.Roles;
+﻿using CRM.Server.DTOs.Auth;
+using CRM.Server.DTOs.Roles;
 using CRM.Server.DTOs.Users;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,7 @@ using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class UserController : ControllerBase
@@ -32,6 +33,22 @@ namespace CRM.Server.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            // ⭐ DUPLICATE CHECK ADDED
+            var users = await _userService.GetAllUsersAsync();
+            var normalizedEmail = dto.Email?.Trim().ToLower();
+
+            if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
+                users.Any(u => u.Email != null &&
+                               u.Email.Trim().ToLower() == normalizedEmail))
+            {
+                return Ok(new
+                {
+                    success = false,
+                    message = "A user with this email already exists."
+                });
+            }
+
+        
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
             await _userService.CreateUserAsync(dto, performedBy!);
 
@@ -63,8 +80,24 @@ namespace CRM.Server.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            await _userService.InviteUserAsync(dto, performedBy!);
+            // ⭐ DUPLICATE CHECK ADDED
+            var users = await _userService.GetAllUsersAsync();
+            var normalizedEmail = dto.Email?.Trim().ToLower();
+
+            if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
+                users.Any(u => u.Email != null &&
+                               u.Email.Trim().ToLower() == normalizedEmail))
+            {
+                return Ok(new
+                {
+                    success = false,
+                    message = "A user with this email already exists."
+                });
+            }
+
+           
+                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                await _userService.InviteUserAsync(dto, performedBy!);
 
             return Ok(new
             {
@@ -107,6 +140,26 @@ namespace CRM.Server.Controllers
         [HttpPut("update/{userId}")]
         public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserDto dto)
         {
+            // ⭐ DUPLICATE CHECK ADDED
+            var users = await _userService.GetAllUsersAsync();
+
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var normalizedEmail = dto.Email.Trim().ToLower();
+
+                if (users.Any(u =>
+                        u.Id != userId &&
+                        u.Email != null &&
+                        u.Email.Trim().ToLower() == normalizedEmail))
+                {
+                    return Ok(new
+                    {
+                        success = false,
+                        message = "Another user already uses this email."
+                    });
+                }
+            }
+
             _logger.LogInformation($"UpdateUser called for: {userId}");
 
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -141,9 +194,9 @@ namespace CRM.Server.Controllers
             return Ok(user);
         }
 
-        // =============================================
-        // GET LOGGED-IN USER PROFILE
-        // =============================================
+        // =====================================================
+        // ✅ GET MY PROFILE (LOGGED-IN USER)
+        // =====================================================
         [HttpGet("me")]
         public async Task<IActionResult> GetMyProfile()
         {

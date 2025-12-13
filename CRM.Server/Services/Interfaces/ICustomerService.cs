@@ -14,6 +14,9 @@ namespace CRM.Server.Services.Interfaces
             string? search);
 
         Task<CustomerResponseDto?> GetByIdAsync(Guid id);
+        Task<List<CustomerResponseDto>> GetAllAsync();
+
+
 
         // Updated to accept performer id for auditing
         Task<CustomerResponseDto> CreateAsync(CustomerCreateDto dto, string performedByUserId);

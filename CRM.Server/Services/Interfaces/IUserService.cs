@@ -33,9 +33,11 @@ namespace CRM.Server.Services.Interfaces
         Task DisableMfaAsync(string userId, string code);
 
         Task AssignRoleAsync(string userId, string roleName, string performedByUserId);
+        Task CompleteRegistrationAsync(CompleteRegistrationDto dto);
+
 
         // new method in IUserService
-      
+
 
     }
 }
