@@ -77,7 +77,11 @@
         {
             await RoleService.CreateRoleAsync(RoleModel);
 
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role created successfully!");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+     "Success",
+     "Role created successfully!",
+     "success");
+
 
             RoleModel = new CreateRoleDto();
             editContext = new EditContext(RoleModel);
@@ -90,26 +94,29 @@
             Console.WriteLine("🔥 RAW API ERROR: " + ex.Message);
 
             var msg = ex.Message?.ToLower() ?? "";
-
-            // 1️⃣ Try to extract backend JSON { message: "..." }
             string cleanMessage = ExtractBackendMessage(ex.Message).ToLower();
 
-            // 2️⃣ Detect duplicate role (backend OR raw text)
             if (cleanMessage.Contains("role") && cleanMessage.Contains("exist") ||
                 msg.Contains("already") ||
                 msg.Contains("exists") ||
                 msg.Contains("duplicate") ||
                 msg.Contains("409"))
             {
-                Message = "Role already exists.";
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Role already exists!");
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Duplicate Role",
+                    "Role already exists!",
+                    "error");
             }
             else
             {
                 Message = "Failed to create role.";
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", cleanMessage);
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Error",
+                    cleanMessage,
+                    "error");
             }
         }
+
         finally
         {
             IsLoading = false;

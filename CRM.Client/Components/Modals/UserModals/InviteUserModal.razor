@@ -147,12 +147,19 @@
 
             if (result != null && !result.Success)
             {
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message ?? "User already exists");
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Error",
+                    result.Message ?? "User already exists",
+                    "error");
+
                 IsLoading = false;
                 return;
             }
 
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Invitation sent successfully!");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+     "Success",
+     "Invitation sent successfully!",
+     "success");
 
             InviteModel = new InviteUserDto(); // reset form
 
@@ -161,7 +168,11 @@
         }
         catch
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to send invite");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+    "Error",
+    "Failed to send invite",
+    "error");
+
         }
         finally
         {

@@ -145,7 +145,10 @@
         {
             await UserService.UpdateUserAsync(User.Id, EditModel);
 
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "User updated successfully.");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Success",
+                "User updated successfully.",
+                "success");
 
             // RESET MODEL AFTER SAVE
             EditModel = new UpdateUserDto();
@@ -156,14 +159,17 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError",
-                ex.Message ?? "Failed to update user.");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                ex.Message ?? "Failed to update user.",
+                "error");
         }
         finally
         {
             IsLoading = false;
         }
     }
+
 
 
     private async Task Cancel()

@@ -5,6 +5,7 @@ namespace CRM.Client.DTOs.Tasks
 {
     public class UpdateTaskDto
     {
+        [Required(ErrorMessage = "Title is required.")]
         [StringLength(100, ErrorMessage = "Title must be less than 100 characters.")]
         public string? Title { get; set; }
 

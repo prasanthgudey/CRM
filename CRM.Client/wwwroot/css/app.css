@@ -858,3 +858,18 @@ textarea.form-control.is-invalid {
 textarea + .validation-message {
     margin-bottom: .5rem;
 }
+
+/* task table */
+.task-completed {
+    color: #16c53a !important;
+    font-weight: 600 !important;
+}
+
+.task-row-completed {
+    background-color: #d4edda !important; /* light green */
+}
+
+.task-row-overdue {
+    background-color: #f8d7da !important; /* light red */
+}
+

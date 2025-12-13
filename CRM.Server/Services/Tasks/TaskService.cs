@@ -123,11 +123,11 @@ namespace CRM.Server.Services
             var existing = _repo.GetById(id)
                 ?? throw new Exception("Task not found");
 
-            if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.Today)
-            {
-                _logger.LogWarning("Invalid DueDate {DueDate} for task {Id}", dto.DueDate.Value, id);
-                throw new Exception("Due date cannot be in the past.");
-            }
+            //if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.Today)
+            //{
+            //    _logger.LogWarning("Invalid DueDate {DueDate} for task {Id}", dto.DueDate.Value, id);
+            //    throw new Exception("Due date cannot be in the past.");
+            //}
 
             var oldValue = JsonSerializer.Serialize(existing);
             var oldState = existing.State;
@@ -140,8 +140,7 @@ namespace CRM.Server.Services
 
             if (dto.DueDate.HasValue)
             {
-                if (dto.DueDate.Value < DateTime.Today)
-                    throw new Exception("Due date cannot be in the past.");
+                
 
                 existing.DueDate = dto.DueDate.Value;
             }
