@@ -4,11 +4,14 @@
 @using CRM.Client.Services.Tasks
 @using CRM.Client.Services.Customers
 @using CRM.Client.Services.Users
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 
 @inject IJSRuntime JSRuntime
 @inject TaskService TaskService
 @inject CustomerService CustomerService
 @inject UserService UserService
+@inject AuthenticationStateProvider AuthStateProvider
 
 @if (IsOpen && Task != null)
 {
@@ -31,7 +34,6 @@
                 <div class="modal-body">
                     <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
-                        <ValidationSummary />
 
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -50,85 +52,121 @@
 
                             <div class="col-md-6">
                                 <label class="form-label">User</label>
-                                <InputSelect class="form-select"
-                                             @bind-Value="SelectedUserId">
-                                    <option value="">-- Assign to user --</option>
-                                    @foreach (var u in Users ?? new())
-                                    {
-                                        var display = string.IsNullOrWhiteSpace(u.FullName)
-                                        ? u.Email
-                                        : $"{u.FullName} ({u.Email})";
 
-                                        <option value="@u.Id">@display</option>
-                                    }
-                                </InputSelect>
+                                @if (IsAdminOrManager)
+                                {
+                                    <!-- Admin/Manager: Editable dropdown -->
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="SelectedUserId">
+                                        <option value="">-- Assign to user --</option>
+                                        @if (Users is not null)
+                                        {
+                                            @foreach (var user in Users)
+                                            {
+                                                var display = string.IsNullOrWhiteSpace(user.FullName)
+                                                ? user.Email
+                                                : $"{user.FullName} ({user.Email})";
+
+                                                <option value="@user.Id">@display</option>
+                                            }
+                                        }
+                                    </InputSelect>
+                                }
+                                else
+                                {
+                                    <!-- Normal User: Frozen -->
+                                    <input class="form-control" value="@GetUserName(SelectedUserId)" disabled />
+
+                                    <!-- Bind hidden -->
+                                    <input type="hidden" @bind="SelectedUserId" />
+                                }
                             </div>
                         </div>
 
-                        <label class="form-label">Title</label>
-                        <InputText class="form-control" @bind-Value="Model.Title" />
-
-                        <label class="form-label mt-2">Description</label>
-                        <InputTextArea class="form-control" @bind-Value="Model.Description" />
-
-                        <label class="form-label mt-2">Due Date</label>
-                        <InputDate class="form-control" @bind-Value="Model.DueDate" />
-
-                        <label class="form-label mt-2">Priority</label>
-                        <InputSelect class="form-select" @bind-Value="Model.Priority">
-                            @foreach (var v in Enum.GetValues<TaskPriority>())
-                            {
-                                <option value="@v">@v</option>
-                            }
-                        </InputSelect>
-
-                        <label class="form-label mt-2">State</label>
-                        <InputSelect class="form-select" @bind-Value="Model.State">
-                            @foreach (var v in Enum.GetValues<TaskState>())
-                            {
-                                <option value="@v">@v</option>
-                            }
-                        </InputSelect>
-
-                        <div class="form-check mt-3">
-                            <InputCheckbox class="form-check-input"
-                                           @bind-Value="Model.IsRecurring" />
-                            <label class="form-check-label">Is Recurring</label>
+                        <div class="mb-3">
+                            <label class="form-label">Title</label>
+                            <InputText class="form-control" @bind-Value="Model.Title" />
+                            <ValidationMessage For="@(() => Model.Title)" />
                         </div>
 
-                        @if (Model.IsRecurring)
-                        {
-                            <label class="form-label mt-2">Recurrence Type</label>
-                            <InputSelect class="form-select"
-                                         @bind-Value="Model.RecurrenceType">
-                                @foreach (var v in Enum.GetValues<RecurrenceType>())
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea class="form-control" @bind-Value="Model.Description" />
+                            <ValidationMessage For="@(() => Model.Description)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Due Date</label>
+                            <InputDate class="form-control"
+                                       @bind-Value="Model.DueDate"
+                                       min="@MinDate" />
+                            <ValidationMessage For="@(() => Model.DueDate)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Priority</label>
+                            <InputSelect class="form-select" @bind-Value="Model.Priority">
+                                @foreach (var value in Enum.GetValues<TaskPriority>())
                                 {
-                                    <option value="@v">@v</option>
+                                    <option value="@value">@value</option>
                                 }
                             </InputSelect>
+                            <ValidationMessage For="@(() => Model.Priority)" />
+                        </div>
 
-                            <label class="form-label mt-2">Interval</label>
-                            <InputNumber class="form-control"
-                                         @bind-Value="Model.RecurrenceInterval" />
+                        <div class="mb-3">
+                            <label class="form-label">State</label>
+                            <InputSelect class="form-select" @bind-Value="Model.State">
+                                @foreach (var value in Enum.GetValues<TaskState>())
+                                {
+                                    <option value="@value">@value</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => Model.State)" />
+                        </div>
 
-                            <label class="form-label mt-2">End Date</label>
-                            <InputDate class="form-control"
-                                       @bind-Value="Model.RecurrenceEndDate" />
+                        <div class="form-check mb-3">
+                            <InputCheckbox class="form-check-input" @bind-Value="Model.IsRecurring" />
+                            <label class="form-check-label">Is Recurring</label>
+                                Is Recurring
+                            </label>
+                        </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Recurrence Type</label>
+                                <InputSelect class="form-select" @bind-Value="Model.RecurrenceType">
+                                    @foreach (var value in Enum.GetValues<RecurrenceType>())
+                                    {
+                                        <option value="@value">@value</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                                </InputSelect>
+                            <div class="mb-3">
+                                <label class="form-label">Recurrence Interval</label>
+                                <InputNumber class="form-control" @bind-Value="Model.RecurrenceInterval" />
+                            </div>
+                                             @bind-Value="Model.RecurrenceInterval" />
+                            <div class="mb-3">
+                                <label class="form-label">Recurrence End Date</label>
+                                <InputDate class="form-control" @bind-Value="Model.RecurrenceEndDate" />
+                            </div>
+                                           @bind-Value="Model.RecurrenceEndDate" />
+                            </div>
                         }
                     </EditForm>
                 </div>
 
-                <!-- FOOTER -->
-                <div class="modal-footer">
-                    <button class="btn btn-secondary"
+                    <button type="button" class="btn btn-secondary" @onclick="() => Close(false)">
+                            class="btn btn-secondary"
                             @onclick="() => Close(false)">
-                        Cancel
-                    </button>
 
                     <button class="btn btn-primary"
                             disabled="@IsLoading"
                             @onclick="Submit">
                         @(IsLoading ? "Saving..." : "Save Changes")
+                            @onclick="Submit">
+                        Save Changes
                     </button>
                 </div>
             </div>
@@ -149,34 +187,55 @@
     private string? SelectedUserId;
     private bool IsLoading;
 
-    protected override async Task OnParametersSetAsync()
-    {
-        if (!IsOpen || Task == null) return;
+    private bool IsAdminOrManager;
 
-        Customers ??= await CustomerService.GetAllAsync();
-        Users ??= await UserService.GetAllUsersAsync();
+    private string MinDate => DateTime.Today.ToString("yyyy-MM-dd");
 
-        Model = new UpdateTaskDto
+        if (IsOpen && Task != null)
         {
-            Title = Task.Title,
-            Description = Task.Description,
-            DueDate = Task.DueDate,
-            Priority = Task.Priority,
-            State = Task.State,
-            IsRecurring = Task.IsRecurring,
-            RecurrenceType = Task.RecurrenceType,
-            RecurrenceInterval = Task.RecurrenceInterval,
-            RecurrenceEndDate = Task.RecurrenceEndDate
-        };
+            if (Customers == null)
+                Customers = await CustomerService.GetAllAsync();
+                Customers = await CustomerService.GetAllAsync();
+            if (Users == null)
+                Users = await UserService.GetAllUsersAsync();
+                Users = await UserService.GetAllUsersAsync();
+            // map task
+            Model = new UpdateTaskDto
+            {
+                Title = Task.Title,
+                Description = Task.Description,
+                DueDate = Task.DueDate,
+                Priority = Task.Priority,
+                State = Task.State,
+                IsRecurring = Task.IsRecurring,
+                RecurrenceType = Task.RecurrenceType,
+                RecurrenceInterval = Task.RecurrenceInterval,
+                RecurrenceEndDate = Task.RecurrenceEndDate
+            };
+                RecurrenceEndDate = Task.RecurrenceEndDate
+            SelectedCustomerIdString = Task.CustomerId.ToString();
+            SelectedUserId = Task.UserId;
 
-        SelectedCustomerIdString = Task.CustomerId.ToString();
-        SelectedUserId = Task.UserId;
+            // ROLE CHECK
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+
+            IsAdminOrManager = user.IsInRole("Admin") || user.IsInRole("Manager");
+        }
+    }
+
+    private string GetUserName(string userId)
+    {
+        var u = Users?.FirstOrDefault(x => x.Id == userId);
+        return u == null
+            ? "Assigned User"
+            : string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName;
+    }
+        }
     }
 
     private async Task HandleValidSubmit()
     {
-        if (Task == null) return;
-
         IsLoading = true;
 
         try
@@ -202,9 +261,8 @@
             IsLoading = false;
         }
     }
-
-    private async Task Submit() => await HandleValidSubmit();
-
-    private async Task Close(bool refresh)
-        => await OnClose.InvokeAsync(refresh);
+        await HandleValidSubmit();
+    private async Task Close(bool refresh) => await OnClose.InvokeAsync(refresh);
+        await OnClose.InvokeAsync(refresh);
+    }
 }

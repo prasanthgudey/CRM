@@ -46,30 +46,52 @@
                                         <option value="">-- Select Customer --</option>
                                         @foreach (var c in Customers ?? new())
                                         {
-                                            <option value="@c.CustomerId">
-                                                @($"{c.FirstName} {c.SurName}".Trim() +
-                                                                                        (string.IsNullOrWhiteSpace(c.Email) ? "" : $" ({c.Email})"))
+                                            @foreach (var c in Customers)
+                                            {
+                                                <option value="@c.CustomerId">
+                                                    @($"{c.FirstName} {c.SurName}".Trim() +
+                                                                                            (string.IsNullOrWhiteSpace(c.Email) ? "" : $" ({c.Email})"))
                                     </option>
                                                                         }
+                                        }
                                     </InputSelect>
                                     <ValidationMessage For="@(() => Model.CustomerId)" class="text-danger" />
                                 </div>
 
+                                <!-- USER FIELD ROLE-BASED -->
                                 <div class="col-md-6">
                                     <label class="form-label">Assign To User</label>
-                                    <InputSelect class="form-select" @bind-Value="Model.UserId">
-                                        <option value="">-- Select User --</option>
-                                        @foreach (var u in Users ?? new())
-                                        {
-                                            var display = string.IsNullOrWhiteSpace(u.FullName)
-                                            ? u.Email
-                                            : $"{u.FullName} ({u.Email})";
 
-                                            <option value="@u.Id">@display</option>
-                                        }
-                                    </InputSelect>
-                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger" />
+                                    @if (IsAdminOrManager)
+                                    {
+                                        <!-- Admin / Manager: Dropdown -->
+                                        <InputSelect class="form-select" @bind-Value="Model.UserId">
+                                            <option value="">-- Select User --</option>
+                                            @if (Users != null)
+                                            {
+                                                @foreach (var u in Users)
+                                                {
+                                                    string display = string.IsNullOrWhiteSpace(u.FullName)
+                                                    ? u.Email
+                                                    : $"{u.FullName} ({u.Email})";
+
+                                                    <option value="@u.Id">@display</option>
+                                                }
+                                            }
+                                        </InputSelect>
+                                    }
+                                    else
+                                    {
+                                        <!-- Normal User: Frozen field -->
+                                        <input class="form-control" value="@GetUserDisplayName(Model.UserId)" disabled />
+
+                                        <!-- Hidden binds userId so model stays valid -->
+                                        <input type="hidden" @bind="Model.UserId" />
+                                    }
+
+                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger validation-message" />
                                 </div>
+
                             </div>
                         </div>
 
@@ -137,6 +159,8 @@
     private List<CustomerResponseDto>? Customers;
     private List<UserResponseDto>? Users;
 
+    private bool IsAdminOrManager;
+
     private EditContext? editContext;
     private ValidationMessageStore? messageStore;
     private bool IsLoading;
@@ -156,19 +180,59 @@
             _loaded = true;
         }
 
-        if (Model.DueDate == default)
-            Model.DueDate = DateTime.Today.AddDays(1);
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+
+            IsAdminOrManager = user.IsInRole("Admin") || user.IsInRole("Manager");
+
+            // For non-admin → auto-assign current user
+            if (!IsAdminOrManager)
+            {
+                var uid = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                Model.UserId = uid;
+            }
+
+            // DEFAULTS ADDED HERE ⭐⭐⭐
+            if (Model.Priority == default)
+                Model.Priority = TaskPriority.Low;
+
+            if (Model.State == default)
+                Model.State = TaskState.Pending;
+
+            if (Model.DueDate == default || Model.DueDate < DateTime.Today)
+                Model.DueDate = DateTime.Today.AddDays(1);
+        }
+    }
+
+    private async Task LoadLookupsAsync()
+    {
+        Customers = await CustomerService.GetAllAsync();
+        Users = await UserService.GetAllUsersAsync();
+    }
+
+    private string GetUserDisplayName(string id)
+    {
+        var u = Users?.FirstOrDefault(x => x.Id == id);
+        return u is null
+            ? "Current User"
+            : string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName;
     }
 
     private async Task HandleValidSubmit()
     {
         messageStore?.Clear();
+        editContext?.NotifyValidationStateChanged();
 
+        if (Model.CustomerId == Guid.Empty)
+            messageStore?.Add(() => Model.CustomerId, "Customer is required.");
+
+        if (Model.DueDate.Date < DateTime.Today)
+            messageStore?.Add(() => Model.DueDate, "Due date cannot be in the past.");
         if (Model.CustomerId == Guid.Empty)
             messageStore?.Add(() => Model.CustomerId, "Customer is required");
 
         if (string.IsNullOrWhiteSpace(Model.UserId))
-            messageStore?.Add(() => Model.UserId, "User is required");
+            messageStore?.Add(() => Model.UserId, "User is required.");
 
         if (editContext!.GetValidationMessages().Any())
         {
@@ -204,7 +268,17 @@
 
     private async Task Close(bool refresh)
     {
-        Model = new CreateTaskDto();
+        // DEFAULTS ADDED HERE TOO ⭐⭐⭐
+        Model = new CreateTaskDto
+        {
+            DueDate = DateTime.Today.AddDays(1),
+            Priority = TaskPriority.Low,      // default priority
+            State = TaskState.Pending         // default status
+        };
+
+        editContext = new EditContext(Model);
+        messageStore = new ValidationMessageStore(editContext);
+
         await OnClose.InvokeAsync(refresh);
     }
 }
