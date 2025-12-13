@@ -130,7 +130,7 @@
                 return;
             }
 
-            RedirectByRole();
+            RedirectAfterLogin();
         }
         catch
         {
@@ -141,6 +141,12 @@
             IsLoading = false;
         }
     }
+
+    private void RedirectAfterLogin()
+    {
+        Navigation.NavigateTo("/dashboard", true);
+    }
+
 
     private void RedirectByRole()
     {
