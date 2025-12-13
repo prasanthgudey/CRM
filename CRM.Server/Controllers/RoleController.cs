@@ -9,150 +9,150 @@ namespace CRM.Server.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    //[Authorize(Roles = "Admin")] // ✅ Enforced as per spec
     public class RoleController : ControllerBase
     {
         private readonly IRoleService _roleService;
+        private readonly ILogger<RoleController> _logger;
 
-        public RoleController(IRoleService roleService)
+        public RoleController(IRoleService roleService, ILogger<RoleController> logger)
         {
             _roleService = roleService;
+            _logger = logger;
         }
 
-        //[HttpPost("create")]
-        //public async Task<IActionResult> CreateRole(CreateRoleDto dto)
-        //{
-        //    await _roleService.CreateRoleAsync(dto.RoleName);
-        //    return Ok("Role created successfully");
-        //}
+        // ================================
+        // CREATE ROLE
+        // ================================
         [HttpPost("create")]
         public async Task<IActionResult> CreateRole(CreateRoleDto dto)
         {
-            if (string.IsNullOrWhiteSpace(dto?.RoleName))
-                return BadRequest("RoleName is required.");
+            _logger.LogInformation("CreateRole called with: {RoleName}", dto?.RoleName);
 
-            // CHECK: if role already exists -> return 409
+            if (string.IsNullOrWhiteSpace(dto?.RoleName))
+            {
+                _logger.LogWarning("CreateRole failed — RoleName missing");
+                return BadRequest("RoleName is required.");
+            }
+
             var existing = await _roleService.GetRoleAsync(dto.RoleName);
             if (existing != null)
             {
+                _logger.LogWarning("CreateRole conflict — Role already exists: {RoleName}", dto.RoleName);
                 return Conflict("Role already exists");
             }
 
-            try
-            {
-                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-                await _roleService.CreateRoleAsync(dto.RoleName, performedBy!);
+            // ❗ No try/catch → exceptions go to GlobalExceptionMiddleware
+            await _roleService.CreateRoleAsync(dto.RoleName, performedBy!);
 
-                return Ok("Role created successfully");
-            }
-            catch (Exception ex)
-            {
-                // keep the same behavior: return BadRequest with message on other errors
-                return BadRequest(ex.Message);
-            }
+            _logger.LogInformation("Role created successfully: {RoleName}", dto.RoleName);
+
+            return Ok("Role created successfully");
         }
 
-
+        // ================================
+        // ASSIGN ROLE
+        // ================================
         [HttpPost("assign")]
         public async Task<IActionResult> AssignRole(AssignRoleDto dto)
         {
+            _logger.LogInformation("AssignRole called for UserId={UserId}, Role={Role}",
+                dto.UserId, dto.RoleName);
+
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            try
-            {
-                await _roleService.AssignRoleAsync(dto.UserId, dto.RoleName, performedBy!);
-                return Ok("Role assigned successfully");
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            await _roleService.AssignRoleAsync(dto.UserId, dto.RoleName, performedBy!);
+
+            _logger.LogInformation("Role assigned successfully: {Role}", dto.RoleName);
+
+            return Ok("Role assigned successfully");
         }
 
+        // ================================
+        // GET ALL ROLES
+        // ================================
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+            _logger.LogInformation("Fetching all roles");
+
             var roles = await _roleService.GetAllRolesAsync();
+
             return Ok(roles);
         }
 
+        // ================================
+        // GET ROLE BY NAME
+        // ================================
         [HttpGet("{name}")]
         public async Task<IActionResult> Get(string name)
         {
+            _logger.LogInformation("Fetching role by name: {RoleName}", name);
+
             var role = await _roleService.GetRoleAsync(name);
-            if (role == null) return NotFound("Role not found");
+
+            if (role == null)
+            {
+                _logger.LogWarning("Role not found: {RoleName}", name);
+                return NotFound("Role not found");
+            }
+
             return Ok(role);
         }
 
-        //[HttpPut("update")]
-        //public async Task<IActionResult> UpdateRole(UpdateRoleDto dto)
-        //{
-        //    await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName);
-        //    return Ok("Role updated successfully");
-        //}
-        // ===============================
+        // ================================
         // UPDATE ROLE
-        // ===============================
-        //[HttpPut("update")]
-        //public async Task<IActionResult> Update([FromBody] UpdateRoleDto dto)
-        //{
-        //    if (string.IsNullOrWhiteSpace(dto.OldName) ||
-        //        string.IsNullOrWhiteSpace(dto.NewName))
-        //    {
-        //        return BadRequest("OldName and NewName are required.");
-        //    }
-
-        //    await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName);
-
-        //    // No body, just status 204 = success
-        //    return NoContent();
-        //}
+        // ================================
         [HttpPut("update")]
         public async Task<IActionResult> Update([FromBody] UpdateRoleDto dto)
         {
+            _logger.LogInformation("Update role request OldName={OldName}, NewName={NewName}",
+                dto.OldName, dto.NewName);
+
             if (string.IsNullOrWhiteSpace(dto.OldName) ||
                 string.IsNullOrWhiteSpace(dto.NewName))
             {
+                _logger.LogWarning("UpdateRole failed — missing names");
                 return BadRequest("OldName and NewName are required.");
             }
 
-            // If the new name equals the old name (case-insensitive), treat as no-op
             if (string.Equals(dto.OldName, dto.NewName, StringComparison.OrdinalIgnoreCase))
             {
-                // nothing to change — return 204 as before
+                _logger.LogInformation("UpdateRole no-op — names are identical");
                 return NoContent();
             }
 
-            // CHECK: if new name already exists -> return 409
             var existing = await _roleService.GetRoleAsync(dto.NewName);
             if (existing != null)
             {
+                _logger.LogWarning("UpdateRole conflict — name exists: {NewName}", dto.NewName);
                 return Conflict("Role already exists");
             }
 
-            try
-            {
-                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-                await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName, performedBy!);
+            await _roleService.UpdateRoleAsync(dto.OldName, dto.NewName, performedBy!);
 
-                return Ok("Role updated successfully");
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            _logger.LogInformation("Role updated successfully: {Old} -> {New}",
+                dto.OldName, dto.NewName);
+
+            return Ok("Role updated successfully");
         }
 
-
-
+        // ================================
+        // DELETE ROLE
+        // ================================
         [HttpDelete("{name}")]
         public async Task<IActionResult> Delete(string name)
         {
+            _logger.LogInformation("Delete role request: {RoleName}", name);
+
             var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             await _roleService.DeleteRoleAsync(name, performedBy!);
+
+            _logger.LogInformation("Role deleted successfully: {RoleName}", name);
 
             return Ok("Role deleted successfully");
         }
