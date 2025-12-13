@@ -208,23 +208,24 @@ else
         await UserService.DeactivateUserAsync(userId);
         Users = await UserService.GetAllUsersAsync();
 
-        await JSRuntime.InvokeVoidAsync(
-            "crmAlerts.showSuccess",
-            "User deactivated"
-        );
+        await JSRuntime.InvokeVoidAsync("Swal.fire",
+            "Success",
+            "User deactivated",
+            "success");
     }
 
-    // ✅ NEW: Activate
+    // ✅ Activate
     private async Task Activate(string userId)
     {
         await UserService.ActivateUserAsync(userId);
         Users = await UserService.GetAllUsersAsync();
 
-        await JSRuntime.InvokeVoidAsync(
-            "crmAlerts.showSuccess",
-            "User activated"
-        );
+        await JSRuntime.InvokeVoidAsync("Swal.fire",
+            "Success",
+            "User activated",
+            "success");
     }
+
 
     // ✅ Edit user
     private void OpenEditModal(UserResponseDto user)

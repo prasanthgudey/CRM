@@ -145,7 +145,10 @@
 
             if (result?.Success == true)
             {
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", result.Message);
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Success",
+                    result.Message ?? "User created successfully",
+                    "success");
 
                 CreateModel = new();
                 await Task.Delay(600);
@@ -153,17 +156,24 @@
             }
             else if (result != null)
             {
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", result.Message);
+                await JSRuntime.InvokeVoidAsync("Swal.fire",
+                    "Error",
+                    result.Message ?? "Failed to create user",
+                    "error");
             }
         }
         catch
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Something went wrong");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Something went wrong",
+                "error");
         }
         finally
         {
             IsLoading = false;
         }
+
     }
 
     private async Task Close()

@@ -1,5 +1,7 @@
 ﻿@using CRM.Client.Services.Tasks
 @inject TaskService TaskService
+@inject IJSRuntime JSRuntime
+
 
 @if (IsOpen && TaskId.HasValue)
 {
@@ -40,15 +42,40 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public Guid? TaskId { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
+    private bool IsLoading;
+
 
     private async Task Delete()
     {
-        if (TaskId.HasValue)
+        if (!TaskId.HasValue)
+            return;
+
+        IsLoading = true;
+
+        try
         {
             await TaskService.DeleteAsync(TaskId.Value);
+
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Success",
+                "Task deleted successfully",
+                "success");
+
             await Close(true);
         }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Failed to delete task",
+                "error");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
+
 
     private async Task Close(bool refresh)
     {

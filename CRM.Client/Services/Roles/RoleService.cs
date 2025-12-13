@@ -1,9 +1,7 @@
 ﻿using CRM.Client.DTOs.Roles;
-using CRM.Client.Services; // make sure this matches where ServiceResult lives
+using CRM.Client.Services;
 using CRM.Client.Services.Http;
 using System.Net;
-using System.Text.Json;
-using static System.Net.WebRequestMethods;
 
 namespace CRM.Client.Services.Roles
 {
@@ -16,43 +14,51 @@ namespace CRM.Client.Services.Roles
             _api = api;
         }
 
-        // CREATE ROLE
+        // ============================
+        // CREATE ROLE  ✅ FIXED
+        // ============================
         public async Task CreateRoleAsync(CreateRoleDto dto)
         {
-            // explicit generic args: request type and response type
-            await _api.PostAsync<CreateRoleDto, object?>("api/role/create", dto);
+            // IMPORTANT:
+            // Do NOT parse response body on success
+            // API returns plain text, not JSON
+
+            var response = await _api.PostRawAsync("api/role/create", dto);
+
+            if (response.IsSuccessStatusCode)
+                return;
+
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception(error);
         }
 
+        // ============================
         // GET ALL ROLES
+        // ============================
         public async Task<List<RoleResponseDto>?> GetAllRolesAsync()
-
         {
             return await _api.GetAsync<List<RoleResponseDto>>("api/role");
         }
 
+        // ============================
         // GET ROLE BY NAME
+        // ============================
         public async Task<RoleResponseDto?> GetRoleAsync(string roleName)
         {
             return await _api.GetAsync<RoleResponseDto>($"api/role/{roleName}");
         }
 
-        //   UPDATE / RENAME ROLE
-        //public async Task UpdateRoleAsync(UpdateRoleDto dto)
-        //{
-        //    await _api.PutAsync<UpdateRoleDto, object?>(
-        //        "api/role/update",
-        //        dto
-        //    );
-        //}
+        // ============================
+        // UPDATE / RENAME ROLE
+        // ============================
         public async Task<ServiceResult> UpdateRoleAsync(UpdateRoleDto dto)
         {
             try
             {
                 var response = await _api.PutRawAsync("api/role/update", dto);
-
                 var body = await response.Content.ReadAsStringAsync();
 
-                // 409 => duplicate role
+                // DUPLICATE ROLE
                 if (response.StatusCode == HttpStatusCode.Conflict)
                 {
                     return new ServiceResult
@@ -63,7 +69,7 @@ namespace CRM.Client.Services.Roles
                     };
                 }
 
-                // SUCCESS CASE
+                // SUCCESS
                 if (response.IsSuccessStatusCode)
                 {
                     return new ServiceResult
@@ -73,7 +79,7 @@ namespace CRM.Client.Services.Roles
                     };
                 }
 
-                // ANY OTHER ERROR
+                // OTHER ERRORS
                 return new ServiceResult
                 {
                     IsSuccess = false,
@@ -91,18 +97,30 @@ namespace CRM.Client.Services.Roles
             }
         }
 
-
-
+        // ============================
         // DELETE ROLE
         public async Task DeleteRoleAsync(string roleName)
         {
+            // ApiClientService.DeleteAsync already:
+            // - throws exception on failure
+            // - returns nothing on success
+
             await _api.DeleteAsync($"api/role/{roleName}");
         }
 
+
+        // ============================
         // ASSIGN ROLE TO USER
+        // ============================
         public async Task AssignRoleAsync(AssignRoleDto dto)
         {
-            await _api.PostAsync<AssignRoleDto, object?>("api/user/assign", dto);
+            var response = await _api.PostRawAsync("api/user/assign", dto);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception(error);
+            }
         }
     }
 }

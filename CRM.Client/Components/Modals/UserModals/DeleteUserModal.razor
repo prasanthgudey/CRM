@@ -43,19 +43,26 @@
             await UserService.DeleteUserAsync(UserId);
 
             // ⭐ SweetAlert on delete success
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "User deleted successfully");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Deleted",
+                "User deleted successfully",
+                "success");
 
             await Task.Delay(500);
             await OnClose.InvokeAsync(true);    // close modal (true means action taken)
         }
         catch
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Deletion failed");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Deletion failed",
+                "error");
         }
         finally
         {
             IsLoading = false;
         }
+
     }
 
     private async Task Cancel()
