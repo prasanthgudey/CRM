@@ -13,7 +13,9 @@ namespace CRM.Server.Controllers
         private readonly ICustomerService _service;
         private readonly ILogger<CustomerController> _logger;
 
-        public CustomerController(ICustomerService service, ILogger<CustomerController> logger)
+        public CustomerController(
+            ICustomerService service,
+            ILogger<CustomerController> logger)
         {
             _service = service;
             _logger = logger;
@@ -31,8 +33,7 @@ namespace CRM.Server.Controllers
             [FromQuery] string? search)
         {
             _logger.LogInformation("GetAll customers called");
-            var result = await _service.FilterAsync(name, email, phone, address, search);
-            return Ok(result);
+            return Ok(await _service.FilterAsync(name, email, phone, address, search));
         }
 
         // =============================================
@@ -41,157 +42,90 @@ namespace CRM.Server.Controllers
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            _logger.LogInformation("Get customer by ID: {CustomerId}", id);
-
-            var result = await _service.GetByIdAsync(id);
-            return result == null ? NotFound() : Ok(result);
+            var customer = await _service.GetByIdAsync(id);
+            return customer == null ? NotFound() : Ok(customer);
         }
 
         // =============================================
-        // CREATE CUSTOMER
+        // CREATE
         // =============================================
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CustomerCreateDto dto)
         {
-            _logger.LogInformation("Create customer called"); _logger.LogInformation("Create customer called");
             if (dto == null)
-                return BadRequest("Invalid customer data.");
+                throw new ArgumentException("Customer data is required");
 
-            // Load all customers for duplicate checks
-            var all = await _service.FilterAsync(null, null, null, null, null);
+            var performedBy = GetUserId();
 
-            var normalizedEmail = dto.Email?.Trim().ToLower();
-            var normalizedPhone = dto.Phone?.Trim();
-
-            if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
-                all.Any(c => c.Email != null &&
-                             c.Email.Equals(normalizedEmail, StringComparison.OrdinalIgnoreCase)))
-            {
-                return Conflict("A customer with this email already exists.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(normalizedPhone) &&
-                all.Any(c => c.Phone == normalizedPhone))
-            {
-                return Conflict("A customer with this phone number already exists.");
-            }
-
-            // Get creator (logged-in user)
-            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                            ?? User.FindFirstValue("sub");
-
-            // If no logged-in user (dev mode), keep dto value
-            if (Guid.TryParse(performedBy, out var uid))
-                dto.CreatedByUserId = uid.ToString();
-
-            var result = await _service.CreateAsync(dto, performedBy!);
-
+            var result = await _service.CreateAsync(dto, performedBy);
             return Ok(result);
         }
 
-        // ============================================
-        // UPDATE CUSTOMER
-        // ============================================
+        // =============================================
+        // UPDATE
+        // =============================================
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] CustomerUpdateDto dto)
         {
-
-            _logger.LogInformation("Update customer {CustomerId}", id);
             if (dto == null)
-                return BadRequest("Invalid update data.");
+                throw new ArgumentException("Update data is required");
 
-            var all = await _service.FilterAsync(null, null, null, null, null);
+            var performedBy = GetUserId();
 
-            // Duplicate email check
-            if (!string.IsNullOrWhiteSpace(dto.Email))
-            {
-                var normalizedEmail = dto.Email.Trim().ToLower();
-
-                if (all.Any(c =>
-                    c.CustomerId != id &&
-                    c.Email != null &&
-                    c.Email.Equals(normalizedEmail, StringComparison.OrdinalIgnoreCase)))
-                {
-                    return Conflict("Another customer already uses this email.");
-                }
-            }
-
-            // Duplicate phone check
-            if (!string.IsNullOrWhiteSpace(dto.Phone))
-            {
-                var normalizedPhone = dto.Phone.Trim();
-
-                if (all.Any(c =>
-                    c.CustomerId != id &&
-                    c.Phone == normalizedPhone))
-                {
-                    return Conflict("Another customer already uses this phone number.");
-                }
-            }
-
-            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                            ?? User.FindFirstValue("sub");
-
-            var updated = await _service.UpdateAsync(id, dto, performedBy!);
-
+            var updated = await _service.UpdateAsync(id, dto, performedBy);
             return updated ? NoContent() : NotFound();
         }
 
-        // ============================================
-        // DELETE CUSTOMER
-        // ============================================
+        // =============================================
+        // DELETE
+        // =============================================
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-           
+            var performedBy = GetUserId();
 
-            _logger.LogInformation("Delete customer {CustomerId}", id);
-            var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                           ?? User.FindFirstValue("sub");
-
-            var deleted = await _service.DeleteAsync(id, performedBy!);
-
+            var deleted = await _service.DeleteAsync(id, performedBy);
             return deleted ? NoContent() : NotFound();
         }
 
-        // ============================================
+        // =============================================
         // PAGED
-        // ============================================
+        // =============================================
         [HttpGet("paged")]
         public async Task<IActionResult> GetPaged([FromQuery] PageParams parms)
         {
-            _logger.LogInformation("GetPaged customers called");
-            var result = await _service.GetPagedAsync(parms);
-            return Ok(result);
+            return Ok(await _service.GetPagedAsync(parms));
         }
 
         // =============================================
         // DASHBOARD: TOTAL COUNT
         // =============================================
-
-        /// <summary>
-        /// NEW: GET /api/customers/count
-            _logger.LogInformation("Get total customers count");
-
-            var count = await _service.GetTotalCountAsync();
-            return Ok(count);
+        [HttpGet("count")]
+        public async Task<IActionResult> GetCount()
+        {
+            return Ok(await _service.GetTotalCountAsync());
         }
-            {
-        // =============================================
-        // DASHBOARD: NEW CUSTOMERS IN X DAYS
-        // =============================================
 
-        /// <summary>
-        /// NEW: GET /api/customers/new?days=7
-            _logger.LogInformation("Get new customers in last {Days} days", days);
+        // =============================================
+        // DASHBOARD: NEW CUSTOMERS
+        // =============================================
+        [HttpGet("new")]
+        public async Task<IActionResult> GetNew([FromQuery] int days = 7)
+        {
+            if (days <= 0)
+                throw new ArgumentException("Days must be greater than zero");
 
-            var count = await _service.GetNewCustomersCountAsync(days);
-            return Ok(count);
+            return Ok(await _service.GetNewCustomersCountAsync(days));
         }
-            catch (Exception ex)
-            {
-                return StatusCode(500, "Failed to get new customers count");
-            }
+
+        // =============================================
+        // HELPER
+        // =============================================
+        private string GetUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub")
+                ?? throw new InvalidOperationException("User identity not found");
         }
     }
 }
