@@ -146,6 +146,7 @@
 
     private List<UserResponseDto>? _users;
     private string _createdByDisplay = string.Empty;
+
     private bool IsLoading;
 
     private EditContext? editContext;
@@ -221,7 +222,7 @@
             bool exists = ExistingCustomers.Any(c =>
                 !string.IsNullOrWhiteSpace(c.Email) &&
                 c.Email.ToLower() == Model.Email.ToLower() &&
-                c.CustomerId != Customer.CustomerId); // exclude same customer
+                c.CustomerId != Customer.CustomerId);
 
             if (exists)
             {
@@ -231,9 +232,13 @@
             }
         }
 
-        await CustomerService.UpdateAsync(Customer.CustomerId, Model);
-        await Close(true);
+        await SaveAsync();
     }
+
+    private async Task Submit() => await HandleValidSubmit();
+
+    private async Task SaveAsync()
+    {
         IsLoading = true;
 
         try
@@ -259,8 +264,6 @@
             IsLoading = false;
         }
     }
-
-    private async Task Submit() => await HandleValidSubmit();
 
     private async Task Close(bool refresh)
     {
