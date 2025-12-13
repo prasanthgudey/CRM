@@ -287,8 +287,8 @@
     private string MonthChangeText = "";
 
     // polling timer
-    private System.Threading.Timer? _refreshTimer;
-    private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(15);
+    // private System.Threading.Timer? _refreshTimer;
+    // private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(15);
 
     // auth / role
     private ClaimsPrincipal? _user;
@@ -301,46 +301,32 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // determine user and role
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _user = authState.User;
 
         if (_user?.Identity?.IsAuthenticated == true)
         {
-            // get id and name from claims (adjust claim types if different in your token)
-            UserId = _user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? _user.FindFirst("sub")?.Value;
-            UserDisplayName = _user.Identity?.Name ?? _user.FindFirst("name")?.Value ?? "User";
+            UserId = _user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? _user.FindFirst("sub")?.Value;
 
-            // role claim commonly has type ClaimTypes.Role or "role"
-            var roleClaim = _user.FindFirst(ClaimTypes.Role)?.Value ?? _user.FindFirst("role")?.Value ?? "";
-            UserRoleDisplay = string.IsNullOrWhiteSpace(roleClaim) ? "User" : roleClaim;
+            var roleClaim =
+                _user.FindFirst(ClaimTypes.Role)?.Value ??
+                _user.FindFirst("role")?.Value ?? "";
 
-            IsAdmin = roleClaim?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true;
-            IsManager = roleClaim?.Equals("Manager", StringComparison.OrdinalIgnoreCase) == true;
+            IsAdmin = roleClaim.Equals("Admin", StringComparison.OrdinalIgnoreCase);
+            IsManager = roleClaim.Equals("Manager", StringComparison.OrdinalIgnoreCase);
             IsUser = !IsAdmin && !IsManager;
         }
 
+        // 🔥 LOAD DATA ONLY ONCE
         await LoadDashboardAsync();
-
-        // polling timer (keeps UI up to date)
-        _refreshTimer = new System.Threading.Timer(async _ =>
-        {
-            try
-            {
-                await InvokeAsync(async () =>
-                {
-                    await LoadDashboardAsync(updateOnly: true);
-                    StateHasChanged();
-                });
-            }
-            catch { /* swallow polling errors */ }
-        }, null, _refreshInterval, _refreshInterval);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        _refreshTimer?.Dispose();
-    }
+
+    // public async ValueTask DisposeAsync()
+    // {
+    //     _refreshTimer?.Dispose();
+    // }
 
     /// <summary>
     /// Loads dashboard data according to role:
@@ -641,7 +627,7 @@
     }
 
     // navigation helpers (add/replace if you already have NavigateToTasks/NavigateToAuditLogs)
-  
+
 
     private void NavigateToCustomers()
 

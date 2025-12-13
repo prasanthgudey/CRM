@@ -47,7 +47,7 @@ namespace CRM.Client.Services.Users
         public async Task<OperationResultDto?> InviteUserAsync(InviteUserDto dto)   // ⭐ new code
         {
             return await _api.PostAsync<InviteUserDto, OperationResultDto>(
-                "api/user/invite", dto);                                            // ⭐ new code
+                "api/auth/invite", dto);                                            // ⭐ new code
         }
 
         // ✅ DEACTIVATE USER

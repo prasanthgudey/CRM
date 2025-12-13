@@ -6,7 +6,6 @@
 @if (IsOpen)
 {
     <div class="modal-backdrop d-flex align-items-center justify-content-center">
-
         <div class="modal-card shadow"
              style="width: 500px; padding: 28px 32px; border-radius: 14px; background:white;">
 
@@ -20,11 +19,11 @@
         <EditForm Model="AssignModel" OnValidSubmit="AssignRole">
             <DataAnnotationsValidator />
 
-            <!-- ROLE WITH CUSTOM SCROLLABLE DROPDOWN -->
+            <!-- ROLE DROPDOWN -->
             <div class="form-group mt-3">
                 <label class="small text-muted">Select Role</label>
 
-                <div class="role-dropdown-container">
+                <div class="role-dropdown-container position-relative">
 
                     <!-- Selected Role -->
                     <div class="role-selected" @onclick="ToggleDropdown">
@@ -33,10 +32,10 @@
                                                 : AssignModel.RoleName)
                     </div>
 
-                        <!-- Scrollable dropdown list -->
+                        <!-- Dropdown List -->
                     @if (ShowDropdown && Roles != null)
                         {
-                            <div class="role-dropdown-list">
+                            <div class="role-dropdown-list shadow-sm">
                                 @foreach (var role in Roles)
                                 {
                                     <div class="role-item"
@@ -57,12 +56,12 @@
                         Cancel
                     </button>
 
-                    <button class="btn btn-success"
+                    <button type="submit"
+                            class="btn btn-success"
                             disabled="@IsLoading">
                         @(IsLoading ? "Assigning..." : "Assign Role")
                     </button>
                 </div>
-
             </EditForm>
 
         </div>
@@ -76,21 +75,26 @@
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private AssignRoleDto AssignModel { get; set; } = new();
-    private List<RoleResponseDto>? Roles { get; set; }
+    private List<RoleResponseDto>? Roles;
 
-    private bool IsLoading { get; set; }
-    private string? Message { get; set; }
-    private bool ShowDropdown = false;
+    private bool IsLoading;
+    private bool ShowDropdown;
+    private string? Message;
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!IsOpen)
+            return;
+
         AssignModel = new AssignRoleDto
         {
             UserId = UserId ?? string.Empty
         };
 
-        if (IsOpen)
-            Roles = await RoleService.GetAllRolesAsync();
+        ShowDropdown = false;
+        Message = null;
+
+        Roles = await RoleService.GetAllRolesAsync();
     }
 
     private void ToggleDropdown()
@@ -108,7 +112,10 @@
     {
         if (string.IsNullOrWhiteSpace(AssignModel.RoleName))
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Please select a role.");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Validation",
+                "Please select a role.",
+                "warning");
             return;
         }
 
@@ -118,14 +125,20 @@
         {
             await RoleService.AssignRoleAsync(AssignModel);
 
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role assigned successfully!");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Success",
+                "Role assigned successfully!",
+                "success");
 
             await Task.Delay(500);
-            await OnClose.InvokeAsync(false);
+            await OnClose.InvokeAsync(true);
         }
         catch
         {
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to assign role.");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Failed to assign role.",
+                "error");
         }
         finally
         {

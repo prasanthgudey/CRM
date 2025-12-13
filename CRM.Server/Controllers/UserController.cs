@@ -1,4 +1,5 @@
-﻿using CRM.Server.DTOs.Roles;
+﻿using CRM.Server.DTOs.Auth;
+using CRM.Server.DTOs.Roles;
 using CRM.Server.DTOs.Users;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;

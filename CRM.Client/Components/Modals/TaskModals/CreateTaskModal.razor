@@ -6,9 +6,9 @@
 @using CRM.Client.Services.Users
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Security.Claims
-@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
 
+@inject IJSRuntime JSRuntime
 @inject TaskService TaskService
 @inject CustomerService CustomerService
 @inject UserService UserService
@@ -25,8 +25,10 @@
                     <h5 class="modal-title task-modal-title">
                         <span class="task-modal-icon">🗂️</span> Create Task
                     </h5>
-                    <button type="button" class="btn-close btn-close-white"
-                            @onclick="() => Close(false)"></button>
+                    <button type="button"
+                            class="btn-close btn-close-white"
+                            @onclick="() => Close(false)">
+                    </button>
                 </div>
 
                 <!-- BODY -->
@@ -44,67 +46,68 @@
                                     <label class="form-label">Customer</label>
                                     <InputSelect class="form-select" @bind-Value="Model.CustomerId">
                                         <option value="">-- Select Customer --</option>
-                                        @if (Customers != null)
+                                        @foreach (var c in Customers ?? new())
                                         {
-                                            @foreach (var c in Customers)
-                                            {
-                                                <option value="@c.CustomerId">
-                                                    @($"{c.FirstName} {c.SurName}".Trim() + (string.IsNullOrWhiteSpace(c.Email) ? "" : $" ({c.Email})"))
-                                                </option>
-                                            }
-                                        }
+                                            <option value="@c.CustomerId">
+                                                @($"{c.FirstName} {c.SurName}".Trim()
+                                                                                        + (string.IsNullOrWhiteSpace(c.Email) ? "" : $" ({c.Email})"))
+                                    </option>
+                                                                        }
                                     </InputSelect>
-                                    <ValidationMessage For="@(() => Model.CustomerId)" class="text-danger validation-message" />
+                                    <ValidationMessage For="@(() => Model.CustomerId)" class="text-danger" />
                                 </div>
 
-                                <!-- USER (bound to model so validation sees it) -->
+                                <!-- USER -->
                                 <div class="col-md-6">
                                     <label class="form-label">Assign To User</label>
-                                    <InputSelect class="form-select" @bind-Value="Model.UserId">
-                                        <option value="">-- Select User --</option>
-                                        @if (Users != null)
-                                        {
-                                            @foreach (var u in Users)
+
+                                    @if (IsAdminOrManager)
+                                    {
+                                        <InputSelect class="form-select" @bind-Value="Model.UserId">
+                                            <option value="">-- Select User --</option>
+                                            @foreach (var u in Users ?? new())
                                             {
-                                                string display = string.IsNullOrWhiteSpace(u.FullName)
+                                                var display = string.IsNullOrWhiteSpace(u.FullName)
                                                 ? u.Email
                                                 : $"{u.FullName} ({u.Email})";
 
                                                 <option value="@u.Id">@display</option>
                                             }
-                                        }
-                                    </InputSelect>
-                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger validation-message" />
+                                        </InputSelect>
+                                    }
+                                    else
+                                    {
+                                        <input class="form-control"
+                                               value="@GetUserDisplayName(Model.UserId)"
+                                               disabled />
+                                        <input type="hidden" @bind="Model.UserId" />
+                                    }
+
+                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger" />
                                 </div>
+
                             </div>
                         </div>
 
                         <!-- DETAILS -->
                         <div class="task-section mb-3">
-                            <div class="task-section-title">Details</div>
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="form-label">Title</label>
-                                    <InputText class="form-control" @bind-Value="Model.Title" />
-                                    <ValidationMessage For="@(() => Model.Title)" class="text-danger validation-message" />
-                                </div>
+                            <label class="form-label">Title</label>
+                            <InputText class="form-control" @bind-Value="Model.Title" />
+                            <ValidationMessage For="@(() => Model.Title)" class="text-danger" />
 
-                                <div class="col-12">
-                                    <label class="form-label">Description</label>
-                                    <InputTextArea class="form-control" rows="3" @bind-Value="Model.Description" />
-                                    <ValidationMessage For="@(() => Model.Description)" class="text-danger validation-message" />
-                                </div>
-                            </div>
+                            <label class="form-label mt-2">Description</label>
+                            <InputTextArea class="form-control"
+                                           rows="3"
+                                           @bind-Value="Model.Description" />
                         </div>
 
                         <!-- SCHEDULE -->
                         <div class="task-section mb-3">
-                            <div class="task-section-title">Schedule & Priority</div>
                             <div class="row g-3">
+
                                 <div class="col-md-4">
                                     <label class="form-label">Due Date</label>
                                     <InputDate class="form-control" @bind-Value="Model.DueDate" />
-                                    <ValidationMessage For="@(() => Model.DueDate)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -115,7 +118,6 @@
                                             <option value="@p">@p</option>
                                         }
                                     </InputSelect>
-                                    <ValidationMessage For="@(() => Model.Priority)" class="text-danger validation-message" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -127,58 +129,18 @@
                                         }
                                     </InputSelect>
                                 </div>
+
                             </div>
                         </div>
 
-                        <!-- RECURRENCE -->
-                        <div class="task-section mb-2">
-                            <div class="task-section-title d-flex justify-content-between">
-                                <span>Recurrence</span>
-
-                                <div class="form-check form-switch">
-                                    <InputCheckbox class="form-check-input" @bind-Value="Model.IsRecurring" />
-                                    <label class="form-check-label ms-1">Recurring</label>
-                                </div>
-                            </div>
-
-                            @if (Model.IsRecurring)
-                            {
-                                <div class="row g-3 mt-1">
-                                    <div class="col-md-4">
-                                        <label class="form-label">Recurrence Type</label>
-                                        <InputSelect class="form-select" @bind-Value="Model.RecurrenceType">
-                                            @foreach (var t in Enum.GetValues<RecurrenceType>())
-                                            {
-                                                <option value="@t">@t</option>
-                                            }
-                                        </InputSelect>
-                                    </div>
-
-                                    <div class="col-md-4">
-                                        <label class="form-label">Interval (1–365)</label>
-                                        <InputNumber class="form-control" @bind-Value="Model.RecurrenceInterval" />
-                                        <ValidationMessage For="@(() => Model.RecurrenceInterval)" class="text-danger validation-message" />
-                                    </div>
-
-                                    <div class="col-md-4">
-                                        <label class="form-label">End Date</label>
-                                        <InputDate class="form-control" @bind-Value="Model.RecurrenceEndDate" />
-                                    </div>
-                                </div>
-                            }
-                        </div>
-
-                        <!-- SUBMIT -->
-                        <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Save Task</button>
+                        <button type="submit"
+                                class="btn btn-primary w-100"
+                                disabled="@IsLoading">
+                            @(IsLoading ? "Saving..." : "Save Task")
+                        </button>
                     </EditForm>
 
                 </div>
-
-                <!-- FOOTER -->
-                <div class="modal-footer task-modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => Close(false)">Cancel</button>
-                </div>
-
             </div>
         </div>
     </div>
@@ -188,109 +150,111 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    private CreateTaskDto Model { get; set; } = new();
+    private CreateTaskDto Model = new();
     private List<CustomerResponseDto>? Customers;
     private List<UserResponseDto>? Users;
 
     private EditContext? editContext;
     private ValidationMessageStore? messageStore;
 
-    private bool _lookupsLoaded;
+    private bool IsAdminOrManager;
+    private bool IsLoading;
+    private bool _loaded;
 
     protected override async Task OnParametersSetAsync()
     {
-        // Recreate EditContext whenever modal opens to clear previous validation state
-        if (IsOpen)
+        if (!IsOpen) return;
+
+        editContext = new EditContext(Model);
+        messageStore = new ValidationMessageStore(editContext);
+
+        if (!_loaded)
         {
-            if (Model == null) Model = new CreateTaskDto();
-            editContext = new EditContext(Model);
-            messageStore = new ValidationMessageStore(editContext);
-
-            if (!_lookupsLoaded)
-            {
-                await LoadLookupsAsync();
-                _lookupsLoaded = true;
-            }
-
-            // sensible defaults: due date = tomorrow (not a past date)
-            if (Model.DueDate == default || Model.DueDate.Date < DateTime.Today)
-                Model.DueDate = DateTime.Today.AddDays(1);
-
-            // For non-admin users prefill Model.UserId (so validation passes)
-            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = auth.User;
-            bool isAdmin = user.IsInRole("Admin") || user.IsInRole("Manager");
-            if (!isAdmin && Users is not null)
-            {
-                var uid = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                       ?? user.FindFirst(ClaimTypes.Email)?.Value;
-                var me = Users.FirstOrDefault(u => u.Id == uid || u.Email == uid);
-                if (me is not null)
-                    Model.UserId = me.Id;
-            }
+            Customers = await CustomerService.GetAllAsync();
+            Users = await UserService.GetAllUsersAsync();
+            _loaded = true;
         }
+
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = auth.User;
+
+        IsAdminOrManager = user.IsInRole("Admin") || user.IsInRole("Manager");
+
+        if (!IsAdminOrManager)
+        {
+            Model.UserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        if (Model.Priority == default)
+            Model.Priority = TaskPriority.Low;
+
+        if (Model.State == default)
+            Model.State = TaskState.Pending;
+
+        if (Model.DueDate == default || Model.DueDate.Date < DateTime.Today)
+            Model.DueDate = DateTime.Today.AddDays(1);
     }
 
-    private async Task LoadLookupsAsync()
+    private string GetUserDisplayName(string? id)
     {
-        Customers = await CustomerService.GetAllAsync();
-        var allUsers = await UserService.GetAllUsersAsync();
-
-        // Keep users list; admin sees all, others will be filtered on OnParametersSetAsync
-        Users = allUsers;
+        var u = Users?.FirstOrDefault(x => x.Id == id);
+        return u == null
+            ? "Current User"
+            : string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName;
     }
 
     private async Task HandleValidSubmit()
     {
-        // clear earlier messages
         messageStore?.Clear();
-        editContext?.NotifyValidationStateChanged();
 
-        // server-side / extra validation: customer selected
-        if (Model.CustomerId is null || Model.CustomerId == Guid.Empty)
-        {
+        if (Model.CustomerId == Guid.Empty)
             messageStore?.Add(() => Model.CustomerId, "Customer is required.");
-        }
 
-        // due date cannot be in the past
         if (Model.DueDate.Date < DateTime.Today)
-        {
             messageStore?.Add(() => Model.DueDate, "Due date cannot be in the past.");
-        }
 
-        // user must be selected
         if (string.IsNullOrWhiteSpace(Model.UserId))
-        {
             messageStore?.Add(() => Model.UserId, "User is required.");
-        }
 
-        // If there are validation messages, notify and return
-        if (messageStore is not null)
+        if (editContext!.GetValidationMessages().Any())
         {
-            var hasErrors = editContext!.GetValidationMessages().Any();
-            if (hasErrors)
-            {
-                editContext.NotifyValidationStateChanged();
-                return;
-            }
+            editContext.NotifyValidationStateChanged();
+            return;
         }
 
-        // all good => create
-        await TaskService.CreateAsync(Model);
+        IsLoading = true;
 
-        // reset and close
-        await Close(true);
+        try
+        {
+            await TaskService.CreateAsync(Model);
+
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Success",
+                "Task created successfully",
+                "success");
+
+            await Close(true);
+        }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Failed to create task",
+                "error");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task Close(bool refresh)
     {
-        // reset model and edit context for next open
         Model = new CreateTaskDto
         {
             DueDate = DateTime.Today.AddDays(1),
-            Priority = TaskPriority.Medium,
-            State = TaskState.Pending,
-            RecurrenceType = RecurrenceType.None
+            Priority = TaskPriority.Low,
+            State = TaskState.Pending
         };
 
         editContext = new EditContext(Model);

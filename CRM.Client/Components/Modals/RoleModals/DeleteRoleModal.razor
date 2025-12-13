@@ -54,31 +54,26 @@
 
     private async Task DeleteRole()
     {
-        if (string.IsNullOrWhiteSpace(RoleName))
-            return;
-
-        IsLoading = true;
-
         try
         {
             await RoleService.DeleteRoleAsync(RoleName!);
 
-            // ⭐ NEW – SweetAlert success
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "Role deleted successfully");
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Deleted",
+                "Role deleted successfully",
+                "success");
 
-            await Task.Delay(400);
-            await OnClose.InvokeAsync(false);   // your existing pattern
+            await OnClose.InvokeAsync(true);
         }
-        catch
+        catch (Exception ex)
         {
-            // ⭐ NEW – SweetAlert error
-            await JSRuntime.InvokeVoidAsync("crmAlerts.showError", "Failed to delete role");
-        }
-        finally
-        {
-            IsLoading = false;
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                ex.Message,
+                "error");
         }
     }
+
 
     private async Task Close()
     {

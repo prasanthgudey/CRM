@@ -21,7 +21,7 @@ namespace CRM.Client.DTOs.Customers
 
         [Required(ErrorMessage = "Phone number is required")]
         [Phone(ErrorMessage = "Invalid phone number format")]
-        [StringLength(20, ErrorMessage = "Phone can't exceed 20 characters")]
+        [StringLength(10, ErrorMessage = "Phone can't exceed 10 characters")]
         public string Phone { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Address is required")]

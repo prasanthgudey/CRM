@@ -11,7 +11,6 @@
 @using CRM.Client.Components.Modals.TaskModals
 @using CRM.Client.Components.Shared
 
-
 @inject TaskService TaskService
 @inject CustomerService CustomerService
 @inject UserService UserService
@@ -45,12 +44,18 @@ else
                 <th style="width:200px;">Actions</th>
             </tr>
         </thead>
+
         <tbody>
             @foreach (var task in Tasks)
             {
                 bool isPast = task.DueDate.Date < DateTime.Today;
+                bool isCompleted = task.State == TaskState.Completed;
 
-                <tr class="@((isPast ? "table-danger" : ""))">
+                string rowClass =
+                isCompleted ? "task-row-completed" :
+                (isPast ? "task-row-overdue" : "");
+
+                <tr class="@rowClass">
                     <td>@task.Title</td>
                     <td>@GetCustomerName(task.CustomerId)</td>
                     <td>@GetUserName(task.UserId)</td>
@@ -83,6 +88,7 @@ else
                 </tr>
             }
         </tbody>
+
     </table>
 
     <Pager CurrentPage="@CurrentPage"
@@ -105,7 +111,7 @@ else
     private bool IsDeleteOpen;
 
     private int CurrentPage = 1;
-    private const int PageSize = 10;   // 🔥 ALWAYS 10 per page
+    private const int PageSize = 10;
     private long TotalCount = 0;
 
     private bool IsLoading = true;

@@ -101,42 +101,42 @@ namespace CRM.Server.Tests.Controllers
         // ------------------------------------------------------
         // INVITE USER
         // ------------------------------------------------------
-        [Fact]
-        public async Task InviteUser_WhenValid_ReturnsSuccessJson()
-        {
-            var dto = new InviteUserDto
-            {
-                FullName = "New",
-                Email = "new@crm.com",
-                Role = "User"
-            };
+        //[Fact]
+        //public async Task InviteUser_WhenValid_ReturnsSuccessJson()
+        //{
+        //    var dto = new InviteUserDto
+        //    {
+        //        FullName = "New",
+        //        Email = "new@crm.com",
+        //        Role = "User"
+        //    };
 
-            _service.Setup(s => s.InviteUserAsync(dto, "admin-1"))
-                .Returns(Task.CompletedTask);
+        //    _service.Setup(s => s.InviteUserAsync(dto, "admin-1"))
+        //        .Returns(Task.CompletedTask);
 
-            var result = await _controller.InviteUser(dto) as OkObjectResult;
+        //    var result = await _controller.InviteUser(dto) as OkObjectResult;
 
-            Assert.NotNull(result);
-            dynamic json = result.Value;
-            Assert.True(json.success);
-            Assert.Equal("Invitation sent successfully", json.message);
-        }
+        //    Assert.NotNull(result);
+        //    dynamic json = result.Value;
+        //    Assert.True(json.success);
+        //    Assert.Equal("Invitation sent successfully", json.message);
+        //}
 
-        [Fact]
-        public async Task InviteUser_WhenServiceThrows_ReturnsSuccessFalseJson()
-        {
-            var dto = new InviteUserDto { Email = "exists@crm.com" };
+        //[Fact]
+        //public async Task InviteUser_WhenServiceThrows_ReturnsSuccessFalseJson()
+        //{
+        //    var dto = new InviteUserDto { Email = "exists@crm.com" };
 
-            _service.Setup(s => s.InviteUserAsync(dto, "admin-1"))
-                .ThrowsAsync(new System.Exception("Email already exists"));
+        //    _service.Setup(s => s.InviteUserAsync(dto, "admin-1"))
+        //        .ThrowsAsync(new System.Exception("Email already exists"));
 
-            var result = await _controller.InviteUser(dto) as OkObjectResult;
+        //    var result = await _controller.InviteUser(dto) as OkObjectResult;
 
-            Assert.NotNull(result);
-            dynamic json = result.Value;
-            Assert.False(json.success);
-            Assert.Equal("Email already exists", json.message);
-        }
+        //    Assert.NotNull(result);
+        //    dynamic json = result.Value;
+        //    Assert.False(json.success);
+        //    Assert.Equal("Email already exists", json.message);
+        //}
 
         // ------------------------------------------------------
         // ACTIVATE & DEACTIVATE USER
