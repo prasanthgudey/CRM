@@ -12,11 +12,10 @@
 
         <div class="modal-card shadow"
              style="
-            width: 540px;
-            border-radius: 14px;
-            padding: 32px 36px;
-            background: white;">
-
+                    width: 540px;
+                    border-radius: 14px;
+                    padding: 32px 36px;
+                    background: white;">
 
             <h5 class="mb-3 text-center">Create New User</h5>
 
@@ -25,7 +24,7 @@
                 <div class="alert alert-info py-2">@Message</div>
             }
 
-        <EditForm Model="CreateModel" OnValidSubmit="CreateUser">
+        <EditForm EditContext="editContext" OnValidSubmit="CreateUser">
             <DataAnnotationsValidator />
 
             <!-- Full Name -->
@@ -34,6 +33,8 @@
                 <InputText class="form-control"
                            placeholder="Enter full name"
                            @bind-Value="CreateModel.FullName" />
+
+                <ValidationMessage For="@(() => CreateModel.FullName)" />
             </div>
 
             <!-- Email -->
@@ -42,22 +43,22 @@
                 <InputText class="form-control"
                            placeholder="Enter email address"
                            @bind-Value="CreateModel.Email" />
+
+                <ValidationMessage For="@(() => CreateModel.Email)" />
             </div>
 
-            <!-- CUSTOM SCROLLABLE ROLE DROPDOWN -->
+            <!-- Role Dropdown -->
             <div class="form-group mt-3">
                 <label class="small text-muted">Select Role</label>
 
                 <div class="role-dropdown-container position-relative">
 
-                    <!-- Selected field -->
                     <div class="role-selected" @onclick="ToggleDropdown">
                         @(string.IsNullOrWhiteSpace(CreateModel.Role)
                                                 ? "-- Select a role --"
                                                 : CreateModel.Role)
                     </div>
 
-                        <!-- Dropdown list -->
                     @if (ShowDropdown)
                         {
                             <div class="role-dropdown-list shadow-sm">
@@ -70,6 +71,8 @@
                             </div>
                         }
                     </div>
+
+                    <ValidationMessage For="@(() => CreateModel.Role)" />
                 </div>
 
                 <!-- Buttons -->
@@ -80,12 +83,15 @@
                         Cancel
                     </button>
 
-                    <button class="btn btn-success" disabled="@IsLoading">
+                    <button type="submit"
+                            class="btn btn-success"
+                            disabled="@IsLoading">
                         @(IsLoading ? "Creating..." : "Create User")
                     </button>
                 </div>
 
             </EditForm>
+
         </div>
     </div>
 }
@@ -94,17 +100,21 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
+    private EditContext editContext;
     private CreateUserDto CreateModel { get; set; } = new();
     private List<RoleResponseDto>? Roles { get; set; }
-    private bool IsLoading { get; set; }
-    private string? Message { get; set; }
 
     private bool ShowDropdown = false;
+    private bool IsLoading { get; set; }
+    private string? Message { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
         if (IsOpen)
         {
+            CreateModel = new CreateUserDto();
+            editContext = new EditContext(CreateModel);   // ▼ IMPORTANT
+
             Roles = await RoleService.GetAllRolesAsync();
         }
     }
@@ -118,6 +128,10 @@
     {
         CreateModel.Role = roleName;
         ShowDropdown = false;
+
+        // Notify Blazor that Role field changed → triggers validation
+        var field = new FieldIdentifier(CreateModel, nameof(CreateUserDto.Role));
+        editContext.NotifyFieldChanged(field);
     }
 
     private async Task CreateUser()
@@ -132,6 +146,7 @@
             if (result?.Success == true)
             {
                 await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", result.Message);
+
                 CreateModel = new();
                 await Task.Delay(600);
                 await OnClose.InvokeAsync(false);

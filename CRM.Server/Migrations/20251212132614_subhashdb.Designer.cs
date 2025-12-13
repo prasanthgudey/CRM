@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CRM.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251212102149_sessionId added in refrestoken")]
-    partial class sessionIdaddedinrefrestoken
+    [Migration("20251212132614_subhashdb")]
+    partial class subhashdb
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

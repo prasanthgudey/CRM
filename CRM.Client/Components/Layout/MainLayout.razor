@@ -52,6 +52,11 @@
 
 </div>
 
+
+@* SweetAlert2 *@
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="js/alertHelper.js"></script>
+
 @code {
     private void ClearGlobalMessage() => AppState.Ui.ClearGlobalMessage();
 
@@ -72,5 +77,8 @@
 
     private void UiStateChanged() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => AppState.Ui.OnChange -= UiStateChanged;
+            // No need to call initAlerts anymore since crmAlerts is already defined
+            // If you use initAlerts(), then add a function inside script
+        }
+    }
 }

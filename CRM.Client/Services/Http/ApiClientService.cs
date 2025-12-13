@@ -12,6 +12,16 @@ using CRM.Client.DTOs.Auth;
 using CRM.Client.Security;
 using CRM.Client.Services.Auth;
 using CRM.Client.State;
+using Microsoft.Extensions.Options;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using static System.Net.WebRequestMethods;
+using CRM.Client.Services.Auth;
+using CRM.Client.State;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Options;
 
@@ -478,5 +488,10 @@ namespace CRM.Client.Services.Http
                 PropertyNameCaseInsensitive = true
             };
         }
+        public async Task<HttpResponseMessage> PostRawAsync(string url, object data)
+        {
+            return await _httpClient.PostAsJsonAsync(url, data);
+        }
+
     }
 }

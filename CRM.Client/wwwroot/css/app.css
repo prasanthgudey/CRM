@@ -719,3 +719,142 @@ h1:focus {
     cursor: pointer;
     color: #664d03;
 }
+
+
+/* -------------------------
+   TASK VIEW MODAL – NEW DESIGN
+--------------------------*/
+
+.task-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+/* Modal box */
+.task-modal-content {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+    border: none;
+}
+
+/* Header */
+.task-modal-header {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    color: white;
+    padding: 16px 22px;
+}
+
+.task-modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* Close button */
+.btn-close-white {
+    filter: brightness(5);
+    opacity: .85;
+}
+.btn-close-white:hover {
+    opacity: 1;
+}
+
+/* Body */
+.task-modal-body {
+    padding: 22px 26px;
+    background: #f9fafb;
+}
+
+/* Section Containers */
+.task-section {
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+}
+
+.task-section-title {
+    font-size: .95rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+/* Field label */
+.form-label {
+    font-size: .78rem;
+    color: #6b7280 !important;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+/* Field value box */
+.form-control-plaintext {
+    padding: .55rem .75rem;
+    background: #f3f4f6 !important;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    color: #111827;
+    font-size: .95rem;
+}
+
+/* Footer */
+.task-modal-footer {
+    padding: 14px 20px;
+    background: #f1f5f9;
+    border-top: 1px solid #e5e7eb;
+}
+
+.task-modal-footer .btn {
+    padding: .45rem 1.1rem;
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+/* make Blazor ValidationMessage outputs match bootstrap danger visuals */
+.validation-message {
+    color: #dc3545 !important; /* bootstrap danger */
+    font-size: .875rem;
+    margin-top: .25rem;
+    display: block;
+}
+
+/* keep specificity for modal scoped styling if you want */
+.customer-modal-content .validation-message,
+.task-modal-content .validation-message {
+    color: #dc3545 !important;
+    font-size: .875rem;
+    margin-top: .25rem;
+    display: block;
+}
+
+/* optional: style a validation summary if you use one */
+.validation-summary-errors,
+.validation-summary-errors ul {
+    color: #dc3545;
+}
+
+/* optional: if you later toggle `is-invalid` on inputs, show red border */
+.form-control.is-invalid,
+.form-select.is-invalid,
+textarea.form-control.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.12rem rgba(220,53,69,.12) !important;
+}
+
+/* small helper to align spacing under inputs */
+.form-control + .validation-message,
+.form-select + .validation-message,
+textarea + .validation-message {
+    margin-bottom: .5rem;
+}

@@ -488,7 +488,7 @@ namespace CRM.Server.Migrations
                     b.HasOne("CRM.Server.Models.ApplicationUser", "CreatedBy")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired();
 
                     b.HasOne("CRM.Server.Models.Customer", "Customer")

@@ -7,6 +7,7 @@ using System.Security.Claims;
 
 namespace CRM.Server.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     //[Authorize] // ✅ All task actions require login

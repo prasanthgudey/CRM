@@ -19,38 +19,45 @@
                 <div class="alert alert-info py-2">@Message</div>
             }
 
-            <EditForm Model="EditModel" OnValidSubmit="Save">
-                <DataAnnotationsValidator />
+        <EditForm EditContext="editContext" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
 
-                <!-- Full Name -->
-                <div class="form-group">
-                    <label class="small text-muted">Full Name</label>
-                    <InputText class="form-control"
-                               placeholder="Enter full name"
-                               @bind-Value="EditModel.FullName" />
-                </div>
+            <!-- Full Name -->
+            <div class="form-group">
+                <label class="small text-muted">Full Name</label>
+                <InputText class="form-control"
+                           placeholder="Enter full name"
+                           @bind-Value="EditModel.FullName" />
 
-                <!-- Email -->
-                <div class="form-group mt-2">
-                    <label class="small text-muted">Email</label>
-                    <InputText class="form-control"
-                               placeholder="Enter email"
-                               @bind-Value="EditModel.Email" />
-                </div>
+                <ValidationMessage For="@(() => EditModel.FullName)" />
+            </div>
 
-                <!-- Role (Dynamic + Scrollable) -->
-                <div class="form-group mt-3">
-                    <label class="small text-muted">Select Role</label>
+            <!-- Email -->
+            <div class="form-group mt-2">
+                <label class="small text-muted">Email</label>
+                <InputText class="form-control"
+                           placeholder="Enter email"
+                           @bind-Value="EditModel.Email" />
 
-                    <div class="role-dropdown-container">
-                        <div class="role-selected" @onclick="ToggleDropdown">
-                            @(SelectedRole ?? "-- Select a role --")
-                        </div>
+                <ValidationMessage For="@(() => EditModel.Email)" />
+            </div>
 
-                        @if (IsDropdownOpen)
+            <!-- Role Dropdown -->
+            <div class="form-group mt-3">
+                <label class="small text-muted">Select Role</label>
+
+                <div class="role-dropdown-container position-relative">
+
+                    <div class="role-selected" @onclick="ToggleDropdown">
+                        @(string.IsNullOrWhiteSpace(EditModel.Role)
+                                                ? "-- Select a role --"
+                                                : EditModel.Role)
+                    </div>
+
+                    @if (IsDropdownOpen)
                         {
-                            <div class="role-dropdown-list">
-                                @foreach (var r in Roles)
+                            <div class="role-dropdown-list shadow-sm">
+                                @foreach (var r in Roles ?? new List<RoleResponseDto>())
                                 {
                                     <div class="role-item" @onclick="() => SelectRole(r.Name)">
                                         @r.Name
@@ -59,6 +66,8 @@
                             </div>
                         }
                     </div>
+
+                    <ValidationMessage For="@(() => EditModel.Role)" />
                 </div>
 
                 <!-- Buttons -->
@@ -69,7 +78,9 @@
                         Cancel
                     </button>
 
-                    <button class="btn btn-primary" disabled="@IsLoading">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@IsLoading">
                         @(IsLoading ? "Saving..." : "Save")
                     </button>
                 </div>
@@ -85,30 +96,17 @@
     [Parameter] public UserResponseDto? User { get; set; }
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
+    private EditContext editContext;
     private UpdateUserDto EditModel { get; set; } = new();
-    private List<RoleResponseDto> Roles = new();
+    private List<RoleResponseDto>? Roles { get; set; }
 
     private bool IsLoading;
     private string? Message;
     private bool IsDropdownOpen = false;
 
-    private string? SelectedRole;
-
-    // JS interop guard
-    private bool _isInteractive = false;
-
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            _isInteractive = true;
-        }
-        return base.OnAfterRenderAsync(firstRender);
-    }
-
     protected override async Task OnParametersSetAsync()
     {
-        if (User != null)
+        if (IsOpen && User != null)
         {
             EditModel = new UpdateUserDto
             {
@@ -117,137 +115,49 @@
                 Role = User.Role
             };
 
-            SelectedRole = User.Role;
+            editContext = new EditContext(EditModel);
 
             Roles = await RoleService.GetAllRolesAsync();
-    Message = null;
+            Message = null;
         }
     }
 
-    private void ToggleDropdown() => IsDropdownOpen = !IsDropdownOpen;
+    private void ToggleDropdown()
+        => IsDropdownOpen = !IsDropdownOpen;
 
     private void SelectRole(string role)
     {
-        SelectedRole = role;
         EditModel.Role = role;
         IsDropdownOpen = false;
-            Message = null;
-        
-    }
 
-    // Safe wrapper for crmAlerts calls
-    private async Task ShowAlertAsync(string kind, string text)
-    {
-        if (!_isInteractive)
-        {
-            // fallback to inline message until JS is ready
-            Message = text;
-            return;
-        }
-
-        try
-        {
-            if (kind.Equals("success", StringComparison.OrdinalIgnoreCase))
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", text);
-            else if (kind.Equals("error", StringComparison.OrdinalIgnoreCase))
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showError", text);
-            else if (kind.Equals("warning", StringComparison.OrdinalIgnoreCase))
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showWarning", text);
-            else
-                await JSRuntime.InvokeVoidAsync("crmAlerts.showInfo", text);
-        }
-        catch
-        {
-            // if JS fails for any reason, show inline message
-            Message = text;
-        }
-    }
-
-    // Simple email validator
-    private bool IsValidEmail(string? email)
-    {
-        if (string.IsNullOrWhiteSpace(email)) return false;
-        try
-        {
-            var addr = new System.Net.Mail.MailAddress(email);
-            return addr.Address == email;
-        }
-        catch
-        {
-            return false;
-        }
+        var field = new FieldIdentifier(EditModel, nameof(UpdateUserDto.Role));
+        editContext.NotifyFieldChanged(field);
     }
 
     private async Task Save()
     {
         if (User == null) return;
 
-        // Client-side validation
-        if (string.IsNullOrWhiteSpace(EditModel.FullName))
-        {
-            await ShowAlertAsync("warning", "Please enter full name.");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(EditModel.Email) || !IsValidEmail(EditModel.Email))
-        {
-            await ShowAlertAsync("warning", "Please enter a valid email address.");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(EditModel.Role))
-        {
-            await ShowAlertAsync("warning", "Please select a role.");
-            return;
-        }
-
         IsLoading = true;
         Message = null;
 
         try
         {
-            // If your UserService.UpdateUserAsync throws on error, we handle exceptions below.
             await UserService.UpdateUserAsync(User.Id, EditModel);
 
-            Message = "User updated successfully.";
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showSuccess", "User updated successfully.");
 
-            await ShowAlertAsync("success", "User updated successfully.");
+            // RESET MODEL AFTER SAVE
+            EditModel = new UpdateUserDto();
+            editContext = new EditContext(EditModel);
 
-            await Task.Delay(700);
+            await Task.Delay(600);
             await OnClose.InvokeAsync(false);
         }
         catch (Exception ex)
         {
-            // Get a normalized message to inspect
-            var msg = ex.Message ?? string.Empty;
-            var lower = msg.ToLowerInvariant();
-
-            // Duplicate detection: prefer explicit keywords
-            if (lower.Contains("exists") || lower.Contains("already") || lower.Contains("duplicate"))
-            {
-                // Distinguish role vs user messages (if server mentions role/email)
-                if (lower.Contains("role"))
-                {
-                    Message = "Role already exists.";
-                    await ShowAlertAsync("error", "Role already exists.");
-                }
-                else if (lower.Contains("email"))
-                {
-                    Message = "Email already in use.";
-                    await ShowAlertAsync("error", "Email already in use.");
-                }
-                else
-                {
-                    Message = "User already exists.";
-                    await ShowAlertAsync("error", "User already exists.");
-                }
-            }
-            else
-            {
-                // Generic failure
-                Message = "Failed to update user.";
-                await ShowAlertAsync("error", "Failed to update user.");
-            }
+            await JSRuntime.InvokeVoidAsync("crmAlerts.showError",
+                ex.Message ?? "Failed to update user.");
         }
         finally
         {
@@ -255,8 +165,12 @@
         }
     }
 
+
     private async Task Cancel()
     {
+        EditModel = new UpdateUserDto();         // reset model
+        editContext = new EditContext(EditModel); // reset validation
         await OnClose.InvokeAsync(false);
     }
+
 }

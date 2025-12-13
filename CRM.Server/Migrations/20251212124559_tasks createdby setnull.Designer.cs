@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CRM.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251211180234_sessionTimout")]
-    partial class sessionTimout
+    [Migration("20251212124559_tasks createdby setnull")]
+    partial class taskscreatedbysetnull
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -225,6 +225,9 @@ namespace CRM.Server.Migrations
 
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("SessionId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Token")
                         .IsRequired()
@@ -488,7 +491,7 @@ namespace CRM.Server.Migrations
                     b.HasOne("CRM.Server.Models.ApplicationUser", "CreatedBy")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired();
 
                     b.HasOne("CRM.Server.Models.Customer", "Customer")

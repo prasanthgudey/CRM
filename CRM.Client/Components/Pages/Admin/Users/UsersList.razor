@@ -2,6 +2,8 @@
 @layout MainLayout
 @attribute [Authorize(Roles ="Admin")]
 
+@using Microsoft.AspNetCore.Authorization
+
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Components.Layout
 @using CRM.Client.Services.Users
@@ -40,7 +42,7 @@ else
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
-                <th style="width:260px">Actions</th>
+                <th style="width:300px">Actions</th>
             </tr>
         </thead>
 

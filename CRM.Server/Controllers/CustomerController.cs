@@ -8,6 +8,7 @@ using System.Security.Claims;
 namespace CRM.Server.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/customers")]
     public class CustomerController : ControllerBase
     {
