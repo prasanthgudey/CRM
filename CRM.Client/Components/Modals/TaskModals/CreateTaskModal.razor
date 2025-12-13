@@ -40,56 +40,50 @@
                         <!-- ASSIGNMENT -->
                         <div class="task-section mb-3">
                             <div class="row g-3">
+
+                                <!-- CUSTOMER -->
                                 <div class="col-md-6">
                                     <label class="form-label">Customer</label>
                                     <InputSelect class="form-select" @bind-Value="Model.CustomerId">
                                         <option value="">-- Select Customer --</option>
                                         @foreach (var c in Customers ?? new())
                                         {
-                                            @foreach (var c in Customers)
-                                            {
-                                                <option value="@c.CustomerId">
-                                                    @($"{c.FirstName} {c.SurName}".Trim() +
-                                                                                            (string.IsNullOrWhiteSpace(c.Email) ? "" : $" ({c.Email})"))
+                                            <option value="@c.CustomerId">
+                                                @($"{c.FirstName} {c.SurName}".Trim()
+                                                                                        + (string.IsNullOrWhiteSpace(c.Email) ? "" : $" ({c.Email})"))
                                     </option>
                                                                         }
-                                        }
                                     </InputSelect>
                                     <ValidationMessage For="@(() => Model.CustomerId)" class="text-danger" />
                                 </div>
 
-                                <!-- USER FIELD ROLE-BASED -->
+                                <!-- USER -->
                                 <div class="col-md-6">
                                     <label class="form-label">Assign To User</label>
 
                                     @if (IsAdminOrManager)
                                     {
-                                        <!-- Admin / Manager: Dropdown -->
                                         <InputSelect class="form-select" @bind-Value="Model.UserId">
                                             <option value="">-- Select User --</option>
-                                            @if (Users != null)
+                                            @foreach (var u in Users ?? new())
                                             {
-                                                @foreach (var u in Users)
-                                                {
-                                                    string display = string.IsNullOrWhiteSpace(u.FullName)
-                                                    ? u.Email
-                                                    : $"{u.FullName} ({u.Email})";
+                                                var display = string.IsNullOrWhiteSpace(u.FullName)
+                                                ? u.Email
+                                                : $"{u.FullName} ({u.Email})";
 
-                                                    <option value="@u.Id">@display</option>
-                                                }
+                                                <option value="@u.Id">@display</option>
                                             }
                                         </InputSelect>
                                     }
                                     else
                                     {
-                                        <!-- Normal User: Frozen field -->
-                                        <input class="form-control" value="@GetUserDisplayName(Model.UserId)" disabled />
-
-                                        <!-- Hidden binds userId so model stays valid -->
+                                        <input class="form-control"
+                                               value="@GetUserDisplayName(Model.UserId)"
+                                               disabled />
                                         <input type="hidden" @bind="Model.UserId" />
                                     }
 
-                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger validation-message" />
+                                    <ValidationMessage For="@(() => Model.UserId)" class="text-danger" />
                                 </div>
 
                             </div>
@@ -97,20 +91,20 @@
 
                         <!-- DETAILS -->
                         <div class="task-section mb-3">
-                            <div class="task-section-title">Details</div>
-
                             <label class="form-label">Title</label>
                             <InputText class="form-control" @bind-Value="Model.Title" />
                             <ValidationMessage For="@(() => Model.Title)" class="text-danger" />
 
                             <label class="form-label mt-2">Description</label>
-                            <InputTextArea class="form-control" rows="3" @bind-Value="Model.Description" />
-                            <ValidationMessage For="@(() => Model.Description)" class="text-danger" />
+                            <InputTextArea class="form-control"
+                                           rows="3"
+                                           @bind-Value="Model.Description" />
                         </div>
 
                         <!-- SCHEDULE -->
                         <div class="task-section mb-3">
                             <div class="row g-3">
+
                                 <div class="col-md-4">
                                     <label class="form-label">Due Date</label>
                                     <InputDate class="form-control" @bind-Value="Model.DueDate" />
@@ -135,6 +129,7 @@
                                         }
                                     </InputSelect>
                                 </div>
+
                             </div>
                         </div>
 
@@ -159,10 +154,10 @@
     private List<CustomerResponseDto>? Customers;
     private List<UserResponseDto>? Users;
 
-    private bool IsAdminOrManager;
-
     private EditContext? editContext;
     private ValidationMessageStore? messageStore;
+
+    private bool IsAdminOrManager;
     private bool IsLoading;
     private bool _loaded;
 
@@ -180,40 +175,30 @@
             _loaded = true;
         }
 
-            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = auth.User;
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = auth.User;
 
-            IsAdminOrManager = user.IsInRole("Admin") || user.IsInRole("Manager");
+        IsAdminOrManager = user.IsInRole("Admin") || user.IsInRole("Manager");
 
-            // For non-admin → auto-assign current user
-            if (!IsAdminOrManager)
-            {
-                var uid = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                Model.UserId = uid;
-            }
-
-            // DEFAULTS ADDED HERE ⭐⭐⭐
-            if (Model.Priority == default)
-                Model.Priority = TaskPriority.Low;
-
-            if (Model.State == default)
-                Model.State = TaskState.Pending;
-
-            if (Model.DueDate == default || Model.DueDate < DateTime.Today)
-                Model.DueDate = DateTime.Today.AddDays(1);
+        if (!IsAdminOrManager)
+        {
+            Model.UserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         }
+
+        if (Model.Priority == default)
+            Model.Priority = TaskPriority.Low;
+
+        if (Model.State == default)
+            Model.State = TaskState.Pending;
+
+        if (Model.DueDate == default || Model.DueDate.Date < DateTime.Today)
+            Model.DueDate = DateTime.Today.AddDays(1);
     }
 
-    private async Task LoadLookupsAsync()
-    {
-        Customers = await CustomerService.GetAllAsync();
-        Users = await UserService.GetAllUsersAsync();
-    }
-
-    private string GetUserDisplayName(string id)
+    private string GetUserDisplayName(string? id)
     {
         var u = Users?.FirstOrDefault(x => x.Id == id);
-        return u is null
+        return u == null
             ? "Current User"
             : string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName;
     }
@@ -221,15 +206,12 @@
     private async Task HandleValidSubmit()
     {
         messageStore?.Clear();
-        editContext?.NotifyValidationStateChanged();
 
         if (Model.CustomerId == Guid.Empty)
             messageStore?.Add(() => Model.CustomerId, "Customer is required.");
 
         if (Model.DueDate.Date < DateTime.Today)
             messageStore?.Add(() => Model.DueDate, "Due date cannot be in the past.");
-        if (Model.CustomerId == Guid.Empty)
-            messageStore?.Add(() => Model.CustomerId, "Customer is required");
 
         if (string.IsNullOrWhiteSpace(Model.UserId))
             messageStore?.Add(() => Model.UserId, "User is required.");
@@ -268,12 +250,11 @@
 
     private async Task Close(bool refresh)
     {
-        // DEFAULTS ADDED HERE TOO ⭐⭐⭐
         Model = new CreateTaskDto
         {
             DueDate = DateTime.Today.AddDays(1),
-            Priority = TaskPriority.Low,      // default priority
-            State = TaskState.Pending         // default status
+            Priority = TaskPriority.Low,
+            State = TaskState.Pending
         };
 
         editContext = new EditContext(Model);
