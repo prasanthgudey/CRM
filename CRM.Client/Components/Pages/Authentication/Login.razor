@@ -12,6 +12,27 @@
 @inject AuthService AuthService
 @inject AppState AppState
 @inject NavigationManager Navigation
+@* @using Microsoft.AspNetCore.WebUtilities *@
+@inject NavigationManager Navigation
+
+@if (ShowUnauthorizedMessage)
+{
+    <div class="auth-alert-overlay">
+        <div class="auth-alert-box">
+            <span class="auth-alert-text">
+                Please login to access the application.
+            </span>
+
+            <button class="auth-alert-close"
+                    @onclick="CloseUnauthorizedAlert">
+                ✕
+            </button>
+        </div>
+    </div>
+}
+
+
+
 
 <div class="login-outer-card">
 
@@ -137,4 +158,24 @@
 
     private void OpenForgotPassword() => IsForgotOpen = true;
     private void CloseForgotPasswordModal(bool _) => IsForgotOpen = false;
+    private bool ShowUnauthorizedMessage;
+
+    private void CloseUnauthorizedAlert()
+    {
+        ShowUnauthorizedMessage = false;
+    }
+
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+
+        if (QueryHelpers.ParseQuery(uri.Query)
+            .TryGetValue("reason", out var reason)
+            && reason == "unauthorized")
+        {
+            ShowUnauthorizedMessage = true;
+        }
+
+    }
 }

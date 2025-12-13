@@ -1,6 +1,6 @@
 ﻿@page "/admin/users"
 @layout MainLayout
-@attribute [Authorize]
+@attribute [Authorize(Roles ="Admin")]
 
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Components.Layout
