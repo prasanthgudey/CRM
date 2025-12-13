@@ -1,4 +1,5 @@
-﻿using CRM.Server.DTOs.Roles;
+﻿using CRM.Server.DTOs.Auth;
+using CRM.Server.DTOs.Roles;
 using CRM.Server.DTOs.Users;
 using CRM.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -55,34 +56,8 @@ namespace CRM.Server.Controllers
             return Ok(users);
         }
 
-        [HttpPost("invite")]
-        public async Task<IActionResult> InviteUser([FromBody] InviteUserDto dto)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+      
 
-            try
-            {
-                var performedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                await _userService.InviteUserAsync(dto, performedBy!);
-
-                // ✅ ALWAYS JSON, includes success flag
-                return Ok(new
-                {
-                    success = true,
-                    message = "Invitation sent successfully"
-                });
-            }
-            catch (Exception ex)
-            {
-                // ✅ ALSO JSON on error (eg: "Email already exists")
-                return Ok(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
-        }
 
         [HttpPut("deactivate/{userId}")]
         public async Task<IActionResult> Deactivate(string userId)

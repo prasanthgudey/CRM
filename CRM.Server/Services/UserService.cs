@@ -201,7 +201,7 @@ namespace CRM.Server.Services
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
             var inviteLink =
-                $"{_config["Client:Url"]}/register?token={Uri.EscapeDataString(token)}&email={user.Email}";
+                $"{_config["Client:Url"]}/complete-registration?token={Uri.EscapeDataString(token)}&email={user.Email}";
 
             await _emailService.SendAsync(
                 user.Email!,
@@ -214,6 +214,58 @@ namespace CRM.Server.Services
 
             await SafeAudit(performedByUserId, user.Id, "User Invited", "User", null, newValue);
         }
+
+
+
+        public async Task CompleteRegistrationAsync(CompleteRegistrationDto dto)
+        {
+            // 1. Load user
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user == null || !user.IsInvitePending)
+                throw new Exception("Invalid or already completed invite");
+
+            // 2. Check invite expiry
+            if (user.InviteExpiry.HasValue && user.InviteExpiry < DateTime.UtcNow)
+                throw new Exception("Invitation link has expired");
+
+            // 3. Decode token (MUST match InviteUserAsync)
+            var decodedToken = Uri.UnescapeDataString(dto.Token);
+
+            // 4. Reset password
+            var result = await _userManager.ResetPasswordAsync(
+                user,
+                decodedToken,
+                dto.Password);
+
+            if (!result.Succeeded)
+                throw new Exception(result.Errors.First().Description);
+
+            // 5. Activate account
+            var oldDto = await MapToUserDto(user);
+            var oldValue = JsonSerializer.Serialize(oldDto);
+
+            user.IsInvitePending = false;
+            user.IsActive = true;
+            user.InviteExpiry = null;
+            user.PasswordLastChanged = DateTime.UtcNow;
+
+            await _userManager.UpdateAsync(user);
+
+            // 6. Audit
+            var newDto = await MapToUserDto(user);
+            var newValue = JsonSerializer.Serialize(newDto);
+
+            await SafeAudit(
+                user.Id,                 // performedByUserId (self)
+                user.Id,                 // targetUserId
+                "User Registration Completed",
+                "User",
+                oldValue,
+                newValue
+            );
+        }
+
+
 
         // ============================================================
         // Deactivate User
