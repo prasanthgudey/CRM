@@ -4,6 +4,7 @@
 @using CRM.Client.Services.Users
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject CustomerService CustomerService
 @inject UserService UserService
@@ -25,7 +26,7 @@
                 <!-- BODY -->
                 <div class="modal-body customer-modal-body">
 
-                    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
+                    <EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
 
                         <!-- NAME -->
@@ -93,7 +94,6 @@
                                 <div class="col-md-8">
                                     <label class="form-label">Created By User</label>
 
-                                    <!-- FROZEN DROPDOWN: ALWAYS DISABLED, ALWAYS LOGGED-IN USER -->
                                     <InputSelect class="form-select" @bind-Value="SelectedUserId" disabled>
                                         @if (LoggedInUser != null)
                                         {
@@ -135,6 +135,10 @@
 
     private CustomerCreateDto Model { get; set; } = new();
     private List<UserResponseDto>? Users;
+    private List<CustomerResponseDto>? ExistingCustomers;
+
+    private EditContext? editContext;
+    private ValidationMessageStore? messageStore;
 
     private UserResponseDto? LoggedInUser;
     private string? SelectedUserId;
@@ -148,10 +152,29 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (IsOpen && !_lookupsLoaded)
+        if (IsOpen)
         {
-            await LoadLoggedInUser();
-            _lookupsLoaded = true;
+            editContext = new EditContext(Model);
+            messageStore = new ValidationMessageStore(editContext);
+
+            // ⭐ FIX: Clear email error when user edits email
+            editContext.OnFieldChanged += HandleFieldChanged;
+
+            if (!_lookupsLoaded)
+            {
+                await LoadLoggedInUser();
+                ExistingCustomers = await CustomerService.GetAllAsync();
+                _lookupsLoaded = true;
+            }
+        }
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        if (e.FieldIdentifier.FieldName == nameof(Model.Email))
+        {
+            messageStore?.Clear(e.FieldIdentifier);
+            editContext?.NotifyValidationStateChanged();
         }
     }
 
@@ -180,6 +203,23 @@
 
     private async Task HandleValidSubmit()
     {
+        messageStore?.Clear();
+
+        // 🌟 Duplicate Email Check
+        if (!string.IsNullOrWhiteSpace(Model.Email) && ExistingCustomers != null)
+        {
+            bool exists = ExistingCustomers.Any(c =>
+                !string.IsNullOrWhiteSpace(c.Email) &&
+                c.Email.ToLower() == Model.Email.ToLower());
+
+            if (exists)
+            {
+                messageStore?.Add(() => Model.Email, "Email already exists.");
+                editContext?.NotifyValidationStateChanged();
+                return;
+            }
+        }
+
         if (Guid.TryParse(SelectedUserId, out var uid))
             Model.CreatedByUserId = uid;
 
@@ -190,6 +230,9 @@
     private async Task Close(bool refresh)
     {
         Model = new CustomerCreateDto();
+        editContext = new EditContext(Model);
+        messageStore = new ValidationMessageStore(editContext);
+
         await OnClose.InvokeAsync(refresh);
     }
 }

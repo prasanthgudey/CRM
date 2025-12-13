@@ -2,6 +2,7 @@
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Customers
 @using CRM.Client.Services.Users
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject CustomerService CustomerService
 @inject UserService UserService
@@ -20,10 +21,10 @@
                 </div>
 
                 <div class="modal-body customer-modal-body">
-                    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
+                    <EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
-                        <ValidationSummary />
 
+                        <!-- NAME -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Name</div>
                             <div class="row g-3">
@@ -31,6 +32,7 @@
                                     <label class="form-label">First Name</label>
                                     <InputText class="form-control"
                                                @bind-Value="Model.FirstName" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -43,6 +45,7 @@
                                     <label class="form-label">Surname</label>
                                     <InputText class="form-control"
                                                @bind-Value="Model.SurName" />
+                                    <ValidationMessage For="@(() => Model.SurName)" />
                                 </div>
                             </div>
 
@@ -53,6 +56,7 @@
                             </div>
                         </div>
 
+                        <!-- CONTACT -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Contact</div>
                             <div class="row g-3">
@@ -60,26 +64,29 @@
                                     <label class="form-label">Email</label>
                                     <InputText class="form-control"
                                                @bind-Value="Model.Email" />
+                                    <ValidationMessage For="@(() => Model.Email)" />
                                 </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label">Phone</label>
                                     <InputText class="form-control"
                                                @bind-Value="Model.Phone" />
+                                    <ValidationMessage For="@(() => Model.Phone)" />
                                 </div>
                             </div>
                         </div>
 
+                        <!-- ADDRESS -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Address</div>
-                            <div>
-                                <label class="form-label">Address</label>
-                                <InputTextArea class="form-control"
-                                               rows="3"
-                                               @bind-Value="Model.Address" />
-                            </div>
+                            <label class="form-label">Address</label>
+                            <InputTextArea class="form-control"
+                                           rows="3"
+                                           @bind-Value="Model.Address" />
+                            <ValidationMessage For="@(() => Model.Address)" />
                         </div>
 
+                        <!-- META -->
                         <div class="customer-section mb-1">
                             <div class="customer-section-title">Meta</div>
 
@@ -125,15 +132,18 @@
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private CustomerUpdateDto Model { get; set; } = new();
+    private List<CustomerResponseDto>? ExistingCustomers;
 
     private List<UserResponseDto>? _users;
     private string _createdByDisplay = string.Empty;
+
+    private EditContext? editContext;
+    private ValidationMessageStore? messageStore;
 
     protected override async Task OnParametersSetAsync()
     {
         if (IsOpen && Customer != null)
         {
-            // Map customer → update model
             Model = new CustomerUpdateDto
             {
                 FirstName = Customer.FirstName,
@@ -145,28 +155,45 @@
                 Address = Customer.Address
             };
 
-            // Load users once
+            editContext = new EditContext(Model);
+            messageStore = new ValidationMessageStore(editContext);
+
+            editContext.OnFieldChanged += HandleFieldChanged;
+
+            ExistingCustomers = await CustomerService.GetAllAsync();
+
             if (_users == null)
-            {
                 _users = await UserService.GetAllUsersAsync();
-            }
 
-            // Build "Created By" display text
-            _createdByDisplay = Customer.CreatedByUserId.ToString();
+            BuildCreatedByDisplay();
+        }
+    }
 
-            if (_users != null)
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        if (e.FieldIdentifier.FieldName == nameof(Model.Email))
+        {
+            messageStore?.Clear(e.FieldIdentifier);
+            editContext?.NotifyValidationStateChanged();
+        }
+    }
+
+    private void BuildCreatedByDisplay()
+    {
+        _createdByDisplay = Customer?.CreatedByUserId.ToString() ?? "";
+
+        if (_users != null && Customer != null)
+        {
+            var user = _users.FirstOrDefault(u =>
+                u.Id.ToString().Equals(Customer.CreatedByUserId.ToString(), StringComparison.OrdinalIgnoreCase));
+
+            if (user != null)
             {
-                var user = _users.FirstOrDefault(u =>
-                    u.Id.ToString().Equals(Customer.CreatedByUserId.ToString(), StringComparison.OrdinalIgnoreCase));
+                var name = string.IsNullOrWhiteSpace(user.FullName)
+                    ? user.Email
+                    : user.FullName;
 
-                if (user != null)
-                {
-                    var name = string.IsNullOrWhiteSpace(user.FullName)
-                        ? user.Email
-                        : user.FullName;
-
-                    _createdByDisplay = $"{name} ({user.Email})";
-                }
+                _createdByDisplay = $"{name} ({user.Email})";
             }
         }
     }
@@ -175,14 +202,29 @@
     {
         if (Customer == null) return;
 
+        messageStore?.Clear();
+
+        // ★ DUPLICATE EMAIL VALIDATION ★
+        if (!string.IsNullOrWhiteSpace(Model.Email) && ExistingCustomers != null)
+        {
+            bool exists = ExistingCustomers.Any(c =>
+                !string.IsNullOrWhiteSpace(c.Email) &&
+                c.Email.ToLower() == Model.Email.ToLower() &&
+                c.CustomerId != Customer.CustomerId); // exclude same customer
+
+            if (exists)
+            {
+                messageStore?.Add(() => Model.Email, "Email already exists.");
+                editContext?.NotifyValidationStateChanged();
+                return;
+            }
+        }
+
         await CustomerService.UpdateAsync(Customer.CustomerId, Model);
         await Close(true);
     }
 
-    private async Task Submit()
-    {
-        await HandleValidSubmit();
-    }
+    private async Task Submit() => await HandleValidSubmit();
 
     private async Task Close(bool refresh)
     {

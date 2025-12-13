@@ -56,6 +56,20 @@ namespace CRM.Server.Services
         // CREATE with audit
         public async Task<CustomerResponseDto> CreateAsync(CustomerCreateDto dto, string performedByUserId)
         {
+            // Load all customers (since repository doesn't expose Query)
+            var allCustomers = await _repo.GetAllAsync();
+
+            // ❗ Check duplicate email
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                bool emailExists = allCustomers
+                    .Any(x => x.Email != null &&
+                              x.Email.ToLower() == dto.Email.ToLower());
+
+                if (emailExists)
+                    throw new Exception("A customer with this email already exists.");
+            }
+
             var c = new Customer
             {
                 CustomerId = Guid.NewGuid(),
@@ -72,7 +86,6 @@ namespace CRM.Server.Services
 
             await _repo.CreateAsync(c);
 
-            // Audit: Created
             await SafeAudit(
                 performedByUserId,
                 c.CustomerId.ToString(),
@@ -97,11 +110,27 @@ namespace CRM.Server.Services
             };
         }
 
+
         // UPDATE with old/new audit
         public async Task<bool> UpdateAsync(Guid id, CustomerUpdateDto dto, string performedByUserId)
         {
             var c = await _repo.GetByIdAsync(id);
             if (c is null) return false;
+
+            // Load all customers
+            var allCustomers = await _repo.GetAllAsync();
+
+            // ❗ Check duplicate email excluding current customer
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                bool emailExists = allCustomers
+                    .Any(x => x.Email != null &&
+                              x.Email.ToLower() == dto.Email.ToLower() &&
+                              x.CustomerId != id);
+
+                if (emailExists)
+                    throw new Exception("A customer with this email already exists.");
+            }
 
             var oldValue = JsonSerializer.Serialize(c);
 
