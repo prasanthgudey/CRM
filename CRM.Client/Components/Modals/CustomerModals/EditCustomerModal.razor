@@ -2,84 +2,88 @@
 @using CRM.Client.DTOs.Users
 @using CRM.Client.Services.Customers
 @using CRM.Client.Services.Users
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject CustomerService CustomerService
 @inject UserService UserService
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen && Customer != null)
 {
     <div class="modal fade show d-block customer-modal-backdrop" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered customer-modal-dialog">
             <div class="modal-content customer-modal-content">
+
+                <!-- HEADER -->
                 <div class="modal-header customer-modal-header">
                     <h5 class="modal-title customer-modal-title">
                         🧑‍💼 Edit Customer - @Customer.FullName
                     </h5>
-                    <button type="button" class="btn-close btn-close-white"
-                            @onclick="() => Close(false)"></button>
+                    <button type="button"
+                            class="btn-close btn-close-white"
+                            @onclick="() => Close(false)">
+                    </button>
                 </div>
 
+                <!-- BODY -->
                 <div class="modal-body customer-modal-body">
                     <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
                         <DataAnnotationsValidator />
                         <ValidationSummary />
 
+                        <!-- NAME -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Name</div>
+
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label class="form-label">First Name</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.FirstName" />
+                                    <InputText class="form-control" @bind-Value="Model.FirstName" />
                                 </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label">Middle Name</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.MiddleName" />
+                                    <InputText class="form-control" @bind-Value="Model.MiddleName" />
                                 </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label">Surname</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.SurName" />
+                                    <InputText class="form-control" @bind-Value="Model.SurName" />
                                 </div>
                             </div>
 
                             <div class="mt-3">
                                 <label class="form-label">Preferred Name</label>
-                                <InputText class="form-control"
-                                           @bind-Value="Model.PreferredName" />
+                                <InputText class="form-control" @bind-Value="Model.PreferredName" />
                             </div>
                         </div>
 
+                        <!-- CONTACT -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Contact</div>
+
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Email</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.Email" />
+                                    <InputText class="form-control" @bind-Value="Model.Email" />
                                 </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label">Phone</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="Model.Phone" />
+                                    <InputText class="form-control" @bind-Value="Model.Phone" />
                                 </div>
                             </div>
                         </div>
 
+                        <!-- ADDRESS -->
                         <div class="customer-section mb-3">
                             <div class="customer-section-title">Address</div>
-                            <div>
-                                <label class="form-label">Address</label>
-                                <InputTextArea class="form-control"
-                                               rows="3"
-                                               @bind-Value="Model.Address" />
-                            </div>
+                            <InputTextArea class="form-control"
+                                           rows="3"
+                                           @bind-Value="Model.Address" />
                         </div>
 
+                        <!-- META -->
                         <div class="customer-section mb-1">
                             <div class="customer-section-title">Meta</div>
 
@@ -102,18 +106,22 @@
                     </EditForm>
                 </div>
 
+                <!-- FOOTER -->
                 <div class="modal-footer customer-modal-footer">
                     <button type="button"
                             class="btn btn-outline-secondary"
                             @onclick="() => Close(false)">
                         Cancel
                     </button>
+
                     <button type="button"
                             class="btn btn-primary"
+                            disabled="@IsLoading"
                             @onclick="Submit">
-                        Save Changes
+                        @(IsLoading ? "Saving..." : "Save Changes")
                     </button>
                 </div>
+
             </div>
         </div>
     </div>
@@ -125,15 +133,14 @@
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private CustomerUpdateDto Model { get; set; } = new();
-
     private List<UserResponseDto>? _users;
     private string _createdByDisplay = string.Empty;
+    private bool IsLoading;
 
     protected override async Task OnParametersSetAsync()
     {
         if (IsOpen && Customer != null)
         {
-            // Map customer → update model
             Model = new CustomerUpdateDto
             {
                 FirstName = Customer.FirstName,
@@ -145,19 +152,15 @@
                 Address = Customer.Address
             };
 
-            // Load users once
             if (_users == null)
-            {
                 _users = await UserService.GetAllUsersAsync();
-            }
 
-            // Build "Created By" display text
             _createdByDisplay = Customer.CreatedByUserId.ToString();
 
             if (_users != null)
             {
                 var user = _users.FirstOrDefault(u =>
-                    u.Id.ToString().Equals(Customer.CreatedByUserId.ToString(), StringComparison.OrdinalIgnoreCase));
+                    u.Id.Equals(Customer.CreatedByUserId.ToString(), StringComparison.OrdinalIgnoreCase));
 
                 if (user != null)
                 {
@@ -175,8 +178,30 @@
     {
         if (Customer == null) return;
 
-        await CustomerService.UpdateAsync(Customer.CustomerId, Model);
-        await Close(true);
+        IsLoading = true;
+
+        try
+        {
+            await CustomerService.UpdateAsync(Customer.CustomerId, Model);
+
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Success",
+                "Customer updated successfully",
+                "success");
+
+            await Close(true);
+        }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Failed to update customer",
+                "error");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task Submit()

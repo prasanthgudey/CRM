@@ -4,10 +4,12 @@
 @using CRM.Client.Services.Users
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject CustomerService CustomerService
 @inject UserService UserService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JSRuntime
 
 @if (IsOpen)
 {
@@ -18,8 +20,10 @@
                 <!-- HEADER -->
                 <div class="modal-header customer-modal-header">
                     <h5 class="modal-title customer-modal-title">🧑‍💼 Create Customer</h5>
-                    <button type="button" class="btn-close btn-close-white"
-                            @onclick="() => Close(false)"></button>
+                    <button type="button"
+                            class="btn-close btn-close-white"
+                            @onclick="() => Close(false)">
+                    </button>
                 </div>
 
                 <!-- BODY -->
@@ -36,7 +40,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">First Name</label>
                                     <InputText class="form-control" @bind-Value="Model.FirstName" />
-                                    <ValidationMessage For="@(() => Model.FirstName)" class="text-danger validation-message" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" class="text-danger" />
                                 </div>
 
                                 <div class="col-md-4">
@@ -47,7 +51,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Surname</label>
                                     <InputText class="form-control" @bind-Value="Model.SurName" />
-                                    <ValidationMessage For="@(() => Model.SurName)" class="text-danger validation-message" />
+                                    <ValidationMessage For="@(() => Model.SurName)" class="text-danger" />
                                 </div>
                             </div>
 
@@ -65,13 +69,18 @@
                                 <div class="col-md-6">
                                     <label class="form-label">Email</label>
                                     <InputText class="form-control" @bind-Value="Model.Email" />
-                                    <ValidationMessage For="@(() => Model.Email)" class="text-danger validation-message" />
+                                    <ValidationMessage For="@(() => Model.Email)" class="text-danger" />
                                 </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label">Phone</label>
-                                    <InputText class="form-control" @bind-Value="Model.Phone" />
-                                    <ValidationMessage For="@(() => Model.Phone)" class="text-danger validation-message" />
+                                    <InputText class="form-control"
+                                               @bind-Value="Model.Phone"
+                                               maxlength="10"
+                                               inputmode="numeric"
+                                               />
+
+                                    <ValidationMessage For="@(() => Model.Phone)" class="text-danger" />
                                 </div>
                             </div>
                         </div>
@@ -81,7 +90,7 @@
                             <div class="customer-section-title">Address</div>
 
                             <InputTextArea class="form-control" rows="3" @bind-Value="Model.Address" />
-                            <ValidationMessage For="@(() => Model.Address)" class="text-danger validation-message" />
+                            <ValidationMessage For="@(() => Model.Address)" class="text-danger" />
                         </div>
 
                         <!-- META -->
@@ -89,11 +98,10 @@
                             <div class="customer-section-title">Meta</div>
 
                             <div class="row g-3 align-items-center">
-
                                 <div class="col-md-8">
                                     <label class="form-label">Created By User</label>
 
-                                    <!-- FROZEN DROPDOWN: ALWAYS DISABLED, ALWAYS LOGGED-IN USER -->
+                                    <!-- LOGGED-IN USER (READ ONLY) -->
                                     <InputSelect class="form-select" @bind-Value="SelectedUserId" disabled>
                                         @if (LoggedInUser != null)
                                         {
@@ -102,15 +110,14 @@
                                             </option>
                                         }
                                     </InputSelect>
-
-                                    <ValidationMessage For="@(() => Model.CreatedByUserId)" class="text-danger validation-message" />
                                 </div>
-
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-success w-100 mt-3">
-                            Save Customer
+                        <button type="submit"
+                                class="btn btn-success w-100 mt-3"
+                                disabled="@IsLoading">
+                            @(IsLoading ? "Saving..." : "Save Customer")
                         </button>
 
                     </EditForm>
@@ -138,6 +145,7 @@
 
     private UserResponseDto? LoggedInUser;
     private string? SelectedUserId;
+    private bool IsLoading;
 
     private string LoggedInUserLabel =>
         string.IsNullOrWhiteSpace(LoggedInUser?.FullName)
@@ -158,13 +166,14 @@
     private async Task LoadLoggedInUser()
     {
         Users = await UserService.GetAllUsersAsync();
+
         var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = auth.User;
 
-        string? userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                      ?? user.FindFirst("sub")?.Value;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? user.FindFirst("sub")?.Value;
 
-        string? email = user.FindFirst(ClaimTypes.Email)?.Value;
+        var email = user.FindFirst(ClaimTypes.Email)?.Value;
 
         LoggedInUser = Users?.FirstOrDefault(u => u.Id == userId)
                     ?? Users?.FirstOrDefault(u => u.Email == email);
@@ -183,8 +192,31 @@
         if (Guid.TryParse(SelectedUserId, out var uid))
             Model.CreatedByUserId = uid;
 
-        await CustomerService.CreateAsync(Model);
-        await Close(true);
+        IsLoading = true;
+
+        try
+        {
+            await CustomerService.CreateAsync(Model);
+
+            // ✅ API returns no body → success if no exception
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Success",
+                "Customer created successfully",
+                "success");
+
+            await Close(true);
+        }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire",
+                "Error",
+                "Failed to create customer",
+                "error");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task Close(bool refresh)
