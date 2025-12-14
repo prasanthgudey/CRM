@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.Net.NetworkInformation;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,15 +28,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // ✅ Swagger with JWT Support
+//It allows Swagger to find and list your API endpoints.
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
+    //Defines one Swagger document
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
         Title = "CRM API",
         Version = "v1"
     });
-
+    //Tells Swagger how JWT authentication works
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -45,7 +48,7 @@ builder.Services.AddSwaggerGen(c =>
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Description = "Enter token like this: Bearer {your JWT token}"
     });
-
+    //Forces Swagger to attach the token to requests
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -125,7 +128,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         new TokenProviderDescriptor(typeof(AuthenticatorTokenProvider<ApplicationUser>));
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders(); // ✅ REQUIRED for MFA
+// Adds built-in token generators used by Identity
+// Required for password reset, email confirmation, and MFA tokens
+.AddDefaultTokenProviders();
 
 
 
@@ -165,6 +170,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    //Allows JWT metadata over HTTP(dev only)
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
 
@@ -182,12 +188,12 @@ builder.Services.AddAuthentication(options =>
             Encoding.UTF8.GetBytes(jwtSettings["Key"]!)
         ),
 
-        // IMPORTANT: reduce/disable default clock skew for strict expiry (use TimeSpan.Zero for testing)
+        //Prevents expired tokens from being accepted
         ClockSkew = TimeSpan.Zero
     };
 });
 
-// 🔹 1. Configure Serilog FIRST
+//  Configure Serilog FIRST
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)   // reads "Serilog" from appsettings.json
     .Enrich.FromLogContext()
@@ -273,7 +279,7 @@ app.UseAuthentication();
 //  - an authenticated HttpContext.User (so it must run after UseAuthentication)
 // Place it BEFORE UseAuthorization so it can deny/revoke sessions before policy enforcement.
 app.UseMiddleware<SessionActivityMiddleware>();
-
+  
 // Authorization runs after session checks, so policies and [Authorize] are enforced on validated sessions
 app.UseAuthorization();
 
