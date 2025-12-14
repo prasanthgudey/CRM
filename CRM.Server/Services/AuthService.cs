@@ -201,37 +201,75 @@ namespace CRM.Server.Services
         }
 
         public async Task<AuthResponseDto> RefreshAsync(
-    RefreshRequestDto dto,
-    HttpContext context)
+     RefreshRequestDto dto,
+     HttpContext context)
         {
             var ip = context.Connection.RemoteIpAddress?.ToString();
             var userAgent = context.Request.Headers["User-Agent"].ToString();
 
+            //  Get refresh token from DB
             var stored = await _refreshTokenService.GetByTokenAsync(dto.RefreshToken);
-            if (stored == null || stored.IsRevoked || stored.ExpiresAt <= DateTime.UtcNow)
+            if (stored == null ||
+                stored.IsRevoked ||
+                stored.ExpiresAt <= DateTime.UtcNow)
+            {
                 throw new AuthInvalidTokenException();
+            }
 
+            //  Validate user
             var user = await _userManager.FindByIdAsync(stored.UserId);
             if (user == null || !user.IsActive)
+            {
                 throw new AuthInvalidTokenException();
+            }
 
+            //  Resolve session id (preferred: from refresh token)
             var sessionId = stored.SessionId
                 ?? (await _userSessionService.GetByRefreshTokenIdAsync(stored.Id))?.Id;
 
-            if (sessionId == null)
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
                 throw new AuthInvalidTokenException();
+            }
 
+            //  Load session and ENFORCE session ↔ refresh token match
+            var session = await _userSessionService.GetByIdAsync(sessionId);
+
+            if (session == null ||
+                session.IsRevoked ||
+                session.ExpiresAt <= DateTime.UtcNow ||
+                session.RefreshTokenId != stored.Id)
+            {
+                throw new AuthInvalidTokenException();
+            }
+
+            //  Generate new access token
             var roles = await _userManager.GetRolesAsync(user);
             var accessToken = _jwtTokenService.GenerateToken(user, roles, sessionId);
 
+            //  Create rotated refresh token
             var replacement = await _refreshTokenService.CreateRefreshTokenAsync(
-                user.Id, ip, userAgent,
+                user.Id,
+                ip,
+                userAgent,
                 _refreshTokenSettings.RefreshTokenExpiryDays,
-                sessionId);
+                sessionId
+            );
 
+            //  Update session FIRST
+            await _userSessionService.LinkRefreshTokenToSessionAsync(
+                sessionId,
+                replacement.Id
+            );
+
+            //  Revoke old refresh token
             await _refreshTokenService.RevokeRefreshTokenAsync(
-                stored, ip, replacement.Token);
+                stored,
+                ip,
+                replacement.Token
+            );
 
+            //  Return response
             return new AuthResponseDto
             {
                 Token = accessToken,
@@ -240,9 +278,10 @@ namespace CRM.Server.Services
                 RefreshExpiresAt = replacement.ExpiresAt
             };
         }
-     
 
-public async Task LogoutAsync(
+
+
+        public async Task LogoutAsync(
     ClaimsPrincipal user,
     HttpContext context)
     {
