@@ -3,31 +3,24 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Options;
+
 using CRM.Client.Config;
 using CRM.Client.DTOs.Auth;
 using CRM.Client.Security;
 using CRM.Client.Services.Auth;
 using CRM.Client.State;
-using Microsoft.Extensions.Options;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-using static System.Net.WebRequestMethods;
-using CRM.Client.Services.Auth;
-using CRM.Client.State;
-using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Options;
 
 namespace CRM.Client.Services.Http
 {
-    // ✅ USER-DEFINED: Central HTTP communication service (REFRESH-AWARE + session handling)
+    //  USER-DEFINED: Central HTTP communication service (REFRESH-AWARE + session handling)
     public class ApiClientService
     {
         private readonly HttpClient _httpClient;
@@ -42,7 +35,7 @@ namespace CRM.Client.Services.Http
 
         public ApiClientService(
       HttpClient httpClient,
-      ApiSettings apiSettings,           // <- direct
+      ApiSettings apiSettings,           
       AppState appState,
       TokenService tokenService,
       JwtAuthStateProvider jwtAuthStateProvider,
@@ -306,6 +299,7 @@ namespace CRM.Client.Services.Http
                     var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(body, JsonOptions());
                     if (dict != null && dict.TryGetValue("error", out var err) && err == "session_expired")
                     {
+                        _appState.Ui.ShowGlobalMessage("Your session has expired. Please log in again.", "warning", 8);
                         await ForceLogoutAsync("Your session has expired. Please log in again.");
                         return response;
                     }
@@ -336,24 +330,16 @@ namespace CRM.Client.Services.Http
         {
             await AttachTokenAsync();
 
-            Console.WriteLine($"[GET] {endpoint}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.GetAsync(endpoint));
-
-            Console.WriteLine($"[GET STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
 
-            Console.WriteLine($"[GET RESPONSE] {content}");
-
             return JsonSerializer.Deserialize<T>(content, JsonOptions());
         }
 
-        // =========================
-        // Generic POST (returns data)
-        // =========================
+
         public async Task<TResponse?> PostAsync<TRequest, TResponse>(string endpoint, TRequest data)
         {
             await AttachTokenAsync();
@@ -361,15 +347,9 @@ namespace CRM.Client.Services.Http
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            Console.WriteLine($"[POST] {endpoint}");
-            Console.WriteLine($"[POST BODY] {json}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.PostAsync(endpoint, content));
 
-            Console.WriteLine($"[POST STATUS] {(int)response.StatusCode} {response.StatusCode}");
-
             var responseJson = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"[POST RESPONSE] {responseJson}");
 
             if (!response.IsSuccessStatusCode)
                 return default;
@@ -380,7 +360,7 @@ namespace CRM.Client.Services.Http
             return JsonSerializer.Deserialize<TResponse>(responseJson, JsonOptions());
         }
 
-        // POST when caller needs raw response (used for special cases like detecting password_expired)
+
         public async Task<HttpResponseMessage> PostRawAsync<TRequest>(string endpoint, TRequest data)
         {
             await AttachTokenAsync();
@@ -388,19 +368,12 @@ namespace CRM.Client.Services.Http
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            Console.WriteLine($"[POST RAW] {endpoint}");
-            Console.WriteLine($"[POST RAW BODY] {json}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.PostAsync(endpoint, content));
-
-            Console.WriteLine($"[POST RAW STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
             return response;
         }
 
-        // =========================
-        // Generic PUT (returns data)
-        // =========================
+
         public async Task<TResponse?> PutAsync<TRequest, TResponse>(string endpoint, TRequest data)
         {
             await AttachTokenAsync();
@@ -408,19 +381,12 @@ namespace CRM.Client.Services.Http
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            Console.WriteLine($"[PUT] {endpoint}");
-            Console.WriteLine($"[PUT BODY] {json}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.PutAsync(endpoint, content));
-
-            Console.WriteLine($"[PUT STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
                 return default;
 
             var responseJson = await response.Content.ReadAsStringAsync();
-
-            Console.WriteLine($"[PUT RESPONSE] {responseJson}");
 
             if (string.IsNullOrWhiteSpace(responseJson))
                 return default;
@@ -428,7 +394,7 @@ namespace CRM.Client.Services.Http
             return JsonSerializer.Deserialize<TResponse>(responseJson, JsonOptions());
         }
 
-        // PUT (no response expected)
+
         public async Task PutAsync<TRequest>(string endpoint, TRequest data)
         {
             await AttachTokenAsync();
@@ -436,17 +402,11 @@ namespace CRM.Client.Services.Http
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            Console.WriteLine($"[PUT] {endpoint}");
-            Console.WriteLine($"[PUT BODY] {json}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.PutAsync(endpoint, content));
-
-            Console.WriteLine($"[PUT STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
             response.EnsureSuccessStatusCode();
         }
 
-        // Raw PUT
         public async Task<HttpResponseMessage> PutRawAsync<TRequest>(string endpoint, TRequest data)
         {
             await AttachTokenAsync();
@@ -454,28 +414,16 @@ namespace CRM.Client.Services.Http
             var json = JsonSerializer.Serialize(data, JsonOptions());
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            Console.WriteLine($"[PUT RAW] {endpoint}");
-            Console.WriteLine($"[PUT RAW BODY] {json}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.PutAsync(endpoint, content));
-
-            Console.WriteLine($"[PUT RAW STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
             return response;
         }
 
-        // =========================
-        // Generic DELETE
-        // =========================
         public async Task DeleteAsync(string endpoint)
         {
             await AttachTokenAsync();
 
-            Console.WriteLine($"[DELETE] {endpoint}");
-
             var response = await SendWithRefreshAsync(() => _httpClient.DeleteAsync(endpoint));
-
-            Console.WriteLine($"[DELETE STATUS] {(int)response.StatusCode} {response.StatusCode}");
 
             response.EnsureSuccessStatusCode();
         }
