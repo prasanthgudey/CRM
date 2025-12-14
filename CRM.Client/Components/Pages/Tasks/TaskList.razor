@@ -1,6 +1,7 @@
 ﻿@page "/tasks"
 @layout MainLayout
 @attribute [Authorize]
+
 @using Microsoft.AspNetCore.Authorization
 @using CRM.Client.DTOs.Tasks
 @using CRM.Client.DTOs.Customers
@@ -37,9 +38,19 @@ else
                 <th>Title</th>
                 <th>Customer</th>
                 <th>User</th>
-                <th>Due Date</th>
-                <th>Priority</th>
-                <th>Status</th>
+
+                <th role="button" @onclick="@(() => SortByColumn("date"))">
+                    Due Date @SortIcon("date")
+                </th>
+
+                <th role="button" @onclick="@(() => SortByColumn("priority"))">
+                    Priority @SortIcon("priority")
+                </th>
+
+                <th role="button" @onclick="@(() => SortByColumn("status"))">
+                    Status @SortIcon("status")
+                </th>
+
                 <th>Recurring</th>
                 <th style="width:200px;">Actions</th>
             </tr>
@@ -66,7 +77,9 @@ else
                     <td>
                         @if (task.IsRecurring)
                         {
-                            <span class="badge bg-info">@task.RecurrenceType (@task.RecurrenceInterval)</span>
+                            <span class="badge bg-info">
+                                @task.RecurrenceType (@task.RecurrenceInterval)
+                            </span>
                         }
                         else
                         {
@@ -88,11 +101,10 @@ else
                 </tr>
             }
         </tbody>
-
     </table>
 
     <Pager CurrentPage="@CurrentPage"
-           PageSize="10"
+           PageSize="@PageSize"
            TotalCount="@TotalCount"
            OnPageChanged="OnPageChanged" />
 }
@@ -117,6 +129,10 @@ else
     private bool IsLoading = true;
     private bool _clamping = false;
 
+    // 🔹 SORT STATE
+    private string? SortBy = null;
+    private string SortDir = "asc";
+
     private Dictionary<Guid, string> CustomerNames = new();
     private Dictionary<string, string> UserNames = new(StringComparer.OrdinalIgnoreCase);
 
@@ -129,6 +145,80 @@ else
             StateHasChanged();
         }
     }
+
+    // ---------------- SORTING ----------------
+
+    private async Task SortByColumn(string column)
+    {
+        if (SortBy == column)
+        {
+            SortDir = SortDir == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            SortBy = column;
+            SortDir = "asc";
+        }
+
+        CurrentPage = 1;
+        await LoadPage();
+    }
+
+    private MarkupString SortIcon(string column)
+    {
+        if (SortBy != column)
+            return new("");
+
+        return SortDir == "asc"
+            ? new MarkupString(" ▲")
+            : new MarkupString(" ▼");
+    }
+
+    // ---------------- DATA ----------------
+
+    private async Task LoadPage()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        var result = await TaskService.GetPagedAsync(
+            CurrentPage,
+            PageSize,
+            search: null,
+            sortBy: SortBy,
+            sortDir: SortDir);
+
+        if (result == null)
+        {
+            Tasks = new();
+            TotalCount = 0;
+            IsLoading = false;
+            return;
+        }
+
+        if (!_clamping && CurrentPage > result.TotalPages)
+        {
+            _clamping = true;
+            CurrentPage = result.TotalPages;
+            await LoadPage();
+            _clamping = false;
+            return;
+        }
+
+        Tasks = result.Items;
+        TotalCount = result.TotalCount;
+        CurrentPage = result.Page;
+
+        IsLoading = false;
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        await LoadPage();
+    }
+
+    // ---------------- LOOKUPS ----------------
 
     private async Task LoadLookups()
     {
@@ -150,6 +240,8 @@ else
 
     private string GetUserName(string id) =>
         UserNames.TryGetValue(id, out var n) ? n : "-";
+
+    // ---------------- MODALS ----------------
 
     private void OpenCreate() => IsCreateOpen = true;
 
@@ -183,42 +275,5 @@ else
         IsDeleteOpen = false;
         SelectedTaskId = null;
         if (refresh) await LoadPage();
-    }
-
-    private async Task LoadPage()
-    {
-        IsLoading = true;
-        StateHasChanged();
-
-        var result = await TaskService.GetPagedAsync(CurrentPage, PageSize);
-
-        if (result == null)
-        {
-            Tasks = new();
-            TotalCount = 0;
-            IsLoading = false;
-            return;
-        }
-
-        if (!_clamping && CurrentPage > result.TotalPages)
-        {
-            _clamping = true;
-            CurrentPage = result.TotalPages;
-            await LoadPage();
-            _clamping = false;
-            return;
-        }
-
-        Tasks = result.Items;
-        TotalCount = result.TotalCount;
-        CurrentPage = result.Page;
-
-        IsLoading = false;
-    }
-
-    private async Task OnPageChanged(int page)
-    {
-        CurrentPage = page;
-        await LoadPage();
     }
 }

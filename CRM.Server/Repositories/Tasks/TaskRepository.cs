@@ -92,29 +92,56 @@ namespace CRM.Server.Repositories.Tasks
         {
             return await base.GetPagedAsync(parms, q =>
             {
+                // -----------------------------
+                // SEARCH (ONLY STRING FIELDS)
+                // -----------------------------
                 if (!string.IsNullOrWhiteSpace(parms.Search))
                 {
-                    var s = parms.Search!.Trim();
+                    var s = parms.Search.Trim();
+
                     q = q.Where(t =>
                         EF.Functions.Like(t.Title ?? "", $"%{s}%") ||
-                        EF.Functions.Like(t.Description ?? "", $"%{s}%") ||
-                        EF.Functions.Like(t.Priority.ToString(), $"%{s}%"));
+                        EF.Functions.Like(t.Description ?? "", $"%{s}%"));
                 }
 
-                // whitelist sorting (safe)
-                if (!string.IsNullOrWhiteSpace(parms.SortBy) && parms.SortBy!.Equals("dueDate", StringComparison.OrdinalIgnoreCase))
+                // -----------------------------
+                // SORTING (MATCHES UI VALUES)
+                // UI sends: date | priority | status
+                // -----------------------------
+                var sortBy = parms.SortBy?.ToLower();
+                var sortDir = parms.SortDir?.ToLower() ?? "asc";
+
+                q = (sortBy, sortDir) switch
                 {
-                    q = parms.SortDir?.Equals("desc", StringComparison.OrdinalIgnoreCase) == true
-                        ? q.OrderByDescending(t => t.DueDate)
-                        : q.OrderBy(t => t.DueDate);
-                }
-                else
-                {
-                    q = q.OrderByDescending(t => t.CreatedAt);
-                }
+                    // Due Date
+                    ("date", "desc") =>
+                        q.OrderByDescending(t => t.DueDate),
+
+                    ("date", _) =>
+                        q.OrderBy(t => t.DueDate),
+
+                    // Priority (enum – SAFE for OrderBy)
+                    ("priority", "desc") =>
+                        q.OrderByDescending(t => t.Priority),
+
+                    ("priority", _) =>
+                        q.OrderBy(t => t.Priority),
+
+                    // Status (enum – SAFE for OrderBy)
+                    ("status", "desc") =>
+                        q.OrderByDescending(t => t.State),
+
+                    ("status", _) =>
+                        q.OrderBy(t => t.State),
+
+                    // DEFAULT (VERY IMPORTANT for pagination)
+                    _ =>
+                        q.OrderByDescending(t => t.CreatedAt)
+                };
 
                 return q;
             });
         }
+
     }
 }
