@@ -504,32 +504,39 @@ namespace CRM.Server.Services
         // 10) Change Password (no audit here - handled in auth)
         // ============================================================
         // in UserService.cs
-        public async Task ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+        public async Task ChangePasswordAsync(
+       string userId,
+       string currentPassword,
+       string newPassword)
         {
+            if (currentPassword == newPassword)
+                throw new InvalidOperationException("New password must be different from the current password.");
+
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
                 throw new Exception("User not found");
 
-            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            var result = await _userManager.ChangePasswordAsync(
+                user, currentPassword, newPassword);
 
             if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
 
-            // Update password timestamp
             user.PasswordLastChanged = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
-
-            // OPTIONAL: revoke refresh tokens / sessions here via your JWT service or repository
-            // If you have a method like _jwtTokenService.RevokeAllTokensForUser(user.Id) - call it here.
-            // e.g. await _jwtTokenService.RevokeAllRefreshTokensAsync(user.Id);
-
-            // Note: AuthController already records audit after calling this service.
         }
 
 
 
-        public async Task ChangePasswordByEmailAsync(string email, string currentPassword, string newPassword)
+
+        public async Task ChangePasswordByEmailAsync(
+      string email,
+      string currentPassword,
+      string newPassword)
         {
+            if (currentPassword == newPassword)
+                throw new InvalidOperationException("New password must be different from the current password.");
+
             if (string.IsNullOrWhiteSpace(email))
                 throw new Exception("Invalid request");
 
@@ -537,24 +544,20 @@ namespace CRM.Server.Services
             if (user == null)
                 throw new Exception("Invalid request");
 
-            // Verify old password (knowledge proof)
             var isValid = await _userManager.CheckPasswordAsync(user, currentPassword);
             if (!isValid)
                 throw new Exception("Invalid credentials");
 
-            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            var result = await _userManager.ChangePasswordAsync(
+                user, currentPassword, newPassword);
+
             if (!result.Succeeded)
                 throw new Exception(result.Errors.First().Description);
 
-            // Update password timestamp
             user.PasswordLastChanged = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
-
-            // OPTIONAL: revoke refresh tokens / sessions via JWT service (implement later)
-            // e.g. await _jwtTokenService.RevokeAllRefreshTokensAsync(user.Id);
-
-            // NOTE: AuthController logs audit after calling service (or you can call SafeAudit here if you prefer)
         }
+
 
         // ============================================================
         // SAFE AUDIT

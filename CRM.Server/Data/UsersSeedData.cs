@@ -12,7 +12,9 @@ namespace CRM.Server.Data
             {
                 ("admin@crm.com",   "Admin@123",   "System Admin",   "Admin"),
                 ("manager@crm.com", "Manager@123", "System Manager", "Manager"),
-                ("user@crm.com",    "User@123",    "System User",    "User")
+                ("user@crm.com",    "User@123",    "System User",    "User"),
+                ("pk@crm.com","Pk@123","prasanth","Admin")
+
             };
 
             foreach (var (email, password, fullName, role) in usersToSeed)

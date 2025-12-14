@@ -4,6 +4,7 @@ using CRM.Client.Security;
 using CRM.Client.Services.Http;
 using CRM.Client.State;
 using Microsoft.AspNetCore.Components;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace CRM.Client.Services.Auth
@@ -119,13 +120,32 @@ namespace CRM.Client.Services.Auth
 
             return response;
         }
+
         // =====================================================
-        // ✅ COMPLETE REGISTRATION → POST api/auth/complete-registration
+        // ✅ FINAL MFA LOGIN → POST api/auth/mfa/login
         // =====================================================
-        public async Task<OperationResultDto?> CompleteRegistrationAsync(CompleteRegistrationDto dto)
+        public async Task<AuthResponseDto?> MfaLoginAsync(MfaLoginDto dto)
         {
-            var response = await _api.PostAsync<CompleteRegistrationDto, OperationResultDto>(
-                "api/auth/complete-registration", dto);
+            var response = await _api.PostAsync<MfaLoginDto, AuthResponseDto>(
+                "api/auth/mfa/login", dto);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Token))
+                return null;
+
+            // Update Blazor authentication state and persist tokens centrally
+            await _authProvider.MarkUserAsAuthenticated(response.Token);
+            await _tokenService.SaveTokenAsync(response.Token);
+
+            var authState = await _authProvider.GetAuthenticationStateAsync();
+            _appState.Auth.SetAuthenticated(response.Token, authState.User);
+
+            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
+            {
+                await _tokenService.SaveRefreshTokenAsync(
+                    response.RefreshToken!,
+                    response.RefreshExpiresAt
+                );
+            }
 
             return response;
         }
@@ -149,47 +169,63 @@ namespace CRM.Client.Services.Auth
             _appState.Auth.Clear();
         }
 
+        // =====================================================
+        // ✅ COMPLETE REGISTRATION → POST api/auth/complete-registration
+        // =====================================================
+        public async Task<OperationResultDto?> CompleteRegistrationAsync(CompleteRegistrationDto dto)
+        {
+            var response = await _api.PostAsync<CompleteRegistrationDto, OperationResultDto>(
+                "api/account/complete-registration", dto);
+
+            return response;
+        }
 
         // =====================================================
         // ✅ CHANGE PASSWORD → POST api/auth/change-password
         // =====================================================
         public async Task ChangePasswordAsync(ChangePasswordDto dto)
         {
-            var response = await _api.PostRawAsync("api/auth/change-password", dto);
+            var response = await _api.PostRawAsync("api/account/change-password", dto);
 
             if (response.IsSuccessStatusCode)
                 return;
 
             var raw = await response.Content.ReadAsStringAsync();
 
-            // Try to extract clean message
+            // 1️⃣ Try structured JSON error
             try
             {
-                var json = System.Text.Json.JsonDocument.Parse(raw);
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                var root = doc.RootElement;
 
-                // Case 1: Standard { message: "..." }
-                if (json.RootElement.TryGetProperty("message", out var msgProp))
-                    throw new Exception(msgProp.GetString()!);
-
-                // Case 2: ASP.NET Validation error: errors -> field -> message
-                if (json.RootElement.TryGetProperty("errors", out var errors))
+                // Case 1: { "message": "..." }
+                if (root.TryGetProperty("message", out var messageProp))
                 {
-                    foreach (var prop in errors.EnumerateObject())
-                    {
-                        var msg = prop.Value[0].GetString();
-                        if (!string.IsNullOrWhiteSpace(msg))
-                            throw new Exception(msg!);
-                    }
+                    var message = messageProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(message))
+                        throw new Exception(message);
                 }
 
-                throw new Exception("Password update failed. Check input.");
+                // Case 2: Validation errors { errors: { Field: [ "msg" ] } }
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    foreach (var errorField in errors.EnumerateObject())
+                    {
+                        var msg = errorField.Value[0].GetString();
+                        if (!string.IsNullOrWhiteSpace(msg))
+                            throw new Exception(msg);
+                    }
+                }
             }
-            catch
+            catch (System.Text.Json.JsonException)
             {
-                // fallback: raw message
-                throw new Exception("Password update failed. Please try again.");
+                // Not JSON → fall through
             }
+
+            // 3️⃣ Final fallback (only if nothing usable found)
+            throw new Exception("Password update failed. Please try again.");
         }
+
 
 
 
@@ -200,7 +236,7 @@ namespace CRM.Client.Services.Auth
         public async Task ForgotPasswordAsync(ForgotPasswordDto dto)
         {
             await _api.PostAsync<ForgotPasswordDto, object>(
-                "api/auth/forgot-password", dto);
+                "api/account/forgot-password", dto);
         }
 
         // =====================================================
@@ -210,7 +246,7 @@ namespace CRM.Client.Services.Auth
         public async Task<AuthResponseDto?> ResetPasswordAsync(ResetPasswordDto dto)
         {
             var response = await _api.PostAsync<ResetPasswordDto, AuthResponseDto>(
-                "api/auth/reset-password", dto);
+                "api/account/reset-password", dto);
 
             if (response == null)
                 return null;
@@ -243,30 +279,68 @@ namespace CRM.Client.Services.Auth
         // =====================================================
         public async Task<AuthResponseDto?> ChangeExpiredPasswordAsync(ChangeExpiredPasswordDto dto)
         {
-            var response = await _api.PostAsync<ChangeExpiredPasswordDto, AuthResponseDto>(
-                "api/auth/change-expired-password", dto);
+            var response = await _api.PostRawAsync(
+                "api/account/change-expired-password", dto);
 
-            if (response == null)
-                return null;
-
-            if (!string.IsNullOrWhiteSpace(response.Token))
+            if (response.IsSuccessStatusCode)
             {
-                await _authProvider.MarkUserAsAuthenticated(response.Token);
-                await _tokenService.SaveTokenAsync(response.Token);
+                var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
 
-                var authState = await _authProvider.GetAuthenticationStateAsync();
-                _appState.Auth.SetAuthenticated(response.Token, authState.User);
+                if (auth == null)
+                    return null;
+
+                // ✅ Auto-login (this flow is allowed to do this)
+                if (!string.IsNullOrWhiteSpace(auth.Token))
+                {
+                    await _authProvider.MarkUserAsAuthenticated(auth.Token);
+                    await _tokenService.SaveTokenAsync(auth.Token);
+
+                    var authState = await _authProvider.GetAuthenticationStateAsync();
+                    _appState.Auth.SetAuthenticated(auth.Token, authState.User);
+                }
+
+                if (!string.IsNullOrWhiteSpace(auth.RefreshToken))
+                {
+                    await _tokenService.SaveRefreshTokenAsync(
+                        auth.RefreshToken!,
+                        auth.RefreshExpiresAt
+                    );
+                }
+
+                return auth;
             }
 
-            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
+            // ❌ Error handling (same pattern as ChangePassword)
+            var raw = await response.Content.ReadAsStringAsync();
+
+            try
             {
-                await _tokenService.SaveRefreshTokenAsync(
-                    response.RefreshToken!,
-                    response.RefreshExpiresAt
-                );
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("message", out var msgProp))
+                {
+                    var msg = msgProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(msg))
+                        throw new Exception(msg);
+                }
+
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    foreach (var prop in errors.EnumerateObject())
+                    {
+                        var msg = prop.Value[0].GetString();
+                        if (!string.IsNullOrWhiteSpace(msg))
+                            throw new Exception(msg);
+                    }
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // not JSON, ignore
             }
 
-            return response;
+            throw new Exception("Password update failed. Please try again.");
         }
 
         // =====================================================
@@ -275,7 +349,7 @@ namespace CRM.Client.Services.Auth
         public async Task<EnableMfaResponseDto?> EnableMfaAsync()
         {
             return await _api.PostAsync<object, EnableMfaResponseDto>(
-                "api/auth/mfa/enable", new { });
+                "api/account/mfa/enable", new { });
         }
 
         // =====================================================
@@ -284,7 +358,7 @@ namespace CRM.Client.Services.Auth
         public async Task VerifyMfaAsync(VerifyMfaDto dto)
         {
             await _api.PostAsync<VerifyMfaDto, object>(
-                "api/auth/mfa/verify", dto);
+                "api/account/mfa/verify", dto);
         }
 
         // =====================================================
@@ -293,37 +367,10 @@ namespace CRM.Client.Services.Auth
         public async Task DisableMfaAsync(string code)
         {
             await _api.PostAsync<object, object>(
-                "api/auth/mfa/disable",
+                "api/account/mfa/disable",
                 new { code });
         }
 
-        // =====================================================
-        // ✅ FINAL MFA LOGIN → POST api/auth/mfa/login
-        // =====================================================
-        public async Task<AuthResponseDto?> MfaLoginAsync(MfaLoginDto dto)
-        {
-            var response = await _api.PostAsync<MfaLoginDto, AuthResponseDto>(
-                "api/auth/mfa/login", dto);
-
-            if (response == null || string.IsNullOrWhiteSpace(response.Token))
-                return null;
-
-            // Update Blazor authentication state and persist tokens centrally
-            await _authProvider.MarkUserAsAuthenticated(response.Token);
-            await _tokenService.SaveTokenAsync(response.Token);
-
-            var authState = await _authProvider.GetAuthenticationStateAsync();
-            _appState.Auth.SetAuthenticated(response.Token, authState.User);
-
-            if (!string.IsNullOrWhiteSpace(response.RefreshToken))
-            {
-                await _tokenService.SaveRefreshTokenAsync(
-                    response.RefreshToken!,
-                    response.RefreshExpiresAt
-                );
-            }
-
-            return response;
-        }
+    
     }
 }

@@ -123,12 +123,6 @@ namespace CRM.Server.Services
             var existing = _repo.GetById(id)
                 ?? throw new Exception("Task not found");
 
-            //if (dto.DueDate.HasValue && dto.DueDate.Value < DateTime.Today)
-            //{
-            //    _logger.LogWarning("Invalid DueDate {DueDate} for task {Id}", dto.DueDate.Value, id);
-            //    throw new Exception("Due date cannot be in the past.");
-            //}
-
             var oldValue = JsonSerializer.Serialize(existing);
             var oldState = existing.State;
 
@@ -139,11 +133,7 @@ namespace CRM.Server.Services
                 existing.Description = dto.Description;
 
             if (dto.DueDate.HasValue)
-            {
-                
-
                 existing.DueDate = dto.DueDate.Value;
-            }
 
             if (dto.Priority.HasValue)
                 existing.Priority = dto.Priority.Value;
@@ -153,6 +143,14 @@ namespace CRM.Server.Services
 
             if (existing.State == TaskState.Completed)
                 existing.CompletedAt = DateTime.UtcNow;
+
+            // 🔴 ADD HERE (VERY IMPORTANT)
+            if (dto.CustomerId.HasValue && dto.CustomerId.Value != existing.CustomerId)
+                existing.CustomerId = dto.CustomerId.Value;
+
+            if (!string.IsNullOrWhiteSpace(dto.UserId) && dto.UserId != existing.CreatedByUserId)
+                existing.CreatedByUserId = dto.UserId;
+            // 🔴 END
 
             if (dto.IsRecurring.HasValue)
                 existing.IsRecurring = dto.IsRecurring.Value;
@@ -170,7 +168,6 @@ namespace CRM.Server.Services
 
             var newValue = JsonSerializer.Serialize(updated);
 
-            // ✅ Status Change separate audit
             if (dto.State.HasValue && oldState != updated.State)
             {
                 await SafeAudit(
@@ -196,8 +193,9 @@ namespace CRM.Server.Services
 
             _logger.LogInformation("Task {Id} updated successfully", id);
 
-            return await Task.FromResult(ToResponseDto(updated));
+            return ToResponseDto(updated);
         }
+
 
         // ============================================================
         // ✅ DELETE TASK + AUDIT
