@@ -22,10 +22,11 @@ namespace CRM.Server.Dtos
 
         public TaskState? State { get; set; }
 
-        // -------------------------
-        // Recurring settings (optional)
-        // -------------------------
+        // ✅ ADD THESE
+        public Guid? CustomerId { get; set; }
+        public string? UserId { get; set; }
 
+        // Recurring
         public bool? IsRecurring { get; set; }
 
         public RecurrenceType? RecurrenceType { get; set; }
