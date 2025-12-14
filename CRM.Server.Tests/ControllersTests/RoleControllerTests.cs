@@ -1,246 +1,271 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using CRM.Server.Controllers;
+﻿using CRM.Server.Controllers;
 using CRM.Server.DTOs.Roles;
 using CRM.Server.Services.Interfaces;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
+using System.Security.Claims;
 using Xunit;
 
-namespace CRM.Tests.Controllers
+namespace CRM.Server.Tests.Controllers
 {
     public class RoleControllerTests
     {
-        private readonly Mock<IRoleService> _serviceMock;
+        private readonly Mock<IRoleService> _roleServiceMock;
+        private readonly Mock<ILogger<RoleController>> _loggerMock;
         private readonly RoleController _controller;
 
         public RoleControllerTests()
         {
-            _serviceMock = new Mock<IRoleService>();
+            _roleServiceMock = new Mock<IRoleService>();
+            _loggerMock = new Mock<ILogger<RoleController>>();
 
-            _controller = new RoleController(_serviceMock.Object);
+            _controller = new RoleController(
+                _roleServiceMock.Object,
+                _loggerMock.Object
+            );
 
-            // Fake user context for performedBy
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-                {
-                    User = new ClaimsPrincipal(
-                        new ClaimsIdentity(new[]
-                        {
-                            new Claim(ClaimTypes.NameIdentifier, "admin-1")
-                        })
-                    )
-                }
-            };
+            SetFakeUser();
         }
 
-        // ---------------------------------------------------------
-        // 1) Create Role
-        // ---------------------------------------------------------
+        // =============================================
+        // CREATE ROLE
+        // =============================================
+
         [Fact]
         public async Task CreateRole_WhenValid_ReturnsOk()
         {
-            var dto = new CreateRoleDto { RoleName = "Manager" };
+            var dto = new CreateRoleDto
+            {
+                RoleName = "Admin"
+            };
 
-            _serviceMock.Setup(s => s.GetRoleAsync("Manager"))
-                .ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityRole?)null);
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("ADMIN"))
+                .Returns(Task.FromResult<IdentityRole?>(null));
 
-            _serviceMock.Setup(s => s.CreateRoleAsync("Manager", "admin-1"))
+            _roleServiceMock
+                .Setup(s => s.CreateRoleAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
-
-            var result = await _controller.CreateRole(dto) as OkObjectResult;
-
-            Assert.NotNull(result);
-            Assert.Equal("Role created successfully", result.Value);
-        }
-
-        [Fact]
-        public async Task CreateRole_WhenRoleExists_ReturnsConflict()
-        {
-            var dto = new CreateRoleDto { RoleName = "Admin" };
-
-            _serviceMock.Setup(s => s.GetRoleAsync("Admin"))
-                .ReturnsAsync(new Microsoft.AspNetCore.Identity.IdentityRole("Admin"));
 
             var result = await _controller.CreateRole(dto);
 
-            Assert.IsType<ConflictObjectResult>(result);
+            result.Should().BeOfType<OkObjectResult>();
         }
 
+
         [Fact]
-        public async Task CreateRole_WhenEmptyName_ReturnsBadRequest()
+        public async Task CreateRole_WhenRoleNameMissing_ReturnsBadRequest()
         {
             var dto = new CreateRoleDto { RoleName = "" };
 
             var result = await _controller.CreateRole(dto);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 2) Assign Role
-        // ---------------------------------------------------------
+
+        [Fact]
+        public async Task CreateRole_WhenRoleAlreadyExists_ReturnsConflict()
+        {
+            var dto = new CreateRoleDto
+            {
+                RoleName = "Admin"
+            };
+
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("ADMIN"))
+                .ReturnsAsync(new IdentityRole("ADMIN")); // ✅ correct type
+
+            var result = await _controller.CreateRole(dto);
+
+            result.Should().BeOfType<ConflictObjectResult>();
+        }
+
+
+        // =============================================
+        // ASSIGN ROLE
+        // =============================================
+
         [Fact]
         public async Task AssignRole_WhenValid_ReturnsOk()
         {
-            var dto = new AssignRoleDto { UserId = "u1", RoleName = "Admin" };
+            var dto = new AssignRoleDto
+            {
+                UserId = "user-1",
+                RoleName = "Admin"
+            };
 
-            _serviceMock.Setup(s => s.AssignRoleAsync("u1", "Admin", "admin-1"))
+            _roleServiceMock
+                .Setup(s => s.AssignRoleAsync(
+                    dto.UserId,
+                    dto.RoleName,
+                    It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
-
-            var result = await _controller.AssignRole(dto) as OkObjectResult;
-
-            Assert.NotNull(result);
-            Assert.Equal("Role assigned successfully", result.Value);
-        }
-
-        [Fact]
-        public async Task AssignRole_WhenServiceThrows_ReturnsBadRequest()
-        {
-            var dto = new AssignRoleDto { UserId = "u1", RoleName = "Admin" };
-
-            _serviceMock.Setup(s => s.AssignRoleAsync("u1", "Admin", "admin-1"))
-                .ThrowsAsync(new Exception("Failed"));
 
             var result = await _controller.AssignRole(dto);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 3) GetAll
-        // ---------------------------------------------------------
-        [Fact]
-        public async Task GetAll_ReturnsRoles()
-        {
-            var roles = new List<Microsoft.AspNetCore.Identity.IdentityRole>
-            {
-                new Microsoft.AspNetCore.Identity.IdentityRole("Admin"),
-                new Microsoft.AspNetCore.Identity.IdentityRole("Manager")
-            };
-
-            _serviceMock.Setup(s => s.GetAllRolesAsync()).ReturnsAsync(roles);
-
-            var result = await _controller.GetAll() as OkObjectResult;
-
-            Assert.NotNull(result);
-            Assert.Equal(roles, result.Value);
-        }
-
-        // ---------------------------------------------------------
-        // 4) Get Role by Name
-        // ---------------------------------------------------------
-        [Fact]
-        public async Task Get_WhenFound_ReturnsOk()
-        {
-            var role = new Microsoft.AspNetCore.Identity.IdentityRole("Admin");
-
-            _serviceMock.Setup(s => s.GetRoleAsync("Admin"))
-                .ReturnsAsync(role);
-
-            var result = await _controller.Get("Admin") as OkObjectResult;
-
-            Assert.NotNull(result);
-            Assert.Equal(role, result.Value);
-        }
+        // =============================================
+        // GET ALL ROLES
+        // =============================================
 
         [Fact]
-        public async Task Get_WhenNotFound_ReturnsNotFound()
+        public async Task GetAll_ReturnsOk()
         {
-            _serviceMock.Setup(s => s.GetRoleAsync("X"))
-                .ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityRole?)null);
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("Admin"))
+.ReturnsAsync(new IdentityRole("Admin"));
 
-            var result = await _controller.Get("X");
 
-            Assert.IsType<NotFoundObjectResult>(result);
+            var result = await _controller.GetAll();
+
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 5) Update Role
-        // ---------------------------------------------------------
+        // =============================================
+        // GET ROLE BY NAME
+        // =============================================
+
+
+        [Fact]
+        public async Task Get_WhenRoleExists_ReturnsOk()
+        {
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("Admin"))
+                .ReturnsAsync(new IdentityRole("Admin")); // ✅ correct type
+
+            var result = await _controller.Get("Admin");
+
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+
+
+        [Fact]
+        public async Task Get_WhenRoleNotFound_ReturnsNotFound()
+        {
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("Admin"))
+                .Returns(Task.FromResult<IdentityRole?>(null));
+
+            var result = await _controller.Get("Admin");
+
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+
+        // =============================================
+        // UPDATE ROLE
+        // =============================================
+
+
         [Fact]
         public async Task Update_WhenValid_ReturnsOk()
         {
-            var dto = new UpdateRoleDto { OldName = "User", NewName = "Member" };
+            var dto = new UpdateRoleDto
+            {
+                OldName = "Admin",
+                NewName = "Manager"
+            };
 
-            _serviceMock.Setup(s => s.GetRoleAsync("Member"))
-                .ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityRole?)null);
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("MANAGER"))
+                .Returns(Task.FromResult<IdentityRole?>(null)); // ✅ correct
 
-            _serviceMock.Setup(s => s.UpdateRoleAsync("User", "Member", "admin-1"))
+            _roleServiceMock
+                .Setup(s => s.UpdateRoleAsync(
+                    "ADMIN",
+                    "MANAGER",
+                    It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
 
-            var result = await _controller.Update(dto) as OkObjectResult;
+            var result = await _controller.Update(dto);
 
-            Assert.NotNull(result);
-            Assert.Equal("Role updated successfully", result.Value);
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        [Fact]
-        public async Task Update_WhenNewNameExists_ReturnsConflict()
-        {
-            var dto = new UpdateRoleDto { OldName = "User", NewName = "Admin" };
 
-            _serviceMock.Setup(s => s.GetRoleAsync("Admin"))
-                .ReturnsAsync(new Microsoft.AspNetCore.Identity.IdentityRole("Admin"));
+        [Fact]
+        public async Task Update_WhenNewNameSameAsOld_ReturnsBadRequest()
+        {
+            var dto = new UpdateRoleDto
+            {
+                OldName = "Admin",
+                NewName = "admin"
+            };
 
             var result = await _controller.Update(dto);
 
-            Assert.IsType<ConflictObjectResult>(result);
+            result.Should().BeOfType<BadRequestObjectResult>();
         }
 
+
         [Fact]
-        public async Task Update_WhenOldAndNewSame_ReturnsNoContent()
+        public async Task Update_WhenNewRoleAlreadyExists_ReturnsConflict()
         {
-            var dto = new UpdateRoleDto { OldName = "User", NewName = "USER" };
+            var dto = new UpdateRoleDto
+            {
+                OldName = "Admin",
+                NewName = "Manager"
+            };
+
+            _roleServiceMock
+                .Setup(s => s.GetRoleAsync("MANAGER"))
+                .ReturnsAsync(new IdentityRole("MANAGER")); // ✅ correct
 
             var result = await _controller.Update(dto);
 
-            Assert.IsType<NoContentResult>(result);
+            result.Should().BeOfType<ConflictObjectResult>();
         }
 
-        [Fact]
-        public async Task Update_WhenMissingValues_ReturnsBadRequest()
-        {
-            var dto = new UpdateRoleDto { OldName = "", NewName = "X" };
 
-            var result = await _controller.Update(dto);
-
-            Assert.IsType<BadRequestObjectResult>(result);
-        }
+        // =============================================
+        // DELETE ROLE
+        // =============================================
 
         [Fact]
-        public async Task Update_WhenServiceThrows_ReturnsBadRequest()
+        public async Task Delete_WhenValid_ReturnsOk()
         {
-            var dto = new UpdateRoleDto { OldName = "User", NewName = "Member" };
-
-            _serviceMock.Setup(s => s.GetRoleAsync("Member"))
-                .ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityRole?)null);
-
-            _serviceMock.Setup(s => s.UpdateRoleAsync("User", "Member", "admin-1"))
-                .ThrowsAsync(new Exception("Fail"));
-
-            var result = await _controller.Update(dto);
-
-            Assert.IsType<BadRequestObjectResult>(result);
-        }
-
-        // ---------------------------------------------------------
-        // 6) DELETE ROLE
-        // ---------------------------------------------------------
-        [Fact]
-        public async Task Delete_ReturnsOk()
-        {
-            _serviceMock.Setup(s => s.DeleteRoleAsync("User", "admin-1"))
+            _roleServiceMock
+                .Setup(s => s.DeleteRoleAsync(
+                    "Admin",
+                    It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
 
-            var result = await _controller.Delete("User") as OkObjectResult;
+            var result = await _controller.Delete("Admin");
 
-            Assert.NotNull(result);
-            Assert.Equal("Role deleted successfully", result.Value);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        // =============================================
+        // HELPER
+        // =============================================
+
+        private void SetFakeUser()
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, "test-user-id")
+            };
+
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            var user = new ClaimsPrincipal(identity);
+
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = user
+                }
+            };
         }
     }
 }

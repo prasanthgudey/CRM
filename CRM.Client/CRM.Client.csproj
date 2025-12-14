@@ -13,4 +13,9 @@
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\images\" />
+    <Folder Include="wwwroot\NewFolder\" />
+  </ItemGroup>
+
 </Project>

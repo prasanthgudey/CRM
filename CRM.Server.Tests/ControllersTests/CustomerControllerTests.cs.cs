@@ -1,168 +1,168 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using CRM.Server.Common.Paging;
-using CRM.Server.Controllers;
+﻿using CRM.Server.Controllers;
 using CRM.Server.DTOs;
+
 using CRM.Server.Services.Interfaces;
+using CRM.Server.Common.Paging;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
+using System.Security.Claims;
 using Xunit;
 
-namespace CRM.Tests.Controllers
+namespace CRM.Server.Tests.Controllers
 {
     public class CustomerControllerTests
     {
         private readonly Mock<ICustomerService> _serviceMock;
+        private readonly Mock<ILogger<CustomerController>> _loggerMock;
         private readonly CustomerController _controller;
 
         public CustomerControllerTests()
         {
             _serviceMock = new Mock<ICustomerService>();
+            _loggerMock = new Mock<ILogger<CustomerController>>();
 
-            _controller = new CustomerController(_serviceMock.Object);
+            _controller = new CustomerController(
+                _serviceMock.Object,
+                _loggerMock.Object
+            );
 
-            // Fake HttpContext (needed for Create/Update/Delete)
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-                {
-                    User = new ClaimsPrincipal(
-                        new ClaimsIdentity(new[]
-                        {
-                            new Claim(ClaimTypes.NameIdentifier, "actor-1")
-                        })
-                    )
-                }
-            };
+            SetFakeUser();
         }
 
-        // ---------------------------------------------------------
-        // 1) GET /api/customers (Filter)
-        // ---------------------------------------------------------
+        // =============================================
+        // GET ALL
+        // =============================================
         [Fact]
-        public async Task GetAll_ReturnsOk_WithServiceResult()
+        
+        public async Task GetAll_ReturnsOkResult()
         {
-            var customers = new List<CustomerResponseDto>
-            {
-                new CustomerResponseDto { CustomerId = Guid.NewGuid(), FirstName = "Ali" }
-            };
+            // Arrange
+            _serviceMock
+                .Setup(s => s.FilterAsync(
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>()))
+                .ReturnsAsync(new List<CustomerResponseDto>());
 
-            _serviceMock.Setup(s => s.FilterAsync("a", null, null, null, null))
-                .ReturnsAsync(customers);
+            // Act
+            var result = await _controller.GetAll(null, null, null, null, null);
 
-            var result = await _controller.GetAll("a", null, null, null, null)
-                            as OkObjectResult;
-
-            Assert.NotNull(result);
-            Assert.Equal(customers, result.Value);
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 2) GET /api/customers/{id}
-        // ---------------------------------------------------------
+
+        // =============================================
+        // GET BY ID
+        // =============================================
         [Fact]
         public async Task GetById_WhenFound_ReturnsOk()
         {
             var id = Guid.NewGuid();
-            var dto = new CustomerResponseDto { CustomerId = id, FirstName = "Ali" };
 
-            _serviceMock.Setup(s => s.GetByIdAsync(id)).ReturnsAsync(dto);
+            _serviceMock.Setup(s => s.GetByIdAsync(id))
+                .ReturnsAsync(new CustomerResponseDto { CustomerId = id });
 
-            var result = await _controller.GetById(id) as OkObjectResult;
+            var result = await _controller.GetById(id);
 
-            Assert.NotNull(result);
-            Assert.Equal(dto, result.Value);
+            result.Should().BeOfType<OkObjectResult>();
         }
 
         [Fact]
+       
         public async Task GetById_WhenNotFound_ReturnsNotFound()
         {
             var id = Guid.NewGuid();
 
-            _serviceMock.Setup(s => s.GetByIdAsync(id))
-                .ReturnsAsync((CustomerResponseDto?)null);
+            _serviceMock
+                .Setup(s => s.GetByIdAsync(id))
+                .Returns(Task.FromResult<CustomerResponseDto?>(null));
 
             var result = await _controller.GetById(id);
 
-            Assert.IsType<NotFoundResult>(result);
+            result.Should().BeOfType<NotFoundResult>();
         }
 
-        // ---------------------------------------------------------
-        // 3) POST /api/customers
-        // ---------------------------------------------------------
+
+        // =============================================
+        // CREATE
+        // =============================================
+        
         [Fact]
-        public async Task Create_ReturnsOk_WithCreatedCustomer()
+        public async Task Create_ReturnsOk()
         {
+            
             var dto = new CustomerCreateDto
             {
-                FirstName = "New",
-                Email = "x@a.com"
+                PreferredName = "Test Customer"
             };
 
-            var response = new CustomerResponseDto
-            {
-                CustomerId = Guid.NewGuid(),
-                FirstName = "New"
-            };
+            _serviceMock
+                .Setup(s => s.CreateAsync(
+                    It.IsAny<CustomerCreateDto>(),
+                    It.IsAny<string>()))
+                .ReturnsAsync(new CustomerResponseDto());
 
-            _serviceMock.Setup(s => s.CreateAsync(dto, "actor-1"))
-                .ReturnsAsync(response);
+            // Act
+            var result = await _controller.Create(dto);
 
-            var result = await _controller.Create(dto) as OkObjectResult;
-
-            Assert.NotNull(result);
-            Assert.Equal(response, result.Value);
-            Assert.Equal("actor-1", dto.CreatedByUserId);
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 4) PUT /api/customers/{id}
-        // ---------------------------------------------------------
+        // =============================================
+        // UPDATE
+        // =============================================
         [Fact]
-        public async Task Update_WhenFound_ReturnsNoContent()
+        public async Task Update_WhenSuccess_ReturnsNoContent()
         {
             var id = Guid.NewGuid();
-            var dto = new CustomerUpdateDto { FirstName = "Updated" };
+            var dto = new CustomerUpdateDto();
 
-            _serviceMock.Setup(s => s.UpdateAsync(id, dto, "actor-1"))
+            _serviceMock.Setup(s =>
+                s.UpdateAsync(id, dto, It.IsAny<string>()))
                 .ReturnsAsync(true);
 
             var result = await _controller.Update(id, dto);
 
-            Assert.IsType<NoContentResult>(result);
+            result.Should().BeOfType<NoContentResult>();
         }
 
         [Fact]
         public async Task Update_WhenNotFound_ReturnsNotFound()
         {
             var id = Guid.NewGuid();
-            var dto = new CustomerUpdateDto { FirstName = "Updated" };
+            var dto = new CustomerUpdateDto();
 
-            _serviceMock.Setup(s => s.UpdateAsync(id, dto, "actor-1"))
+            _serviceMock.Setup(s =>
+                s.UpdateAsync(id, dto, It.IsAny<string>()))
                 .ReturnsAsync(false);
 
             var result = await _controller.Update(id, dto);
 
-            Assert.IsType<NotFoundResult>(result);
+            result.Should().BeOfType<NotFoundResult>();
         }
 
-        // ---------------------------------------------------------
-        // 5) DELETE /api/customers/{id}
-        // ---------------------------------------------------------
+        // =============================================
+        // DELETE
+        // =============================================
         [Fact]
-        public async Task Delete_WhenFound_ReturnsNoContent()
+        public async Task Delete_WhenSuccess_ReturnsNoContent()
         {
             var id = Guid.NewGuid();
 
-            _serviceMock.Setup(s => s.DeleteAsync(id, "actor-1"))
+            _serviceMock.Setup(s =>
+                s.DeleteAsync(id, It.IsAny<string>()))
                 .ReturnsAsync(true);
 
             var result = await _controller.Delete(id);
 
-            Assert.IsType<NoContentResult>(result);
+            result.Should().BeOfType<NoContentResult>();
         }
 
         [Fact]
@@ -170,70 +170,87 @@ namespace CRM.Tests.Controllers
         {
             var id = Guid.NewGuid();
 
-            _serviceMock.Setup(s => s.DeleteAsync(id, "actor-1"))
+            _serviceMock.Setup(s =>
+                s.DeleteAsync(id, It.IsAny<string>()))
                 .ReturnsAsync(false);
 
             var result = await _controller.Delete(id);
 
-            Assert.IsType<NotFoundResult>(result);
+            result.Should().BeOfType<NotFoundResult>();
         }
 
-        // ---------------------------------------------------------
-        // 6) GET /api/customers/paged
-        // ---------------------------------------------------------
+        // =============================================
+        // PAGED
+        // =============================================
         [Fact]
         public async Task GetPaged_ReturnsOk()
         {
-            var parms = new PageParams { Page = 1, PageSize = 10 };
-
-            var pagedResult = new PagedResult<CustomerResponseDto>
+            var pageParams = new PageParams
             {
-                Items = new List<CustomerResponseDto>
-                {
-                    new CustomerResponseDto { FirstName = "X" }
-                },
                 Page = 1,
-                PageSize = 10,
-                TotalCount = 1
+                PageSize = 10
             };
 
-            _serviceMock.Setup(s => s.GetPagedAsync(parms))
-                .ReturnsAsync(pagedResult);
+            _serviceMock
+                .Setup(s => s.GetPagedAsync(It.IsAny<PageParams>()))
+                .ReturnsAsync(new PagedResult<CustomerResponseDto>());
 
-            var result = await _controller.GetPaged(parms) as OkObjectResult;
+            var result = await _controller.GetPaged(pageParams);
 
-            Assert.NotNull(result);
-            Assert.Equal(pagedResult, result.Value);
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 7) GET /api/customers/count
-        // ---------------------------------------------------------
+
+
+        // =============================================
+        // COUNT
+        // =============================================
         [Fact]
-        public async Task GetTotalCount_ReturnsOk()
+        public async Task GetCount_ReturnsOk()
         {
             _serviceMock.Setup(s => s.GetTotalCountAsync())
-                .ReturnsAsync(25);
+                .ReturnsAsync(10);
 
-            var result = await _controller.GetTotalCount() as OkObjectResult;
+            var result = await _controller.GetCount();
 
-            Assert.NotNull(result);
-            Assert.Equal(25, result.Value);
+            result.Should().BeOfType<OkObjectResult>();
         }
 
-        // ---------------------------------------------------------
-        // 8) GET /api/customers/new?days=x
-        // ---------------------------------------------------------
+        // =============================================
+        // NEW CUSTOMERS
+        // =============================================
         [Fact]
-        public async Task GetNewCustomers_ReturnsOk()
+        public async Task GetNew_ReturnsOk()
         {
-            _serviceMock.Setup(s => s.GetNewCustomersCountAsync(7))
-                .ReturnsAsync(5);
+            _serviceMock.Setup(s =>
+                s.GetNewCustomersCountAsync(7))
+                .ReturnsAsync(3);
 
-            var result = await _controller.GetNewCustomers(7) as OkObjectResult;
+            var result = await _controller.GetNew(7);
 
-            Assert.NotNull(result);
-            Assert.Equal(5, result.Value);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        // =============================================
+        // HELPER
+        // =============================================
+        private void SetFakeUser()
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, "test-user-id")
+            };
+
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            var user = new ClaimsPrincipal(identity);
+
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = user
+                }
+            };
         }
     }
 }

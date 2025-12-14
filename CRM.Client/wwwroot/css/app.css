@@ -873,3 +873,11 @@ textarea + .validation-message {
     background-color: #f8d7da !important; /* light red */
 }
 
+.nav-title {
+    font-size: 1.4rem; /* ⬅ increase text size */
+    font-weight: 700; /* bold */
+    letter-spacing: 0.8px;
+    color: #2563eb; /* primary blue */
+}
+
+
