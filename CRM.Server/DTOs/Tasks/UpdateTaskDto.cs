@@ -10,6 +10,10 @@ namespace CRM.Server.Dtos
         public TaskPriority? Priority { get; set; }
         public TaskState? State { get; set; }
 
+        // ✅ ADD THESE
+        public Guid? CustomerId { get; set; }
+        public string? UserId { get; set; }
+
         // Recurring
         public bool? IsRecurring { get; set; }
         public RecurrenceType? RecurrenceType { get; set; }

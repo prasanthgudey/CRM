@@ -221,6 +221,10 @@
     {
         if (Task == null) return;
 
+        // 🔴 THIS WAS MISSING
+        Model.CustomerId = Guid.Parse(SelectedCustomerIdString!);
+        Model.UserId = SelectedUserId!;
+
         IsLoading = true;
         try
         {
