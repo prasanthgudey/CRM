@@ -26,6 +26,7 @@ namespace CRM.Server.Controllers
         [HttpGet("paged")]
         public async Task<IActionResult> GetAll([FromQuery] PageParams parms)
         {
+
             var result = await _service.GetPagedAsync(parms);
             return Ok(result);
         }
