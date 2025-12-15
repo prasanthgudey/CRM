@@ -3,6 +3,7 @@
 @attribute [Authorize]
 
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using CRM.Client.DTOs.Tasks
 @using CRM.Client.DTOs.Customers
 @using CRM.Client.DTOs.Users
@@ -15,11 +16,14 @@
 @inject TaskService TaskService
 @inject CustomerService CustomerService
 @inject UserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <h3>Tasks</h3>
 
 <div class="mb-3 d-flex gap-2 align-items-center">
-    <button class="btn btn-primary" @onclick="OpenCreate">+ New Task</button>
+    <button class="btn btn-primary" @onclick="OpenCreate">
+        + New Task
+    </button>
 </div>
 
 @if (IsLoading)
@@ -37,7 +41,11 @@ else
             <tr>
                 <th>Title</th>
                 <th>Customer</th>
-                <th>User</th>
+
+                @if (IsAdmin)
+                {
+                    <th>User</th>
+                }
 
                 <th role="button" @onclick="@(() => SortByColumn("date"))">
                     Due Date @SortIcon("date")
@@ -69,7 +77,12 @@ else
                 <tr class="@rowClass">
                     <td>@task.Title</td>
                     <td>@GetCustomerName(task.CustomerId)</td>
-                    <td>@GetUserName(task.UserId)</td>
+
+                    @if (IsAdmin)
+                    {
+                        <td>@GetUserName(task.UserId)</td>
+                    }
+
                     <td>@task.DueDate.ToString("dd MMM yyyy")</td>
                     <td>@task.Priority</td>
                     <td>@task.State</td>
@@ -114,6 +127,10 @@ else
 <DeleteTaskModal IsOpen="@IsDeleteOpen" TaskId="@SelectedTaskId" OnClose="HandleDeleteClosed" />
 
 @code {
+
+    // ======================
+    // STATE
+    // ======================
     private List<TaskResponseDto> Tasks = new();
     private TaskResponseDto? SelectedTask;
     private Guid? SelectedTaskId;
@@ -122,38 +139,46 @@ else
     private bool IsEditOpen;
     private bool IsDeleteOpen;
 
+    private bool IsAdmin;
+
     private int CurrentPage = 1;
     private const int PageSize = 10;
-    private long TotalCount = 0;
+    private long TotalCount;
 
     private bool IsLoading = true;
-    private bool _clamping = false;
+    private bool _clamping;
 
-    // 🔹 SORT STATE
-    private string? SortBy = null;
+    // SORT
+    private string? SortBy;
     private string SortDir = "asc";
 
+    // LOOKUPS
     private Dictionary<Guid, string> CustomerNames = new();
     private Dictionary<string, string> UserNames = new(StringComparer.OrdinalIgnoreCase);
 
+    // ======================
+    // LIFECYCLE
+    // ======================
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            await LoadLookups();
-            await LoadPage();
-            StateHasChanged();
-        }
+        if (!firstRender) return;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        IsAdmin = authState.User.IsInRole("Admin");
+
+        await LoadLookups();
+        await LoadPage();
+
+        StateHasChanged();
     }
 
-    // ---------------- SORTING ----------------
-
+    // ======================
+    // SORTING
+    // ======================
     private async Task SortByColumn(string column)
     {
         if (SortBy == column)
-        {
             SortDir = SortDir == "asc" ? "desc" : "asc";
-        }
         else
         {
             SortBy = column;
@@ -174,8 +199,9 @@ else
             : new MarkupString(" ▼");
     }
 
-    // ---------------- DATA ----------------
-
+    // ======================
+    // DATA
+    // ======================
     private async Task LoadPage()
     {
         IsLoading = true;
@@ -208,7 +234,6 @@ else
         Tasks = result.Items;
         TotalCount = result.TotalCount;
         CurrentPage = result.Page;
-
         IsLoading = false;
     }
 
@@ -218,21 +243,26 @@ else
         await LoadPage();
     }
 
-    // ---------------- LOOKUPS ----------------
-
+    // ======================
+    // LOOKUPS
+    // ======================
     private async Task LoadLookups()
     {
         var customers = await CustomerService.GetAllAsync();
         if (customers != null)
+        {
             foreach (var c in customers)
                 CustomerNames[c.CustomerId] = $"{c.FirstName} {c.SurName}".Trim();
+        }
 
         var users = await UserService.GetAllUsersAsync();
         if (users != null)
+        {
             foreach (var u in users)
                 UserNames[u.Id] = string.IsNullOrWhiteSpace(u.FullName)
                     ? u.Email
                     : $"{u.FullName} ({u.Email})";
+        }
     }
 
     private string GetCustomerName(Guid id) =>
@@ -241,13 +271,14 @@ else
     private string GetUserName(string id) =>
         UserNames.TryGetValue(id, out var n) ? n : "-";
 
-    // ---------------- MODALS ----------------
-
+    // ======================
+    // MODALS
+    // ======================
     private void OpenCreate() => IsCreateOpen = true;
 
-    private void OpenEdit(TaskResponseDto t)
+    private void OpenEdit(TaskResponseDto task)
     {
-        SelectedTask = t;
+        SelectedTask = task;
         IsEditOpen = true;
     }
 

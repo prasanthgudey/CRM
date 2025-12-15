@@ -26,6 +26,14 @@ namespace CRM.Server.Controllers
         [HttpGet("paged")]
         public async Task<IActionResult> GetAll([FromQuery] PageParams parms)
         {
+            var loggedInUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isAdmin = User.IsInRole("Admin");
+
+            // 👤 If NOT admin → force user scope
+            if (!isAdmin)
+            {
+                parms.UserId = loggedInUserId;
+            }
 
             var result = await _service.GetPagedAsync(parms);
             return Ok(result);

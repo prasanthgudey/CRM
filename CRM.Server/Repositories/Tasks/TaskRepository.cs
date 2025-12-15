@@ -92,6 +92,12 @@ namespace CRM.Server.Repositories.Tasks
         {
             return await base.GetPagedAsync(parms, q =>
             {
+                // 🔒 USER FILTER (APPLIED ONLY WHEN SET)
+                if (!string.IsNullOrWhiteSpace(parms.UserId))
+                {
+                    q = q.Where(t => t.CreatedByUserId == parms.UserId);
+                }
+
                 // -----------------------------
                 // SEARCH (ONLY STRING FIELDS)
                 // -----------------------------
@@ -120,14 +126,14 @@ namespace CRM.Server.Repositories.Tasks
                     ("date", _) =>
                         q.OrderBy(t => t.DueDate),
 
-                    // Priority (enum – SAFE for OrderBy)
+                    // Priority
                     ("priority", "desc") =>
                         q.OrderByDescending(t => t.Priority),
 
                     ("priority", _) =>
                         q.OrderBy(t => t.Priority),
 
-                    // Status (enum – SAFE for OrderBy)
+                    // Status
                     ("status", "desc") =>
                         q.OrderByDescending(t => t.State),
 
@@ -142,6 +148,5 @@ namespace CRM.Server.Repositories.Tasks
                 return q;
             });
         }
-
     }
 }

@@ -15,5 +15,7 @@ namespace CRM.Server.Common.Paging
         public string? Search { get; set; }
         public string? SortBy { get; set; }
         public string? SortDir { get; set; } = "desc"; // "asc" or "desc"
+
+        public string? UserId { get; set; }
     }
 }
